@@ -36,9 +36,9 @@ anyhow = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
 
-# Terminal UI
-crossterm = "0.27"
-ratatui = { version = "0.26", optional = true }
+# Terminal UI (uses workspace versions)
+crossterm = { workspace = true }
+ratatui = { workspace = true, optional = true }
 
 # Colors and styling
 colored = "2.1"

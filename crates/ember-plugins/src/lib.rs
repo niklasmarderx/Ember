@@ -116,9 +116,19 @@ pub mod prelude {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+
     #[test]
-    fn test_crate_compiles() {
-        // Basic compilation test
-        assert!(true);
+    fn test_runtime_config_default() {
+        let config = RuntimeConfig::default();
+        // Verify the config can be created
+        assert!(config.default_memory_limit > 0);
+    }
+
+    #[test]
+    fn test_plugin_manifest_creation() {
+        let manifest = PluginManifest::new("test", "1.0.0", "Test plugin");
+        assert_eq!(manifest.name, "test");
+        assert_eq!(manifest.version, "1.0.0");
     }
 }

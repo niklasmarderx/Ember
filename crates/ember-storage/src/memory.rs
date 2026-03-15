@@ -203,11 +203,9 @@ impl VectorMemory {
         metadata: Option<serde_json::Value>,
     ) -> Result<DocId> {
         let mut doc = Document::new(content);
-        if let Some(meta) = metadata {
-            if let serde_json::Value::Object(map) = meta {
-                for (k, v) in map {
-                    doc = doc.with_metadata(k, v);
-                }
+        if let Some(serde_json::Value::Object(map)) = metadata {
+            for (k, v) in map {
+                doc = doc.with_metadata(k, v);
             }
         }
         self.add(doc).await

@@ -39,7 +39,8 @@ impl ToolDefinition {
         }
     }
 
-    /// Convert to ember_llm ToolDefinition for use with the agent.
+    /// Convert to `ember_llm` `ToolDefinition` for use with the agent.
+    #[must_use]
     pub fn to_llm_definition(&self) -> LLMToolDefinition {
         LLMToolDefinition {
             name: self.name.clone(),
@@ -48,7 +49,8 @@ impl ToolDefinition {
         }
     }
 
-    /// Create from ember_llm ToolDefinition.
+    /// Create from `ember_llm` `ToolDefinition`.
+    #[must_use]
     pub fn from_llm_definition(def: &LLMToolDefinition) -> Self {
         Self {
             name: def.name.clone(),
@@ -160,7 +162,7 @@ impl ToolOutput {
         }
     }
 
-    /// Convert to ember_llm ToolResult for use with the agent.
+    /// Convert to `ember_llm` `ToolResult` for use with the agent.
     pub fn to_llm_result(&self, tool_call_id: impl Into<String>) -> LLMToolResult {
         if self.success {
             LLMToolResult::success(tool_call_id, &self.output)
@@ -233,7 +235,7 @@ impl ToolRegistry {
             .collect()
     }
 
-    /// Get all tool definitions as ember_llm types for use with the agent.
+    /// Get all tool definitions as `ember_llm` types for use with the agent.
     pub fn llm_tool_definitions(&self) -> Vec<LLMToolDefinition> {
         self.tools
             .values()

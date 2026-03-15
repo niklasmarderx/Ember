@@ -20,7 +20,7 @@ pub fn render(frame: &mut Frame, app: &App) {
             Constraint::Length(3), // Input
             Constraint::Length(1), // Status bar
         ])
-        .split(frame.size());
+        .split(frame.area());
 
     render_chat(frame, app, chunks[0]);
     render_input(frame, app, chunks[1]);
@@ -124,10 +124,10 @@ fn render_input(frame: &mut Frame, app: &App, area: Rect) {
 
     // Set cursor position
     if matches!(app.state, AppState::Input) && !app.input.is_empty() {
-        frame.set_cursor(
+        frame.set_cursor_position((
             area.x + app.cursor as u16 + 1, // +1 for border
             area.y + 1,
-        );
+        ));
     }
 }
 
@@ -165,7 +165,7 @@ fn render_status_bar(frame: &mut Frame, app: &App, area: Rect) {
 
 /// Render help overlay
 fn render_help(frame: &mut Frame) {
-    let area = centered_rect(60, 50, frame.size());
+    let area = centered_rect(60, 50, frame.area());
     frame.render_widget(Clear, area);
 
     let help_text = vec![

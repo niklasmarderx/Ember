@@ -15,7 +15,7 @@ members = [
 [workspace.package]
 version = "0.1.0"
 edition = "2021"
-rust-version = "1.75"
+rust-version = "1.83"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/ember-ai/ember"
 homepage = "https://ember.dev"
@@ -84,12 +84,12 @@ dirs = "5"
 regex = "1"
 
 # WASM runtime (for plugins)
-wasmtime = "19"
-wasmtime-wasi = "19"
+wasmtime = "29"
+wasmtime-wasi = "29"
 
 # TUI (Terminal UI)
-ratatui = "0.26"
-crossterm = "0.27"
+ratatui = "0.29"
+crossterm = "0.28"
 
 # Testing
 mockall = "0.12"

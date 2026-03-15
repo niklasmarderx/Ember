@@ -29,8 +29,8 @@ tokio = { workspace = true, features = ["process", "fs", "io-util"] }
 # Async trait support
 async-trait = { workspace = true }
 
-# HTTP client for web tools
-reqwest = { version = "0.12", features = ["json"], optional = true }
+# HTTP client for web tools (uses workspace config with rustls-tls)
+reqwest = { workspace = true, optional = true }
 
 # Path handling
 dirs = "5.0"

@@ -81,9 +81,16 @@ pub mod prelude {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+
     #[test]
-    fn test_crate_compiles() {
-        // Basic compilation test
-        assert!(true);
+    fn test_storage_error_display() {
+        // Basic test that error types can be created and displayed
+        let err = StorageError::NotFound {
+            entity: "test".to_string(),
+            id: "123".to_string(),
+        };
+        let display = format!("{}", err);
+        assert!(!display.is_empty());
     }
 }

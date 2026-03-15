@@ -6,6 +6,13 @@
 //!   ember config init                    # Initialize configuration
 //!   ember config show                    # Show current configuration
 
+#![allow(clippy::too_many_arguments)]
+#![allow(clippy::wildcard_in_or_patterns)]
+#![allow(clippy::if_same_then_else)]
+#![allow(clippy::manual_div_ceil)]
+#![allow(clippy::derivable_impls)]
+#![allow(clippy::module_name_repetitions)]
+
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
 use colored::Colorize;

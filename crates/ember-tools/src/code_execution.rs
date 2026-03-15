@@ -642,7 +642,7 @@ mod tests {
 
     // Integration tests require actual runtimes
     #[tokio::test]
-    #[ignore] // Run with: cargo test -- --ignored
+    #[ignore = "requires Python runtime - run with: cargo test -- --ignored"]
     async fn test_python_execution() {
         let tool = CodeExecutionTool::new();
         if !tool.is_available(Language::Python).await {
@@ -658,7 +658,7 @@ mod tests {
     }
 
     #[tokio::test]
-    #[ignore]
+    #[ignore = "requires Node.js runtime - run with: cargo test -- --ignored"]
     async fn test_javascript_execution() {
         let tool = CodeExecutionTool::new();
         if !tool.is_available(Language::JavaScript).await {
@@ -674,7 +674,7 @@ mod tests {
     }
 
     #[tokio::test]
-    #[ignore]
+    #[ignore = "requires Python runtime - run with: cargo test -- --ignored"]
     async fn test_timeout() {
         let mut config = CodeExecutionConfig::default();
         config.timeout = Duration::from_millis(100);

@@ -9,9 +9,7 @@
 //! - Concurrent request handling
 
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
-use ember_llm::{CompletionRequest, LLMProvider, Message, OllamaProvider};
-use std::time::Duration;
-use tokio::runtime::Runtime;
+use ember_llm::{CompletionRequest, Message, OllamaProvider};
 
 /// Benchmark provider creation
 fn bench_provider_creation(c: &mut Criterion) {
@@ -77,10 +75,10 @@ fn bench_conversation_sizes(c: &mut Criterion) {
                 let mut request = CompletionRequest::new("llama3.2");
                 for i in 0..size {
                     if i % 2 == 0 {
-                        request = request.with_message(Message::user(&format!("Message {}", i)));
+                        request = request.with_message(Message::user(format!("Message {}", i)));
                     } else {
                         request =
-                            request.with_message(Message::assistant(&format!("Response {}", i)));
+                            request.with_message(Message::assistant(format!("Response {}", i)));
                     }
                 }
                 black_box(request)

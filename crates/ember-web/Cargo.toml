@@ -57,4 +57,4 @@ askama = { version = "0.12", optional = true }
 
 [dev-dependencies]
 tokio-test = "0.4"
-reqwest = { version = "0.12", features = ["json"] }
+reqwest = { workspace = true }

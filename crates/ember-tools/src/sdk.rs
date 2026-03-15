@@ -15,9 +15,8 @@
 //! ## Example: Basic Tool
 //!
 //! ```rust,no_run
-//! use ember_tools::sdk::{SimpleTool, SimpleToolConfig};
+//! use ember_tools::sdk::SimpleTool;
 //! use ember_tools::{ToolRegistry, ToolOutput};
-//! use serde_json::Value;
 //!
 //! // Create a simple tool using the builder pattern
 //! let greeting_tool = SimpleTool::builder("greet")
@@ -28,8 +27,7 @@
 //!             .and_then(|v| v.as_str())
 //!             .unwrap_or("World");
 //!         Ok(ToolOutput::success(format!("Hello, {}!", name)))
-//!     })
-//!     .build();
+//!     });
 //!
 //! let mut registry = ToolRegistry::new();
 //! registry.register(greeting_tool);

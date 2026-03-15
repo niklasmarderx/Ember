@@ -324,8 +324,7 @@ impl SqliteStorage {
         let tags_json = memory
             .tags
             .as_ref()
-            .map(|t| serde_json::to_string(t).ok())
-            .flatten();
+            .and_then(|t| serde_json::to_string(t).ok());
 
         let conn = self.conn.lock().await;
         conn.execute(
