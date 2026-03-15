@@ -283,17 +283,75 @@ docker pull ghcr.io/niklasmarderx/Ember
 
 ---
 
-## Contributing
+## Join the Ember Community
 
-We welcome contributions! Ember is designed to be easy to understand and extend.
+<div align="center">
+
+**Ember is built by developers, for developers.**
+
+We believe the best AI tooling should be open, fast, and accessible to everyone.
+
+</div>
+
+### Ways to Contribute
+
+| Contribution | Description | Difficulty |
+|---|---|---|
+| **Report Bugs** | Found an issue? Open a GitHub issue | Easy |
+| **Improve Docs** | Help others get started faster | Easy |
+| **Add Examples** | Share your use cases | Easy |
+| **New Providers** | Add support for more LLMs (Google, Mistral, etc.) | Medium |
+| **New Tools** | Build tools others can use | Medium |
+| **Core Features** | Help with the agent runtime | Advanced |
+| **WASM Plugins** | Extend the plugin system | Advanced |
+
+### Good First Issues
+
+We label beginner-friendly issues with `good first issue`. Perfect for your first PR!
+
+[View Good First Issues](https://github.com/niklasmarderx/Ember/labels/good%20first%20issue)
+
+### Getting Started
 
 ```bash
+# Clone the repository
 git clone https://github.com/niklasmarderx/Ember
 cd Ember
-./quickstart.sh  # Builds everything, sets up config
+
+# Run the quickstart script (builds and configures everything)
+./quickstart.sh
+
+# Run tests
+cargo test --workspace
+
+# Run the CLI
+cargo run -p ember-cli -- chat "Hello!"
 ```
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+### Project Structure
+
+```
+ember/
+├── crates/
+│   ├── ember-core/      # Agent runtime, memory, context
+│   ├── ember-llm/       # LLM providers (OpenAI, Anthropic, Ollama, Groq)
+│   ├── ember-tools/     # Built-in tools (shell, filesystem, web, git)
+│   ├── ember-storage/   # SQLite, vector database
+│   ├── ember-plugins/   # WASM plugin system
+│   ├── ember-cli/       # Command-line interface
+│   └── ember-web/       # Web UI and REST API
+├── examples/            # Code examples
+├── docs/                # Documentation
+└── extensions/          # VS Code extension
+```
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelines.
+
+### Contributors
+
+<!-- ALL-CONTRIBUTORS-LIST:START -->
+Your name could be here! Submit your first PR today.
+<!-- ALL-CONTRIBUTORS-LIST:END -->
 
 ---
 
@@ -309,7 +367,11 @@ MIT License - see [LICENSE-MIT](LICENSE-MIT)
 
 Built with Rust. Built for speed. Built for developers who ship.
 
-[Get Started](#quick-start-30-seconds) | [Star on GitHub](https://github.com/niklasmarderx/Ember)
+**If Ember helps you, please consider giving us a star - it helps others discover the project!**
+
+[![Star on GitHub](https://img.shields.io/github/stars/niklasmarderx/Ember?style=social)](https://github.com/niklasmarderx/Ember)
+
+[Get Started](#quick-start-30-seconds) | [Report Bug](https://github.com/niklasmarderx/Ember/issues) | [Request Feature](https://github.com/niklasmarderx/Ember/issues)
 
 ---
 
