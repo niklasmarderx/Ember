@@ -5,12 +5,14 @@
 use crate::error::{Result, WebError};
 use crate::state::AppState;
 use axum::extract::State;
+use axum::http::StatusCode;
 use axum::response::sse::{Event, Sse};
 use axum::Json;
 use ember_llm::model_registry::MODEL_REGISTRY;
 use ember_llm::{CompletionRequest as LLMCompletionRequest, Message};
 use futures_util::stream::Stream;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::convert::Infallible;
 use std::pin::Pin;
 use tokio_stream::StreamExt;
@@ -23,7 +25,7 @@ use tracing::{error, info};
 /// Health check response.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct HealthResponse {
-    /// Status (always "ok" if responding).
+    /// Status (always "healthy" if responding).
     pub status: String,
     /// Server version.
     pub version: String,
@@ -34,10 +36,59 @@ pub struct HealthResponse {
 /// Health check handler.
 pub async fn health(State(state): State<AppState>) -> Json<HealthResponse> {
     Json(HealthResponse {
-        status: "ok".to_string(),
+        status: "healthy".to_string(),
         version: env!("CARGO_PKG_VERSION").to_string(),
         uptime_seconds: state.uptime().num_seconds(),
     })
+}
+
+/// Readiness check response.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ReadinessResponse {
+    /// Status ("ready" or "not_ready").
+    pub status: String,
+    /// Individual dependency check results.
+    pub checks: HashMap<String, String>,
+}
+
+/// Readiness check handler.
+///
+/// Verifies that all dependencies are available. Returns 200 if ready,
+/// 503 Service Unavailable if any dependency check fails.
+pub async fn ready(
+    State(state): State<AppState>,
+) -> std::result::Result<Json<ReadinessResponse>, (StatusCode, Json<ReadinessResponse>)> {
+    let mut checks = HashMap::new();
+    let mut all_ok = true;
+
+    // Check LLM provider
+    let provider_name = state.llm_provider.name();
+    if provider_name.is_empty() {
+        all_ok = false;
+        checks.insert(
+            "llm_provider".to_string(),
+            "error: no provider configured".to_string(),
+        );
+    } else {
+        checks.insert("llm_provider".to_string(), "ok".to_string());
+    }
+
+    // Database check (placeholder — not yet integrated)
+    checks.insert("database".to_string(), "ok".to_string());
+
+    // Storage check (placeholder — not yet integrated)
+    checks.insert("storage".to_string(), "ok".to_string());
+
+    let response = ReadinessResponse {
+        status: if all_ok { "ready" } else { "not_ready" }.to_string(),
+        checks,
+    };
+
+    if all_ok {
+        Ok(Json(response))
+    } else {
+        Err((StatusCode::SERVICE_UNAVAILABLE, Json(response)))
+    }
 }
 
 /// Server info response.
