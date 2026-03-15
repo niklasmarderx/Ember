@@ -2,6 +2,7 @@
 //!
 //! This module defines the shared state available to all handlers.
 
+use crate::websocket::StreamManager;
 use ember_core::CostPredictor;
 use ember_llm::{LLMProvider, OllamaProvider, OpenAIProvider};
 use std::sync::Arc;
@@ -107,6 +108,8 @@ pub struct AppState {
     pub llm_provider: Arc<dyn LLMProvider>,
     /// Cost predictor for budget management.
     pub cost_predictor: Arc<CostPredictor>,
+    /// Stream manager for WebSocket connections.
+    pub stream_manager: Arc<StreamManager>,
 }
 
 impl AppState {
@@ -135,6 +138,7 @@ impl AppState {
             started_at: chrono::Utc::now(),
             llm_provider,
             cost_predictor: Arc::new(CostPredictor::default()),
+            stream_manager: Arc::new(StreamManager::new()),
         }
     }
 
@@ -146,6 +150,7 @@ impl AppState {
             started_at: chrono::Utc::now(),
             llm_provider: provider,
             cost_predictor: Arc::new(CostPredictor::default()),
+            stream_manager: Arc::new(StreamManager::new()),
         }
     }
 

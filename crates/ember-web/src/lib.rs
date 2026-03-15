@@ -42,6 +42,10 @@
 //!
 //! ## Tools
 //! - `GET /api/v1/tools` - List available tools
+//!
+//! ## WebSocket
+//! - `WS /api/v1/ws` - WebSocket connection for real-time streaming
+//! - `GET /api/v1/streams` - Get active stream information
 
 #![deny(missing_docs)]
 #![deny(unsafe_code)]
@@ -50,6 +54,7 @@ pub mod error;
 pub mod handlers;
 pub mod routes;
 pub mod state;
+pub mod websocket;
 
 // Re-exports
 pub use error::{ErrorResponse, Result, WebError};
@@ -60,6 +65,7 @@ pub use handlers::{
 };
 pub use routes::{create_router, create_router_with_static, paths, API_PREFIX};
 pub use state::{AppState, LLMProviderType, ServerConfig};
+pub use websocket::{ClientMessage, ServerMessage, StreamManager, StreamsInfoResponse};
 
 use std::net::SocketAddr;
 use tokio::net::TcpListener;

@@ -4,6 +4,7 @@
 
 use crate::handlers;
 use crate::state::AppState;
+use crate::websocket::{get_streams_info, websocket_handler};
 use axum::routing::{delete, get, post, put};
 use axum::Router;
 use tower_http::cors::{Any, CorsLayer};
@@ -42,7 +43,10 @@ pub fn create_router(state: AppState) -> Router {
         .route("/usage", get(handlers::get_usage_stats))
         .route("/budget", get(handlers::get_budget_config))
         .route("/budget", put(handlers::update_budget_config))
-        .route("/recommendations", get(handlers::get_recommendations));
+        .route("/recommendations", get(handlers::get_recommendations))
+        // WebSocket & Streaming
+        .route("/ws", get(websocket_handler))
+        .route("/streams", get(get_streams_info));
 
     let mut router = Router::new()
         .nest("/api/v1", api_routes)
@@ -98,7 +102,10 @@ pub fn create_router_with_static(state: AppState, static_dir: &str) -> Router {
         .route("/usage", get(handlers::get_usage_stats))
         .route("/budget", get(handlers::get_budget_config))
         .route("/budget", put(handlers::update_budget_config))
-        .route("/recommendations", get(handlers::get_recommendations));
+        .route("/recommendations", get(handlers::get_recommendations))
+        // WebSocket & Streaming
+        .route("/ws", get(websocket_handler))
+        .route("/streams", get(get_streams_info));
 
     // Static file service for frontend
     let serve_dir = ServeDir::new(static_dir);
@@ -154,6 +161,10 @@ pub mod paths {
     pub const BUDGET: &str = "/budget";
     /// Recommendations endpoint.
     pub const RECOMMENDATIONS: &str = "/recommendations";
+    /// WebSocket endpoint for real-time streaming.
+    pub const WS: &str = "/ws";
+    /// Active streams info endpoint.
+    pub const STREAMS: &str = "/streams";
 }
 
 #[cfg(test)]
