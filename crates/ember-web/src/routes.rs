@@ -141,7 +141,13 @@ pub fn create_router(state: AppState) -> Router {
 pub fn create_router_api_only(state: AppState) -> Router {
     let api_routes = create_api_routes();
 
+    // Root-level health/readiness endpoints for Kubernetes probes and load balancers
+    let health_routes = Router::new()
+        .route("/health", get(handlers::health))
+        .route("/ready", get(handlers::ready));
+
     let mut router = Router::new()
+        .merge(health_routes)
         .nest("/api/v1", api_routes)
         .with_state(state.clone());
 
@@ -200,10 +206,16 @@ pub fn create_router_with_static(state: AppState, static_dir: &str) -> Router {
         .route("/ws", get(websocket_handler))
         .route("/streams", get(get_streams_info));
 
+    // Root-level health/readiness endpoints for Kubernetes probes and load balancers
+    let health_routes = Router::new()
+        .route("/health", get(handlers::health))
+        .route("/ready", get(handlers::ready));
+
     // Static file service for frontend
     let serve_dir = ServeDir::new(static_dir);
 
     let mut router = Router::new()
+        .merge(health_routes)
         .nest("/api/v1", api_routes)
         .fallback_service(serve_dir)
         .with_state(state.clone());
@@ -228,8 +240,10 @@ pub const API_PREFIX: &str = "/api/v1";
 
 /// API endpoint paths.
 pub mod paths {
-    /// Health check endpoint.
+    /// Health check endpoint (root-level, for Kubernetes liveness probes).
     pub const HEALTH: &str = "/health";
+    /// Readiness check endpoint (root-level, for Kubernetes readiness probes).
+    pub const READY: &str = "/ready";
     /// Server info endpoint.
     pub const INFO: &str = "/info";
     /// Chat endpoint (non-streaming).
@@ -333,6 +347,40 @@ mod tests {
             .oneshot(
                 Request::builder()
                     .uri("/api/v1/tools")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn test_root_health_endpoint() {
+        let app = create_test_app();
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .uri("/health")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn test_root_ready_endpoint() {
+        let app = create_test_app();
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .uri("/ready")
                     .body(Body::empty())
                     .unwrap(),
             )
