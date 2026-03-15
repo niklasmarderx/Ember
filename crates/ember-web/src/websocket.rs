@@ -151,7 +151,7 @@ pub enum ServerMessage {
 // =============================================================================
 
 /// Active stream state (internal)
-struct ActiveStream {
+pub(crate) struct ActiveStream {
     /// Unique stream identifier
     id: String,
     /// Model being used
@@ -281,13 +281,13 @@ async fn handle_socket(socket: WebSocket, state: AppState) {
     info!(client_id = client_id, "WebSocket client connected");
 
     let (mut ws_sender, mut ws_receiver) = socket.split();
-    
+
     // Channel for sending messages to this client
     let (msg_tx, mut msg_rx) = mpsc::channel::<ServerMessage>(256);
-    
+
     // Current active stream for this connection
     let current_stream: Arc<RwLock<Option<String>>> = Arc::new(RwLock::new(None));
-    
+
     // Task to forward messages to WebSocket
     let msg_sender = tokio::spawn(async move {
         while let Some(msg) = msg_rx.recv().await {
@@ -308,12 +308,10 @@ async fn handle_socket(socket: WebSocket, state: AppState) {
     while let Some(msg) = FuturesStreamExt::next(&mut ws_receiver).await {
         let msg = match msg {
             Ok(WsMessage::Text(text)) => text,
-            Ok(WsMessage::Binary(data)) => {
-                match String::from_utf8(data) {
-                    Ok(s) => s,
-                    Err(_) => continue,
-                }
-            }
+            Ok(WsMessage::Binary(data)) => match String::from_utf8(data) {
+                Ok(s) => s,
+                Err(_) => continue,
+            },
             Ok(WsMessage::Ping(_)) => continue,
             Ok(WsMessage::Pong(_)) => continue,
             Ok(WsMessage::Close(_)) => break,
@@ -326,11 +324,13 @@ async fn handle_socket(socket: WebSocket, state: AppState) {
         let client_msg: ClientMessage = match serde_json::from_str(&msg) {
             Ok(m) => m,
             Err(e) => {
-                let _ = msg_tx.send(ServerMessage::Error {
-                    stream_id: None,
-                    code: "parse_error".to_string(),
-                    message: format!("Invalid message format: {}", e),
-                }).await;
+                let _ = msg_tx
+                    .send(ServerMessage::Error {
+                        stream_id: None,
+                        code: "parse_error".to_string(),
+                        message: format!("Invalid message format: {}", e),
+                    })
+                    .await;
                 continue;
             }
         };
@@ -359,24 +359,26 @@ async fn handle_socket(socket: WebSocket, state: AppState) {
                 let (stream, mut cancel_rx) = stream_manager
                     .register_stream(stream_id.clone(), model_name.clone(), conv_id.clone())
                     .await;
-                
+
                 *current_stream.write().await = Some(stream_id.clone());
 
                 // Send stream start
-                let _ = msg_tx.send(ServerMessage::StreamStart {
-                    stream_id: stream_id.clone(),
-                    model: model_name.clone(),
-                    conversation_id: conv_id.clone(),
-                }).await;
+                let _ = msg_tx
+                    .send(ServerMessage::StreamStart {
+                        stream_id: stream_id.clone(),
+                        model: model_name.clone(),
+                        conversation_id: conv_id.clone(),
+                    })
+                    .await;
 
                 // Build LLM request
                 let mut llm_request = LLMCompletionRequest::new(&model_name);
-                
+
                 if let Some(sys) = system_prompt {
                     llm_request = llm_request.with_message(Message::system(&sys));
                 }
                 llm_request = llm_request.with_message(Message::user(&message));
-                
+
                 if let Some(temp) = temperature {
                     llm_request = llm_request.with_temperature(temp);
                 }
@@ -416,9 +418,9 @@ async fn handle_socket(socket: WebSocket, state: AppState) {
                                                 if let Some(content) = chunk.content {
                                                     token_index += 1;
                                                     stream_clone.tokens_generated.fetch_add(1, Ordering::SeqCst);
-                                                    
+
                                                     let elapsed = start_time.elapsed().as_millis() as u64;
-                                                    
+
                                                     // Send token
                                                     let _ = msg_tx_clone.send(ServerMessage::Token {
                                                         stream_id: stream_id_clone.clone(),
@@ -435,14 +437,14 @@ async fn handle_socket(socket: WebSocket, state: AppState) {
                                                         } else {
                                                             0.0
                                                         };
-                                                        
+
                                                         let _ = msg_tx_clone.send(ServerMessage::Progress {
                                                             stream_id: stream_id_clone.clone(),
                                                             tokens_generated: tokens as u32,
                                                             elapsed_ms: elapsed,
                                                             tokens_per_second: tps,
                                                         }).await;
-                                                        
+
                                                         last_progress_update = std::time::Instant::now();
                                                     }
                                                 }
@@ -454,7 +456,7 @@ async fn handle_socket(socket: WebSocket, state: AppState) {
                                                     let finish_reason = chunk.finish_reason
                                                         .map(|r| format!("{:?}", r))
                                                         .unwrap_or_else(|| "unknown".to_string());
-                                                    
+
                                                     let _ = msg_tx_clone.send(ServerMessage::StreamComplete {
                                                         stream_id: stream_id_clone.clone(),
                                                         total_tokens,
@@ -476,7 +478,7 @@ async fn handle_socket(socket: WebSocket, state: AppState) {
                                                 // Stream ended without finish reason
                                                 let total_tokens = stream_clone.tokens_generated.load(Ordering::SeqCst) as u32;
                                                 let total_duration = start_time.elapsed().as_millis() as u64;
-                                                
+
                                                 let _ = msg_tx_clone.send(ServerMessage::StreamComplete {
                                                     stream_id: stream_id_clone.clone(),
                                                     total_tokens,
@@ -492,11 +494,13 @@ async fn handle_socket(socket: WebSocket, state: AppState) {
                         }
                         Err(e) => {
                             let error_msg: String = e.to_string();
-                            let _ = msg_tx_clone.send(ServerMessage::Error {
-                                stream_id: Some(stream_id_clone.clone()),
-                                code: "provider_error".to_string(),
-                                message: error_msg,
-                            }).await;
+                            let _ = msg_tx_clone
+                                .send(ServerMessage::Error {
+                                    stream_id: Some(stream_id_clone.clone()),
+                                    code: "provider_error".to_string(),
+                                    message: error_msg,
+                                })
+                                .await;
                         }
                     }
 
@@ -515,27 +519,33 @@ async fn handle_socket(socket: WebSocket, state: AppState) {
 
             ClientMessage::PauseStream => {
                 if let Some(stream_id) = current_stream.read().await.as_ref() {
-                    let _ = msg_tx.send(ServerMessage::StreamPaused {
-                        stream_id: stream_id.clone(),
-                    }).await;
+                    let _ = msg_tx
+                        .send(ServerMessage::StreamPaused {
+                            stream_id: stream_id.clone(),
+                        })
+                        .await;
                 }
             }
 
             ClientMessage::ResumeStream => {
                 if let Some(stream_id) = current_stream.read().await.as_ref() {
-                    let _ = msg_tx.send(ServerMessage::StreamResumed {
-                        stream_id: stream_id.clone(),
-                    }).await;
+                    let _ = msg_tx
+                        .send(ServerMessage::StreamResumed {
+                            stream_id: stream_id.clone(),
+                        })
+                        .await;
                 }
             }
 
             ClientMessage::Ping => {
-                let _ = msg_tx.send(ServerMessage::Pong {
-                    timestamp_ms: std::time::SystemTime::now()
-                        .duration_since(std::time::UNIX_EPOCH)
-                        .unwrap_or_default()
-                        .as_millis() as u64,
-                }).await;
+                let _ = msg_tx
+                    .send(ServerMessage::Pong {
+                        timestamp_ms: std::time::SystemTime::now()
+                            .duration_since(std::time::UNIX_EPOCH)
+                            .unwrap_or_default()
+                            .as_millis() as u64,
+                    })
+                    .await;
             }
 
             ClientMessage::Subscribe { channel } => {
@@ -590,7 +600,7 @@ pub struct StreamInfo {
 pub async fn get_streams_info(State(state): State<AppState>) -> axum::Json<StreamsInfoResponse> {
     let manager = &state.stream_manager;
     let streams_map = manager.streams.read().await;
-    
+
     let streams: Vec<StreamInfo> = streams_map
         .values()
         .map(|s| {
@@ -601,7 +611,7 @@ pub async fn get_streams_info(State(state): State<AppState>) -> axum::Json<Strea
             } else {
                 0.0
             };
-            
+
             StreamInfo {
                 id: s.id.clone(),
                 model: s.model.clone(),
@@ -655,7 +665,7 @@ mod tests {
     #[tokio::test]
     async fn test_stream_manager() {
         let manager = StreamManager::new();
-        
+
         let (stream, _cancel_rx) = manager
             .register_stream(
                 "test-123".to_string(),
@@ -663,10 +673,10 @@ mod tests {
                 "conv-456".to_string(),
             )
             .await;
-        
+
         assert_eq!(stream.id, "test-123");
         assert_eq!(manager.active_stream_count().await, 1);
-        
+
         manager.remove_stream("test-123").await;
         assert_eq!(manager.active_stream_count().await, 0);
     }
@@ -675,13 +685,13 @@ mod tests {
     fn test_client_count() {
         let manager = StreamManager::new();
         assert_eq!(manager.client_count(), 0);
-        
+
         manager.add_client();
         assert_eq!(manager.client_count(), 1);
-        
+
         manager.add_client();
         assert_eq!(manager.client_count(), 2);
-        
+
         manager.remove_client();
         assert_eq!(manager.client_count(), 1);
     }

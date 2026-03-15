@@ -43,10 +43,11 @@ use tracing::info;
 // =============================================================================
 
 /// Type of plugin functionality
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum PluginType {
     /// A tool plugin that can be called by the agent
+    #[default]
     Tool,
     /// A provider plugin (LLM provider)
     Provider,
@@ -58,12 +59,6 @@ pub enum PluginType {
     Hook,
     /// A custom plugin type
     Custom,
-}
-
-impl Default for PluginType {
-    fn default() -> Self {
-        Self::Tool
-    }
 }
 
 /// Plugin category for organization
@@ -238,11 +233,7 @@ impl PluginBuilder {
     }
 
     /// Add a dependency
-    pub fn dependency(
-        mut self,
-        name: impl Into<String>,
-        version: impl Into<String>,
-    ) -> Self {
+    pub fn dependency(mut self, name: impl Into<String>, version: impl Into<String>) -> Self {
         self.dependencies.insert(name.into(), version.into());
         self
     }
@@ -257,7 +248,9 @@ impl PluginBuilder {
     pub fn build(self) -> Result<PluginDefinition> {
         // Validate
         if self.name.is_empty() {
-            return Err(PluginError::InvalidManifest("Plugin name is required".to_string()));
+            return Err(PluginError::InvalidManifest(
+                "Plugin name is required".to_string(),
+            ));
         }
 
         if self.exports.is_empty() {
@@ -268,7 +261,7 @@ impl PluginBuilder {
 
         let mut manifest = PluginManifest::new(&self.name, &self.version, &self.description)
             .with_capabilities(self.capabilities.clone());
-        
+
         // Add exports one by one since with_exports doesn't exist
         for export in self.exports.clone() {
             manifest = manifest.with_export(export);
@@ -550,7 +543,8 @@ impl PluginValidator {
         if !Self::is_valid_name(&plugin.manifest.name) {
             errors.push(ValidationError {
                 code: "E002".to_string(),
-                message: "Plugin name must be lowercase, alphanumeric, with dashes only".to_string(),
+                message: "Plugin name must be lowercase, alphanumeric, with dashes only"
+                    .to_string(),
                 location: Some("manifest.name".to_string()),
             });
         }
@@ -596,7 +590,9 @@ impl PluginValidator {
                 warnings.push(ValidationWarning {
                     code: "W002".to_string(),
                     message: "Plugin has no description".to_string(),
-                    suggestion: Some("Add a description to help users understand the plugin".to_string()),
+                    suggestion: Some(
+                        "Add a description to help users understand the plugin".to_string(),
+                    ),
                 });
             }
 
@@ -645,7 +641,9 @@ impl PluginValidator {
                 warnings.push(ValidationWarning {
                     code: "S002".to_string(),
                     message: "Plugin requests shell capability".to_string(),
-                    suggestion: Some("Shell access is powerful - ensure it's necessary".to_string()),
+                    suggestion: Some(
+                        "Shell access is powerful - ensure it's necessary".to_string(),
+                    ),
                 });
             }
         }
@@ -750,77 +748,92 @@ impl PluginTemplate {
                 .plugin_type(PluginType::Tool)
                 .category(PluginCategory::Productivity)
                 .add_function("execute")
-                    .description("Execute the tool")
-                    .param("input", "string", "Input data")
-                    .returns("string")
-                    .done(),
+                .description("Execute the tool")
+                .param("input", "string", "Input data")
+                .returns("string")
+                .done(),
 
             TemplateType::HttpApi => builder
                 .plugin_type(PluginType::Tool)
                 .category(PluginCategory::WebApi)
                 .capability_network(true)
                 .add_function("get")
-                    .description("HTTP GET request")
-                    .param("url", "string", "URL to fetch")
-                    .optional_param("headers", "object", "HTTP headers", serde_json::json!({}))
-                    .returns("object")
-                    .done()
+                .description("HTTP GET request")
+                .param("url", "string", "URL to fetch")
+                .optional_param("headers", "object", "HTTP headers", serde_json::json!({}))
+                .returns("object")
+                .done()
                 .add_function("post")
-                    .description("HTTP POST request")
-                    .param("url", "string", "URL to post to")
-                    .param("body", "object", "Request body")
-                    .optional_param("headers", "object", "HTTP headers", serde_json::json!({}))
-                    .returns("object")
-                    .done(),
+                .description("HTTP POST request")
+                .param("url", "string", "URL to post to")
+                .param("body", "object", "Request body")
+                .optional_param("headers", "object", "HTTP headers", serde_json::json!({}))
+                .returns("object")
+                .done(),
 
             TemplateType::FileProcessor => builder
                 .plugin_type(PluginType::Tool)
                 .category(PluginCategory::FileManagement)
                 .capability_filesystem(true)
                 .add_function("process")
-                    .description("Process a file")
-                    .param("path", "string", "Path to file")
-                    .optional_param("options", "object", "Processing options", serde_json::json!({}))
-                    .returns("object")
-                    .done()
+                .description("Process a file")
+                .param("path", "string", "Path to file")
+                .optional_param(
+                    "options",
+                    "object",
+                    "Processing options",
+                    serde_json::json!({}),
+                )
+                .returns("object")
+                .done()
                 .add_function("list")
-                    .description("List files in directory")
-                    .param("path", "string", "Directory path")
-                    .returns("array")
-                    .done(),
+                .description("List files in directory")
+                .param("path", "string", "Directory path")
+                .returns("array")
+                .done(),
 
             TemplateType::DataTransformer => builder
                 .plugin_type(PluginType::Transformer)
                 .category(PluginCategory::DataProcessing)
                 .add_function("transform")
-                    .description("Transform data")
-                    .param("data", "any", "Input data")
-                    .param("format", "string", "Target format")
-                    .returns("any")
-                    .done()
+                .description("Transform data")
+                .param("data", "any", "Input data")
+                .param("format", "string", "Target format")
+                .returns("any")
+                .done()
                 .add_function("validate")
-                    .description("Validate data")
-                    .param("data", "any", "Data to validate")
-                    .param("schema", "object", "Validation schema")
-                    .returns("object")
-                    .done(),
+                .description("Validate data")
+                .param("data", "any", "Data to validate")
+                .param("schema", "object", "Validation schema")
+                .returns("object")
+                .done(),
 
             TemplateType::Provider => builder
                 .plugin_type(PluginType::Provider)
                 .category(PluginCategory::ArtificialIntelligence)
                 .capability_network(true)
                 .add_function("complete")
-                    .description("Generate completion")
-                    .param("messages", "array", "Conversation messages")
-                    .optional_param("temperature", "number", "Sampling temperature", serde_json::json!(0.7))
-                    .optional_param("max_tokens", "number", "Maximum tokens", serde_json::json!(1000))
-                    .returns("object")
-                    .done()
+                .description("Generate completion")
+                .param("messages", "array", "Conversation messages")
+                .optional_param(
+                    "temperature",
+                    "number",
+                    "Sampling temperature",
+                    serde_json::json!(0.7),
+                )
+                .optional_param(
+                    "max_tokens",
+                    "number",
+                    "Maximum tokens",
+                    serde_json::json!(1000),
+                )
+                .returns("object")
+                .done()
                 .add_function("stream")
-                    .description("Generate streaming completion")
-                    .param("messages", "array", "Conversation messages")
-                    .returns("stream")
-                    .done(),
+                .description("Generate streaming completion")
+                .param("messages", "array", "Conversation messages")
+                .returns("stream")
+                .done(),
         };
 
         builder.build().expect("Template should always be valid")
@@ -829,7 +842,8 @@ impl PluginTemplate {
     /// Generate Rust source code template
     pub fn generate_rust_source(&self) -> String {
         let fn_impls = match self.template_type {
-            TemplateType::BasicTool => r#"
+            TemplateType::BasicTool => {
+                r#"
 #[no_mangle]
 pub extern "C" fn execute(input_ptr: *const u8, input_len: usize) -> *mut u8 {
     // Parse input
@@ -843,8 +857,10 @@ pub extern "C" fn execute(input_ptr: *const u8, input_len: usize) -> *mut u8 {
     
     // Return result
     Box::into_raw(result.into_bytes().into_boxed_slice()) as *mut u8
-}"#,
-            TemplateType::HttpApi => r#"
+}"#
+            }
+            TemplateType::HttpApi => {
+                r#"
 #[no_mangle]
 pub extern "C" fn get(url_ptr: *const u8, url_len: usize) -> *mut u8 {
     // TODO: Implement HTTP GET
@@ -866,13 +882,16 @@ pub extern "C" fn get(url_ptr: *const u8, url_len: usize) -> *mut u8 {
 pub extern "C" fn post(/* params */) -> *mut u8 {
     // TODO: Implement HTTP POST
     unimplemented!()
-}"#,
-            _ => r#"
+}"#
+            }
+            _ => {
+                r#"
 #[no_mangle]
 pub extern "C" fn execute(/* params */) -> *mut u8 {
     // TODO: Implement your plugin logic
     unimplemented!()
-}"#,
+}"#
+            }
         };
 
         format!(
@@ -1067,10 +1086,10 @@ mod tests {
             .capability_network(false)
             .capability_filesystem(false)
             .add_function("test_fn")
-                .description("A test function")
-                .param("input", "string", "Input value")
-                .returns("string")
-                .done()
+            .description("A test function")
+            .param("input", "string", "Input value")
+            .returns("string")
+            .done()
             .build()
             .unwrap();
 
@@ -1085,14 +1104,13 @@ mod tests {
         // Empty name should fail
         let result = PluginBuilder::new("")
             .add_function("test")
-                .returns("void")
-                .done()
+            .returns("void")
+            .done()
             .build();
         assert!(result.is_err());
 
         // No exports should fail
-        let result = PluginBuilder::new("test")
-            .build();
+        let result = PluginBuilder::new("test").build();
         assert!(result.is_err());
     }
 
@@ -1102,15 +1120,15 @@ mod tests {
             .version("1.0.0")
             .description("A valid plugin")
             .add_function("test")
-                .description("Test function")
-                .returns("void")
-                .done()
+            .description("Test function")
+            .returns("void")
+            .done()
             .build()
             .unwrap();
 
         let validator = PluginValidator::new();
         let result = validator.validate(&plugin);
-        
+
         assert!(result.valid);
     }
 
@@ -1118,14 +1136,14 @@ mod tests {
     fn test_validator_warnings() {
         let plugin = PluginBuilder::new("test")
             .add_function("test")
-                .returns("void")
-                .done()
+            .returns("void")
+            .done()
             .build()
             .unwrap();
 
         let validator = PluginValidator::new();
         let result = validator.validate(&plugin);
-        
+
         // Should have warnings for missing description, author, license, etc.
         assert!(!result.warnings.is_empty());
     }
@@ -1180,14 +1198,14 @@ mod tests {
         let plugin = PluginBuilder::new("test")
             .version("1.0.0")
             .add_function("test")
-                .returns("void")
-                .done()
+            .returns("void")
+            .done()
             .build()
             .unwrap();
 
         let json = plugin.to_json().unwrap();
         let parsed = PluginDefinition::from_json(&json).unwrap();
-        
+
         assert_eq!(parsed.name(), plugin.name());
     }
 }

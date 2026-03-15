@@ -104,14 +104,14 @@ impl ToolRegistry {
     pub async fn register_in_category(&self, tool: Arc<dyn AsyncTool>, category: &str) {
         let name = tool.name().to_string();
         self.tools.write().await.insert(name.clone(), tool);
-        
+
         self.categories
             .write()
             .await
             .entry(category.to_string())
             .or_default()
             .push(name.clone());
-        
+
         info!(tool = %name, category = %category, "Tool registered in category");
     }
 
@@ -124,7 +124,7 @@ impl ToolRegistry {
     pub async fn get_category(&self, category: &str) -> Vec<Arc<dyn AsyncTool>> {
         let categories = self.categories.read().await;
         let tools = self.tools.read().await;
-        
+
         categories
             .get(category)
             .map(|names| {
@@ -149,7 +149,7 @@ impl ToolRegistry {
     /// Unregister a tool
     pub async fn unregister(&self, name: &str) {
         self.tools.write().await.remove(name);
-        
+
         // Remove from all categories
         for tools in self.categories.write().await.values_mut() {
             tools.retain(|n| n != name);
@@ -234,11 +234,7 @@ impl ExecutionMetrics {
             } else {
                 0.0
             },
-            average_execution_time_ms: if total > 0 {
-                total_time / total
-            } else {
-                0
-            },
+            average_execution_time_ms: if total > 0 { total_time / total } else { 0 },
             total_retries: retries,
         }
     }
@@ -302,9 +298,10 @@ impl ToolExecutor {
         let call_id = call.id.clone();
 
         // Acquire semaphore permit
-        let _permit = self.semaphore.acquire().await.map_err(|_| {
-            Error::tool_execution(&tool_name, "Failed to acquire execution permit")
-        })?;
+        let _permit =
+            self.semaphore.acquire().await.map_err(|_| {
+                Error::tool_execution(&tool_name, "Failed to acquire execution permit")
+            })?;
 
         // Get the tool
         let tool = self.registry.get(&tool_name).await.ok_or_else(|| {
@@ -312,17 +309,13 @@ impl ToolExecutor {
         })?;
 
         // Execute with retry
-        let (result, retries) = self
-            .execute_with_retry(&tool, call)
-            .await;
+        let (result, retries) = self.execute_with_retry(&tool, call).await;
 
         let duration = start.elapsed();
         let duration_ms = duration.as_millis() as u64;
 
         // Update metrics
-        self.metrics
-            .total_executions
-            .fetch_add(1, Ordering::SeqCst);
+        self.metrics.total_executions.fetch_add(1, Ordering::SeqCst);
         self.metrics
             .total_execution_time_ms
             .fetch_add(duration_ms, Ordering::SeqCst);
@@ -335,7 +328,7 @@ impl ToolExecutor {
                 self.metrics
                     .successful_executions
                     .fetch_add(1, Ordering::SeqCst);
-                
+
                 ToolExecutionResult {
                     tool_name,
                     call_id,
@@ -351,7 +344,7 @@ impl ToolExecutor {
                 self.metrics
                     .failed_executions
                     .fetch_add(1, Ordering::SeqCst);
-                
+
                 ToolExecutionResult {
                     tool_name: tool_name.clone(),
                     call_id: call_id.clone(),
@@ -374,26 +367,25 @@ impl ToolExecutor {
     }
 
     /// Execute multiple tool calls in parallel
-    pub async fn execute_parallel(
-        &self,
-        calls: Vec<ToolCall>,
-    ) -> Vec<ToolExecutionResult> {
+    pub async fn execute_parallel(&self, calls: Vec<ToolCall>) -> Vec<ToolExecutionResult> {
         let futures: Vec<_> = calls.iter().map(|call| self.execute(call)).collect();
-        
+
         let results = futures::future::join_all(futures).await;
-        
+
         results
             .into_iter()
-            .map(|r| r.unwrap_or_else(|e| ToolExecutionResult {
-                tool_name: "unknown".to_string(),
-                call_id: "unknown".to_string(),
-                result: ToolResult::failure("unknown", format!("Execution failed: {}", e)),
-                duration_ms: 0,
-                retries: 0,
-                success: false,
-                error: Some(e.to_string()),
-                executed_at: chrono::Utc::now(),
-            }))
+            .map(|r| {
+                r.unwrap_or_else(|e| ToolExecutionResult {
+                    tool_name: "unknown".to_string(),
+                    call_id: "unknown".to_string(),
+                    result: ToolResult::failure("unknown", format!("Execution failed: {}", e)),
+                    duration_ms: 0,
+                    retries: 0,
+                    success: false,
+                    error: Some(e.to_string()),
+                    executed_at: chrono::Utc::now(),
+                })
+            })
             .collect()
     }
 
@@ -429,12 +421,12 @@ impl ToolExecutor {
                         );
                         return (Err(e), retries);
                     }
-                    
+
                     retries += 1;
                     let delay = Duration::from_millis(
-                        self.config.retry_base_delay_ms * (2_u64.pow(retries - 1))
+                        self.config.retry_base_delay_ms * (2_u64.pow(retries - 1)),
                     );
-                    
+
                     warn!(
                         tool = %tool.name(),
                         error = %e,
@@ -442,24 +434,21 @@ impl ToolExecutor {
                         delay_ms = delay.as_millis(),
                         "Retrying tool execution"
                     );
-                    
+
                     tokio::time::sleep(delay).await;
                 }
                 Err(_) => {
                     self.metrics
                         .timed_out_executions
                         .fetch_add(1, Ordering::SeqCst);
-                    
+
                     if retries >= max_retries {
                         return (
-                            Err(Error::tool_execution(
-                                tool.name(),
-                                "Execution timed out",
-                            )),
+                            Err(Error::tool_execution(tool.name(), "Execution timed out")),
                             retries,
                         );
                     }
-                    
+
                     retries += 1;
                     warn!(
                         tool = %tool.name(),
@@ -542,7 +531,12 @@ where
 /// An async function-based tool
 pub struct AsyncFunctionTool<F>
 where
-    F: Fn(ToolCall) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<ToolResult>> + Send>> + Send + Sync,
+    F: Fn(
+            ToolCall,
+        )
+            -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<ToolResult>> + Send>>
+        + Send
+        + Sync,
 {
     name: String,
     description: String,
@@ -551,7 +545,12 @@ where
 
 impl<F> AsyncFunctionTool<F>
 where
-    F: Fn(ToolCall) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<ToolResult>> + Send>> + Send + Sync,
+    F: Fn(
+            ToolCall,
+        )
+            -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<ToolResult>> + Send>>
+        + Send
+        + Sync,
 {
     /// Create a new async function tool
     pub fn new(name: impl Into<String>, description: impl Into<String>, func: F) -> Self {
@@ -566,7 +565,12 @@ where
 #[async_trait]
 impl<F> AsyncTool for AsyncFunctionTool<F>
 where
-    F: Fn(ToolCall) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<ToolResult>> + Send>> + Send + Sync,
+    F: Fn(
+            ToolCall,
+        )
+            -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<ToolResult>> + Send>>
+        + Send
+        + Sync,
 {
     fn name(&self) -> &str {
         &self.name
@@ -660,9 +664,7 @@ mod tests {
         let tool = Arc::new(FunctionTool::new(
             "test_tool",
             "A test tool",
-            |call: &ToolCall| {
-                Ok(ToolResult::success(&call.id, "Test output"))
-            },
+            |call: &ToolCall| Ok(ToolResult::success(&call.id, "Test output")),
         ));
 
         registry.register(tool).await;
@@ -678,9 +680,7 @@ mod tests {
         let tool = Arc::new(FunctionTool::new(
             "echo",
             "Echoes input",
-            |call: &ToolCall| {
-                Ok(ToolResult::success(&call.id, call.arguments.to_string()))
-            },
+            |call: &ToolCall| Ok(ToolResult::success(&call.id, call.arguments.to_string())),
         ));
 
         registry.register(tool).await;
@@ -704,9 +704,7 @@ mod tests {
         let tool = Arc::new(FunctionTool::new(
             "delay",
             "Delays and returns",
-            |call: &ToolCall| {
-                Ok(ToolResult::success(&call.id, "Done"))
-            },
+            |call: &ToolCall| Ok(ToolResult::success(&call.id, "Done")),
         ));
 
         registry.register(tool).await;
@@ -730,13 +728,9 @@ mod tests {
     async fn test_metrics() {
         let registry = Arc::new(ToolRegistry::new());
 
-        let tool = Arc::new(FunctionTool::new(
-            "counter",
-            "Counts",
-            |call: &ToolCall| {
-                Ok(ToolResult::success(&call.id, "1"))
-            },
-        ));
+        let tool = Arc::new(FunctionTool::new("counter", "Counts", |call: &ToolCall| {
+            Ok(ToolResult::success(&call.id, "1"))
+        }));
 
         registry.register(tool).await;
 

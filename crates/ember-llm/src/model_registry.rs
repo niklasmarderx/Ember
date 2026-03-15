@@ -798,8 +798,6 @@ impl CostEstimate {
 
         if self.total_cost < 0.01 {
             format!("${:.4}", self.total_cost)
-        } else if self.total_cost < 1.0 {
-            format!("${:.2}", self.total_cost)
         } else {
             format!("${:.2}", self.total_cost)
         }

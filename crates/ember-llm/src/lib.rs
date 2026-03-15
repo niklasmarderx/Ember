@@ -105,7 +105,9 @@ pub use openrouter::OpenRouterProvider;
 #[cfg(feature = "xai")]
 pub use xai::XAIProvider;
 
-pub use model_registry::{CostEstimate, ModelCapabilities, ModelMetadata, ModelRegistry, MODEL_REGISTRY};
+pub use model_registry::{
+    CostEstimate, ModelCapabilities, ModelMetadata, ModelRegistry, MODEL_REGISTRY,
+};
 pub use retry::{complete_with_retry, RetryConfig};
 pub use router::LLMRouter;
 

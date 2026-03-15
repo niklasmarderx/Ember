@@ -103,8 +103,8 @@ pub use hot_reload::{
 #[cfg(feature = "sdk")]
 pub use sdk::{
     FunctionBuilder, PackageFormat, PackageMetadata, PluginBuilder, PluginCategory,
-    PluginDefinition, PluginPackager, PluginTemplate, PluginType, PluginValidator,
-    TemplateType, ValidationError, ValidationResult, ValidationWarning,
+    PluginDefinition, PluginPackager, PluginTemplate, PluginType, PluginValidator, TemplateType,
+    ValidationError, ValidationResult, ValidationWarning,
 };
 
 /// Prelude module for convenient imports.

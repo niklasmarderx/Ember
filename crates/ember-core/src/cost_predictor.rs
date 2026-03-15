@@ -200,7 +200,12 @@ impl CostPredictor {
     }
 
     /// Estimate cost for a request before making it
-    pub fn estimate(&self, model_id: &str, input_tokens: u32, output_tokens: u32) -> Option<CostEstimate> {
+    pub fn estimate(
+        &self,
+        model_id: &str,
+        input_tokens: u32,
+        output_tokens: u32,
+    ) -> Option<CostEstimate> {
         MODEL_REGISTRY.estimate_cost(model_id, input_tokens, output_tokens)
     }
 
@@ -211,7 +216,8 @@ impl CostPredictor {
         estimated_input_tokens: u32,
         estimated_output_tokens: u32,
     ) -> PredictionResult {
-        let estimate = self.estimate(model_id, estimated_input_tokens, estimated_output_tokens)
+        let estimate = self
+            .estimate(model_id, estimated_input_tokens, estimated_output_tokens)
             .unwrap_or_else(|| CostEstimate {
                 model_id: model_id.to_string(),
                 input_tokens: estimated_input_tokens,
@@ -245,7 +251,7 @@ impl CostPredictor {
         if let Some(limit) = config.max_cost_per_hour {
             let projected = hourly_spend + estimate.total_cost;
             let percentage = projected / limit;
-            
+
             if projected > limit {
                 alerts.push(BudgetAlert::BudgetExceeded {
                     budget_type: "hourly".to_string(),
@@ -269,7 +275,7 @@ impl CostPredictor {
         if let Some(limit) = config.max_cost_per_day {
             let projected = daily_spend + estimate.total_cost;
             let percentage = projected / limit;
-            
+
             if projected > limit {
                 alerts.push(BudgetAlert::BudgetExceeded {
                     budget_type: "daily".to_string(),
@@ -293,7 +299,7 @@ impl CostPredictor {
         if let Some(limit) = config.max_total_cost {
             let projected = total_spend + estimate.total_cost;
             let percentage = projected / limit;
-            
+
             if projected > limit {
                 alerts.push(BudgetAlert::BudgetExceeded {
                     budget_type: "total".to_string(),
@@ -336,7 +342,8 @@ impl CostPredictor {
         output_tokens: u32,
         request_id: Option<String>,
     ) {
-        let cost = self.estimate(model_id, input_tokens, output_tokens)
+        let cost = self
+            .estimate(model_id, input_tokens, output_tokens)
             .map(|e| e.total_cost)
             .unwrap_or(0.0);
 
@@ -357,7 +364,8 @@ impl CostPredictor {
 
         // Update total cost
         let cost_micros = (cost * 1_000_000.0) as u64;
-        self.total_cost_micros.fetch_add(cost_micros, Ordering::SeqCst);
+        self.total_cost_micros
+            .fetch_add(cost_micros, Ordering::SeqCst);
     }
 
     /// Get total spend across all time
@@ -369,7 +377,7 @@ impl CostPredictor {
     pub fn get_hourly_spend(&self) -> f64 {
         let now = chrono::Utc::now();
         let hour_ago = now - chrono::Duration::hours(1);
-        
+
         self.usage_history
             .read()
             .unwrap()
@@ -383,7 +391,7 @@ impl CostPredictor {
     pub fn get_daily_spend(&self) -> f64 {
         let now = chrono::Utc::now();
         let day_ago = now - chrono::Duration::days(1);
-        
+
         self.usage_history
             .read()
             .unwrap()
@@ -396,7 +404,7 @@ impl CostPredictor {
     /// Get aggregated usage statistics
     pub fn get_stats(&self) -> UsageStats {
         let history = self.usage_history.read().unwrap();
-        
+
         if history.is_empty() {
             return UsageStats::default();
         }
@@ -411,24 +419,38 @@ impl CostPredictor {
             stats.total_output_tokens += record.output_tokens as u64;
             stats.total_cost += record.cost;
 
-            *stats.cost_by_model.entry(record.model_id.clone()).or_insert(0.0) += record.cost;
-            *stats.requests_by_model.entry(record.model_id.clone()).or_insert(0) += 1;
+            *stats
+                .cost_by_model
+                .entry(record.model_id.clone())
+                .or_insert(0.0) += record.cost;
+            *stats
+                .requests_by_model
+                .entry(record.model_id.clone())
+                .or_insert(0) += 1;
 
             // Get provider from model registry
             if let Some(model) = MODEL_REGISTRY.get(&record.model_id) {
-                *stats.cost_by_provider.entry(model.provider.clone()).or_insert(0.0) += record.cost;
+                *stats
+                    .cost_by_provider
+                    .entry(model.provider.clone())
+                    .or_insert(0.0) += record.cost;
             }
         }
 
         stats.avg_cost_per_request = stats.total_cost / stats.total_requests as f64;
-        stats.avg_tokens_per_request = (stats.total_input_tokens + stats.total_output_tokens) as f64 
+        stats.avg_tokens_per_request = (stats.total_input_tokens + stats.total_output_tokens)
+            as f64
             / stats.total_requests as f64;
 
         stats
     }
 
     /// Get cost optimization recommendations
-    pub fn get_recommendations(&self, model_id: &str, estimate: &CostEstimate) -> Vec<CostRecommendation> {
+    pub fn get_recommendations(
+        &self,
+        model_id: &str,
+        estimate: &CostEstimate,
+    ) -> Vec<CostRecommendation> {
         let mut recommendations = Vec::new();
 
         // Get current model info
@@ -447,14 +469,22 @@ impl CostPredictor {
                 ),
                 potential_savings: savings,
                 alternative_model: Some(alt_model.id.clone()),
-                priority: if savings > 0.1 { 1 } else if savings > 0.01 { 2 } else { 3 },
+                priority: if savings > 0.1 {
+                    1
+                } else if savings > 0.01 {
+                    2
+                } else {
+                    3
+                },
             });
         }
 
         // Check if model is overkill for simple tasks
         if current_model.capabilities.reasoning && estimate.input_tokens < 500 {
             recommendations.push(CostRecommendation {
-                description: "Reasoning models may be overkill for short prompts. Consider a standard model.".to_string(),
+                description:
+                    "Reasoning models may be overkill for short prompts. Consider a standard model."
+                        .to_string(),
                 potential_savings: estimate.total_cost * 0.5,
                 alternative_model: Some("gpt-4o-mini".to_string()),
                 priority: 2,
@@ -464,10 +494,13 @@ impl CostPredictor {
         // Check if using caching could help
         if let Some(cached_price) = current_model.cached_input_price_per_1k {
             if estimate.input_tokens > 1000 {
-                let potential_savings = estimate.input_cost * (1.0 - cached_price / current_model.input_price_per_1k);
+                let potential_savings =
+                    estimate.input_cost * (1.0 - cached_price / current_model.input_price_per_1k);
                 if potential_savings > 0.001 {
                     recommendations.push(CostRecommendation {
-                        description: "Enable prompt caching for repeated prompts to reduce input costs.".to_string(),
+                        description:
+                            "Enable prompt caching for repeated prompts to reduce input costs."
+                                .to_string(),
                         potential_savings,
                         alternative_model: None,
                         priority: 2,
@@ -490,7 +523,11 @@ impl CostPredictor {
         recommendations
     }
 
-    fn find_cheaper_alternatives(&self, current: &ModelMetadata, estimate: &CostEstimate) -> Vec<(&ModelMetadata, f64)> {
+    fn find_cheaper_alternatives(
+        &self,
+        current: &ModelMetadata,
+        estimate: &CostEstimate,
+    ) -> Vec<(&ModelMetadata, f64)> {
         let mut alternatives = Vec::new();
 
         for model in MODEL_REGISTRY.all() {
@@ -510,7 +547,11 @@ impl CostPredictor {
             }
 
             // Calculate potential savings
-            let alt_estimate = MODEL_REGISTRY.estimate_cost(&model.id, estimate.input_tokens, estimate.output_tokens);
+            let alt_estimate = MODEL_REGISTRY.estimate_cost(
+                &model.id,
+                estimate.input_tokens,
+                estimate.output_tokens,
+            );
             if let Some(alt_est) = alt_estimate {
                 let savings = estimate.total_cost - alt_est.total_cost;
                 if savings > 0.0 {
@@ -521,7 +562,7 @@ impl CostPredictor {
 
         // Sort by savings descending
         alternatives.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
-        
+
         // Return top 3
         alternatives.into_iter().take(3).collect()
     }
@@ -567,7 +608,7 @@ mod tests {
     #[test]
     fn test_cost_prediction() {
         let predictor = CostPredictor::default();
-        
+
         let result = predictor.predict("gpt-4o-mini", 1000, 500);
         assert!(result.allowed);
         assert!(result.estimate.total_cost > 0.0);
@@ -580,9 +621,9 @@ mod tests {
             enforce_limits: true,
             ..Default::default()
         };
-        
+
         let predictor = CostPredictor::new(config);
-        
+
         // This should exceed the tiny budget
         let result = predictor.predict("gpt-4o", 10000, 5000);
         assert!(!result.allowed);
@@ -592,10 +633,10 @@ mod tests {
     #[test]
     fn test_usage_recording() {
         let predictor = CostPredictor::default();
-        
+
         predictor.record_usage("gpt-4o-mini", 1000, 500, None);
         predictor.record_usage("gpt-4o-mini", 2000, 1000, None);
-        
+
         let stats = predictor.get_stats();
         assert_eq!(stats.total_requests, 2);
         assert!(stats.total_cost > 0.0);
@@ -604,10 +645,10 @@ mod tests {
     #[test]
     fn test_recommendations() {
         let predictor = CostPredictor::default();
-        
+
         // Use an expensive model
         let result = predictor.predict("claude-3-opus-20240229", 5000, 2000);
-        
+
         // Should have recommendations for cheaper alternatives
         assert!(!result.recommendations.is_empty());
     }
@@ -615,13 +656,13 @@ mod tests {
     #[test]
     fn test_model_listing() {
         let predictor = CostPredictor::default();
-        
+
         let all_models = predictor.list_models();
         assert!(!all_models.is_empty());
-        
+
         let openai_models = predictor.list_models_by_provider("openai");
         assert!(!openai_models.is_empty());
-        
+
         let vision_models = predictor.list_models_by_capability("vision");
         assert!(!vision_models.is_empty());
     }

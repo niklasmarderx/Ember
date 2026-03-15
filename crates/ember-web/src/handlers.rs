@@ -7,8 +7,8 @@ use crate::state::AppState;
 use axum::extract::State;
 use axum::response::sse::{Event, Sse};
 use axum::Json;
-use ember_llm::{CompletionRequest as LLMCompletionRequest, Message};
 use ember_llm::model_registry::MODEL_REGISTRY;
+use ember_llm::{CompletionRequest as LLMCompletionRequest, Message};
 use futures_util::stream::Stream;
 use serde::{Deserialize, Serialize};
 use std::convert::Infallible;
@@ -630,11 +630,10 @@ pub async fn estimate_cost(
     State(state): State<AppState>,
     Json(request): Json<CostEstimateRequest>,
 ) -> Result<Json<CostEstimateResponse>> {
-    let estimate = state.cost_predictor.estimate(
-        &request.model,
-        request.input_tokens,
-        request.output_tokens,
-    ).ok_or_else(|| WebError::NotFound(format!("Model {} not found", request.model)))?;
+    let estimate = state
+        .cost_predictor
+        .estimate(&request.model, request.input_tokens, request.output_tokens)
+        .ok_or_else(|| WebError::NotFound(format!("Model {} not found", request.model)))?;
 
     Ok(Json(CostEstimateResponse {
         model_id: estimate.model_id,
@@ -678,7 +677,7 @@ pub struct UsageStatsResponse {
 /// Get usage statistics handler.
 pub async fn get_usage_stats(State(state): State<AppState>) -> Json<UsageStatsResponse> {
     let stats = state.cost_predictor.get_stats();
-    
+
     Json(UsageStatsResponse {
         total_requests: stats.total_requests,
         total_input_tokens: stats.total_input_tokens,
@@ -714,7 +713,7 @@ pub struct BudgetConfigResponse {
 /// Get budget configuration handler.
 pub async fn get_budget_config(State(state): State<AppState>) -> Json<BudgetConfigResponse> {
     let config = state.cost_predictor.config();
-    
+
     Json(BudgetConfigResponse {
         max_cost_per_request: config.max_cost_per_request,
         max_cost_per_hour: config.max_cost_per_hour,
@@ -748,20 +747,22 @@ pub async fn update_budget_config(
     Json(request): Json<UpdateBudgetRequest>,
 ) -> Json<BudgetConfigResponse> {
     use ember_core::BudgetConfig;
-    
+
     let current = state.cost_predictor.config();
-    
+
     let new_config = BudgetConfig {
-        max_cost_per_request: request.max_cost_per_request.or(current.max_cost_per_request),
+        max_cost_per_request: request
+            .max_cost_per_request
+            .or(current.max_cost_per_request),
         max_cost_per_hour: request.max_cost_per_hour.or(current.max_cost_per_hour),
         max_cost_per_day: request.max_cost_per_day.or(current.max_cost_per_day),
         max_total_cost: request.max_total_cost.or(current.max_total_cost),
         alert_threshold: request.alert_threshold.unwrap_or(current.alert_threshold),
         enforce_limits: request.enforce_limits.unwrap_or(current.enforce_limits),
     };
-    
+
     state.cost_predictor.set_config(new_config.clone());
-    
+
     Json(BudgetConfigResponse {
         max_cost_per_request: new_config.max_cost_per_request,
         max_cost_per_hour: new_config.max_cost_per_hour,
@@ -823,14 +824,14 @@ pub struct ExtendedModelsResponse {
 /// List models with extended information (pricing, capabilities).
 pub async fn list_models_extended() -> Json<ExtendedModelsResponse> {
     let all_models = MODEL_REGISTRY.all();
-    
+
     let mut providers: std::collections::HashMap<String, usize> = std::collections::HashMap::new();
-    
+
     let models: Vec<ExtendedModelInfo> = all_models
         .iter()
         .map(|m| {
             *providers.entry(m.provider.clone()).or_insert(0) += 1;
-            
+
             ExtendedModelInfo {
                 id: m.id.clone(),
                 name: m.name.clone(),
@@ -849,9 +850,9 @@ pub async fn list_models_extended() -> Json<ExtendedModelsResponse> {
             }
         })
         .collect();
-    
+
     let total = models.len();
-    
+
     Json(ExtendedModelsResponse {
         models,
         total,
@@ -884,17 +885,25 @@ pub async fn get_recommendations(
     State(state): State<AppState>,
     axum::extract::Query(params): axum::extract::Query<std::collections::HashMap<String, String>>,
 ) -> Json<RecommendationsResponse> {
-    let model = params.get("model").cloned().unwrap_or_else(|| "gpt-4o".to_string());
-    let input_tokens: u32 = params.get("input_tokens")
+    let model = params
+        .get("model")
+        .cloned()
+        .unwrap_or_else(|| "gpt-4o".to_string());
+    let input_tokens: u32 = params
+        .get("input_tokens")
         .and_then(|s| s.parse().ok())
         .unwrap_or(1000);
-    let output_tokens: u32 = params.get("output_tokens")
+    let output_tokens: u32 = params
+        .get("output_tokens")
         .and_then(|s| s.parse().ok())
         .unwrap_or(500);
-    
-    let result = state.cost_predictor.predict(&model, input_tokens, output_tokens);
-    
-    let recommendations: Vec<RecommendationInfo> = result.recommendations
+
+    let result = state
+        .cost_predictor
+        .predict(&model, input_tokens, output_tokens);
+
+    let recommendations: Vec<RecommendationInfo> = result
+        .recommendations
         .into_iter()
         .map(|r| RecommendationInfo {
             description: r.description,
@@ -903,7 +912,7 @@ pub async fn get_recommendations(
             priority: r.priority,
         })
         .collect();
-    
+
     Json(RecommendationsResponse { recommendations })
 }
 

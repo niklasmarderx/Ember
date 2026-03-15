@@ -124,6 +124,10 @@ pub use collaboration::{
 pub use config::{AgentConfig, AgentConfigBuilder};
 pub use context::{Context, ContextManager};
 pub use conversation::{Conversation, ConversationId, Turn};
+pub use cost_predictor::{
+    BudgetAlert, BudgetConfig, CostPredictor, CostRecommendation, PredictionResult, UsageRecord,
+    UsageStats,
+};
 pub use knowledge_graph::{
     Entity, EntityId, FilterOperation, GraphConfig, GraphExport, GraphQuery, GraphStats,
     KnowledgeGraph, PropertyFilter, PropertyValue, QueryResult, RelationDirection, Relationship,
@@ -159,13 +163,9 @@ pub use task_planner::{
     PlannerStats, ProgressCallback, Task, TaskComplexity, TaskExecutor, TaskId, TaskPlanBuilder,
     TaskPlanner, TaskPriority, TaskStatus, TaskType,
 };
-pub use cost_predictor::{
-    BudgetAlert, BudgetConfig, CostPredictor, CostRecommendation, PredictionResult, UsageRecord,
-    UsageStats,
-};
 pub use tool_executor::{
-    AsyncFunctionTool, AsyncTool, ExecutionMetrics, ExecutorConfig, FunctionTool,
-    MetricsSummary, ToolContext, ToolExecutionResult, ToolExecutor, ToolRegistry,
+    AsyncFunctionTool, AsyncTool, ExecutionMetrics, ExecutorConfig, FunctionTool, MetricsSummary,
+    ToolContext, ToolExecutionResult, ToolExecutor, ToolRegistry,
 };
 
 /// Re-export commonly used types from ember-llm

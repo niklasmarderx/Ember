@@ -230,11 +230,7 @@ impl LLMProvider for OpenRouterProvider {
 
             return match status.as_u16() {
                 401 => Err(Error::api_key_missing("openrouter")),
-                402 => Err(Error::api_error(
-                    "openrouter",
-                    402,
-                    "Insufficient credits",
-                )),
+                402 => Err(Error::api_error("openrouter", 402, "Insufficient credits")),
                 429 => Err(Error::rate_limit("openrouter", None)),
                 _ => Err(Error::api_error(
                     "openrouter",
@@ -353,7 +349,10 @@ impl LLMProvider for OpenRouterProvider {
                 name: m.name.unwrap_or_else(|| m.id.clone()),
                 description: m.description,
                 context_window: Some(m.context_length),
-                max_output_tokens: m.top_provider.as_ref().and_then(|p| p.max_completion_tokens),
+                max_output_tokens: m
+                    .top_provider
+                    .as_ref()
+                    .and_then(|p| p.max_completion_tokens),
                 supports_tools: true, // Most models support tools via OpenRouter
                 supports_vision: m.architecture.as_ref().map_or(false, |a| {
                     a.modality.as_ref().map_or(false, |m| m.contains("image"))

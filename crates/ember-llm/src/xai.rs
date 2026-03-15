@@ -541,7 +541,9 @@ fn get_model_description(id: &str) -> String {
     match id {
         "grok-2" => "Most capable Grok model, excellent for complex reasoning".to_string(),
         "grok-2-mini" => "Faster, more efficient Grok model for everyday tasks".to_string(),
-        "grok-2-vision-1212" => "Grok 2 with vision capabilities for image understanding".to_string(),
+        "grok-2-vision-1212" => {
+            "Grok 2 with vision capabilities for image understanding".to_string()
+        }
         "grok-2-image-1212" => "Grok 2 for image generation".to_string(),
         _ => "xAI Grok model".to_string(),
     }

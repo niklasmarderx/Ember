@@ -67,8 +67,7 @@ impl MistralProvider {
     ///
     /// Looks for `MISTRAL_API_KEY` environment variable.
     pub fn from_env() -> Result<Self> {
-        let api_key =
-            env::var("MISTRAL_API_KEY").map_err(|_| Error::api_key_missing("mistral"))?;
+        let api_key = env::var("MISTRAL_API_KEY").map_err(|_| Error::api_key_missing("mistral"))?;
 
         let mut provider = Self::new(api_key);
 

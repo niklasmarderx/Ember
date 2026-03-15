@@ -256,15 +256,14 @@ impl LLMProvider for GeminiProvider {
                                             })
                                         }),
                                         done,
-                                        finish_reason: candidate
-                                            .finish_reason
-                                            .as_ref()
-                                            .map(|r| match r.as_str() {
+                                        finish_reason: candidate.finish_reason.as_ref().map(|r| {
+                                            match r.as_str() {
                                                 "STOP" => FinishReason::Stop,
                                                 "MAX_TOKENS" => FinishReason::Length,
                                                 "SAFETY" => FinishReason::ContentFilter,
                                                 _ => FinishReason::Stop,
-                                            }),
+                                            }
+                                        }),
                                     };
 
                                     if tx.send(Ok(stream_chunk)).await.is_err() {
@@ -321,7 +320,9 @@ impl LLMProvider for GeminiProvider {
                     context_window: m.input_token_limit,
                     max_output_tokens: m.output_token_limit,
                     supports_tools: true,
-                    supports_vision: id.contains("vision") || id.contains("1.5") || id.contains("2.0"),
+                    supports_vision: id.contains("vision")
+                        || id.contains("1.5")
+                        || id.contains("2.0"),
                     provider: "gemini".to_string(),
                 }
             })
@@ -741,10 +742,7 @@ mod tests {
         assert!(gemini_req.system_instruction.is_some());
         assert_eq!(gemini_req.contents.len(), 1);
         assert!(gemini_req.generation_config.is_some());
-        assert_eq!(
-            gemini_req.generation_config.unwrap().temperature,
-            Some(0.7)
-        );
+        assert_eq!(gemini_req.generation_config.unwrap().temperature, Some(0.7));
     }
 
     #[test]
