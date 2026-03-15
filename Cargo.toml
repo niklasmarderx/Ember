@@ -15,7 +15,7 @@ members = [
 [workspace.package]
 version = "0.1.0"
 edition = "2021"
-rust-version = "1.83"
+rust-version = "1.85"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/ember-ai/ember"
 homepage = "https://ember.dev"
@@ -88,8 +88,8 @@ wasmtime = "29"
 wasmtime-wasi = "29"
 
 # TUI (Terminal UI)
-ratatui = "0.29"
-crossterm = "0.28"
+ratatui = "0.27"
+crossterm = "0.27"
 
 # Testing
 mockall = "0.12"
