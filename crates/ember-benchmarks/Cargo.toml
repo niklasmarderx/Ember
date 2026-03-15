@@ -18,11 +18,14 @@ tokio = { version = "1", features = ["full", "rt-multi-thread", "macros"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 async-trait = "0.1"
+rand = "0.8"
 
 [dev-dependencies]
 criterion = { version = "0.5", features = ["html_reports", "async_tokio"] }
 rand = "0.8"
 tempfile = "3"
+chrono = "0.4"
+toml = "0.8"
 
 [[bench]]
 name = "core_benchmarks"

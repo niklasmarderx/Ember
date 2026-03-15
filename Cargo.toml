@@ -10,6 +10,7 @@ members = [
     "crates/ember-browser",
     "crates/ember-cli",
     "crates/ember-web",
+    "crates/ember-benchmarks",
 ]
 
 [workspace.package]
