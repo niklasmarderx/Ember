@@ -62,10 +62,10 @@ use tracing::{debug, info, warn};
 pub trait MCPTransport: Send + Sync {
     /// Send a request and wait for response.
     async fn request(&self, request: JsonRpcRequest) -> Result<JsonRpcResponse>;
-    
+
     /// Send a notification (no response expected).
     async fn notify(&self, method: &str, params: Option<Value>) -> Result<()>;
-    
+
     /// Close the transport.
     async fn close(&self) -> Result<()>;
 }
@@ -74,19 +74,19 @@ pub trait MCPTransport: Send + Sync {
 pub struct MCPClient {
     /// Transport layer
     transport: Arc<dyn MCPTransport>,
-    
+
     /// Server info after initialization
     server_info: RwLock<Option<InitializeResult>>,
-    
+
     /// Request ID counter
     request_id: AtomicI64,
-    
+
     /// Cached tools list
     cached_tools: RwLock<Option<Vec<MCPTool>>>,
-    
+
     /// Cached resources list
     cached_resources: RwLock<Option<Vec<MCPResource>>>,
-    
+
     /// Client configuration
     config: MCPClientConfig,
 }
@@ -96,13 +96,13 @@ pub struct MCPClient {
 pub struct MCPClientConfig {
     /// Client name for identification
     pub name: String,
-    
+
     /// Client version
     pub version: String,
-    
+
     /// Request timeout in seconds
     pub timeout_secs: u64,
-    
+
     /// Whether to cache tool/resource lists
     pub enable_caching: bool,
 }
@@ -164,11 +164,10 @@ impl MCPClient {
             });
         }
 
-        let result: InitializeResult = serde_json::from_value(
-            response.result.ok_or_else(|| Error::Protocol {
+        let result: InitializeResult =
+            serde_json::from_value(response.result.ok_or_else(|| Error::Protocol {
                 message: "Missing initialize result".to_string(),
-            })?,
-        )?;
+            })?)?;
 
         info!(
             server = %result.server_info.name,
@@ -179,7 +178,9 @@ impl MCPClient {
         *self.server_info.write().await = Some(result.clone());
 
         // Send initialized notification
-        self.transport.notify("notifications/initialized", None).await?;
+        self.transport
+            .notify("notifications/initialized", None)
+            .await?;
 
         Ok(result)
     }
@@ -221,9 +222,8 @@ impl MCPClient {
             message: "Missing tools/list result".to_string(),
         })?;
 
-        let tools: Vec<MCPTool> = serde_json::from_value(
-            result.get("tools").cloned().unwrap_or(Value::Array(vec![])),
-        )?;
+        let tools: Vec<MCPTool> =
+            serde_json::from_value(result.get("tools").cloned().unwrap_or(Value::Array(vec![])))?;
 
         // Update cache
         if self.config.enable_caching {
@@ -240,7 +240,7 @@ impl MCPClient {
         arguments: Value,
     ) -> Result<CallToolResult> {
         let name = name.into();
-        
+
         debug!(tool = %name, "Calling MCP tool");
 
         let params = CallToolParams {
@@ -262,11 +262,10 @@ impl MCPClient {
             });
         }
 
-        let result: CallToolResult = serde_json::from_value(
-            response.result.ok_or_else(|| Error::Protocol {
+        let result: CallToolResult =
+            serde_json::from_value(response.result.ok_or_else(|| Error::Protocol {
                 message: "Missing tools/call result".to_string(),
-            })?,
-        )?;
+            })?)?;
 
         Ok(result)
     }
@@ -294,7 +293,10 @@ impl MCPClient {
         })?;
 
         let resources: Vec<MCPResource> = serde_json::from_value(
-            result.get("resources").cloned().unwrap_or(Value::Array(vec![])),
+            result
+                .get("resources")
+                .cloned()
+                .unwrap_or(Value::Array(vec![])),
         )?;
 
         // Update cache
@@ -308,7 +310,7 @@ impl MCPClient {
     /// Read a resource from the server.
     pub async fn read_resource(&self, uri: impl Into<String>) -> Result<ReadResourceResult> {
         let uri = uri.into();
-        
+
         debug!(uri = %uri, "Reading MCP resource");
 
         let params = ReadResourceParams { uri: uri.clone() };
@@ -322,11 +324,10 @@ impl MCPClient {
             });
         }
 
-        let result: ReadResourceResult = serde_json::from_value(
-            response.result.ok_or_else(|| Error::Protocol {
+        let result: ReadResourceResult =
+            serde_json::from_value(response.result.ok_or_else(|| Error::Protocol {
                 message: "Missing resources/read result".to_string(),
-            })?,
-        )?;
+            })?)?;
 
         Ok(result)
     }
@@ -351,19 +352,19 @@ impl MCPClient {
 pub struct StdioTransport {
     /// Child process
     child: Mutex<Option<TokioChild>>,
-    
+
     /// Process stdin
     stdin: Mutex<Option<tokio::process::ChildStdin>>,
-    
+
     /// Process stdout reader
     stdout: Mutex<Option<TokioBufReader<tokio::process::ChildStdout>>>,
-    
+
     /// Command to run
     command: String,
-    
+
     /// Command arguments
     args: Vec<String>,
-    
+
     /// Environment variables
     env: HashMap<String, String>,
 }
@@ -430,7 +431,7 @@ impl MCPTransport for StdioTransport {
         }
 
         let json = serde_json::to_string(&request)?;
-        
+
         debug!(method = %request.method, id = ?request.id, "Sending MCP request");
 
         // Write request
@@ -439,10 +440,13 @@ impl MCPTransport for StdioTransport {
             let stdin = stdin_guard.as_mut().ok_or_else(|| Error::Transport {
                 message: "Stdin not available".to_string(),
             })?;
-            
-            stdin.write_all(json.as_bytes()).await.map_err(|e| Error::Transport {
-                message: format!("Failed to write request: {}", e),
-            })?;
+
+            stdin
+                .write_all(json.as_bytes())
+                .await
+                .map_err(|e| Error::Transport {
+                    message: format!("Failed to write request: {}", e),
+                })?;
             stdin.write_all(b"\n").await.map_err(|e| Error::Transport {
                 message: format!("Failed to write newline: {}", e),
             })?;
@@ -459,9 +463,12 @@ impl MCPTransport for StdioTransport {
             })?;
 
             let mut line = String::new();
-            stdout.read_line(&mut line).await.map_err(|e| Error::Transport {
-                message: format!("Failed to read response: {}", e),
-            })?;
+            stdout
+                .read_line(&mut line)
+                .await
+                .map_err(|e| Error::Transport {
+                    message: format!("Failed to read response: {}", e),
+                })?;
 
             if line.is_empty() {
                 return Err(Error::Transport {
@@ -499,9 +506,12 @@ impl MCPTransport for StdioTransport {
             message: "Stdin not available".to_string(),
         })?;
 
-        stdin.write_all(json.as_bytes()).await.map_err(|e| Error::Transport {
-            message: format!("Failed to write notification: {}", e),
-        })?;
+        stdin
+            .write_all(json.as_bytes())
+            .await
+            .map_err(|e| Error::Transport {
+                message: format!("Failed to write notification: {}", e),
+            })?;
         stdin.write_all(b"\n").await.map_err(|e| Error::Transport {
             message: format!("Failed to write newline: {}", e),
         })?;
@@ -515,7 +525,7 @@ impl MCPTransport for StdioTransport {
     async fn close(&self) -> Result<()> {
         // Drop stdin to signal EOF
         *self.stdin.lock().await = None;
-        
+
         // Kill the process if still running
         if let Some(mut child) = self.child.lock().await.take() {
             let _ = child.kill().await;
@@ -569,7 +579,7 @@ impl MCPManager {
     /// List all tools from all connected servers.
     pub async fn list_all_tools(&self) -> Result<Vec<(String, MCPTool)>> {
         let mut all_tools = Vec::new();
-        
+
         for (name, client) in self.clients.read().await.iter() {
             match client.list_tools().await {
                 Ok(tools) => {
@@ -593,11 +603,15 @@ impl MCPManager {
         tool: &str,
         arguments: Value,
     ) -> Result<CallToolResult> {
-        let client = self.clients.read().await.get(server).cloned().ok_or_else(|| {
-            Error::Protocol {
+        let client = self
+            .clients
+            .read()
+            .await
+            .get(server)
+            .cloned()
+            .ok_or_else(|| Error::Protocol {
                 message: format!("Server '{}' not found", server),
-            }
-        })?;
+            })?;
 
         client.call_tool(tool, arguments).await
     }
@@ -605,7 +619,7 @@ impl MCPManager {
     /// Close all connections.
     pub async fn close_all(&self) -> Result<()> {
         let clients: Vec<_> = self.clients.write().await.drain().collect();
-        
+
         for (name, client) in clients {
             if let Err(e) = client.close().await {
                 warn!(server = %name, error = %e, "Error closing MCP client");
@@ -636,12 +650,14 @@ mod tests {
 
     #[test]
     fn test_stdio_transport_creation() {
-        let transport = StdioTransport::new("echo", &["hello"])
-            .with_env("TEST_VAR", "test_value");
-        
+        let transport = StdioTransport::new("echo", &["hello"]).with_env("TEST_VAR", "test_value");
+
         assert_eq!(transport.command, "echo");
         assert_eq!(transport.args, vec!["hello".to_string()]);
-        assert_eq!(transport.env.get("TEST_VAR"), Some(&"test_value".to_string()));
+        assert_eq!(
+            transport.env.get("TEST_VAR"),
+            Some(&"test_value".to_string())
+        );
     }
 
     #[test]

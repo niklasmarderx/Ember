@@ -144,10 +144,7 @@ impl MCPServer {
             Ok(value) => JsonRpcResponse::success(request.id, value),
             Err(e) => {
                 warn!(error = %e, "MCP request failed");
-                JsonRpcResponse::error(
-                    request.id,
-                    JsonRpcError::internal_error(e.to_string()),
-                )
+                JsonRpcResponse::error(request.id, JsonRpcError::internal_error(e.to_string()))
             }
         }
     }

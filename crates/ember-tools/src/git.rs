@@ -7,7 +7,7 @@
 //! - Viewing diffs and logs
 //! - File operations (add, restore, etc.)
 
-use crate::{Error, Result, ToolDefinition, ToolHandler, registry::ToolOutput};
+use crate::{registry::ToolOutput, Error, Result, ToolDefinition, ToolHandler};
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -21,13 +21,13 @@ use tracing::debug;
 pub struct GitConfig {
     /// Default repository path (if not specified in each call)
     pub default_repo: Option<PathBuf>,
-    
+
     /// Maximum output size in bytes
     pub max_output_bytes: usize,
-    
+
     /// Timeout for git operations in seconds
     pub timeout_secs: u64,
-    
+
     /// Whether to allow destructive operations (reset --hard, etc.)
     pub allow_destructive: bool,
 }
@@ -125,8 +125,10 @@ impl GitTool {
 
     /// Get repository status.
     pub async fn status(&self, repo_path: Option<&Path>) -> Result<String> {
-        let output = self.run_git(&["status", "--porcelain=v2", "--branch"], repo_path).await?;
-        
+        let output = self
+            .run_git(&["status", "--porcelain=v2", "--branch"], repo_path)
+            .await?;
+
         if !output.success {
             return Err(Error::execution_failed("git", output.stderr));
         }
@@ -159,10 +161,10 @@ impl GitTool {
                 if parts.len() >= 9 {
                     let xy = parts[1];
                     let path = parts[8];
-                    
+
                     let index = xy.chars().next().unwrap_or(' ');
                     let worktree = xy.chars().nth(1).unwrap_or(' ');
-                    
+
                     if index != '.' && index != ' ' {
                         staged.push(format!("{}: {}", index, path));
                     }
@@ -209,13 +211,18 @@ impl GitTool {
     }
 
     /// Get the diff of changes.
-    pub async fn diff(&self, staged: bool, file: Option<&str>, repo_path: Option<&Path>) -> Result<String> {
+    pub async fn diff(
+        &self,
+        staged: bool,
+        file: Option<&str>,
+        repo_path: Option<&Path>,
+    ) -> Result<String> {
         let mut args = vec!["diff"];
-        
+
         if staged {
             args.push("--cached");
         }
-        
+
         // Add file if specified
         if let Some(f) = file {
             args.push("--");
@@ -223,7 +230,7 @@ impl GitTool {
         }
 
         let output = self.run_git(&args, repo_path).await?;
-        
+
         if !output.success && !output.stderr.is_empty() {
             return Err(Error::execution_failed("git", output.stderr));
         }
@@ -236,10 +243,15 @@ impl GitTool {
     }
 
     /// Get commit log.
-    pub async fn log(&self, count: usize, oneline: bool, repo_path: Option<&Path>) -> Result<String> {
+    pub async fn log(
+        &self,
+        count: usize,
+        oneline: bool,
+        repo_path: Option<&Path>,
+    ) -> Result<String> {
         let count_str = format!("-{}", count);
         let mut args = vec!["log", &count_str];
-        
+
         if oneline {
             args.push("--oneline");
         } else {
@@ -248,7 +260,7 @@ impl GitTool {
         }
 
         let output = self.run_git(&args, repo_path).await?;
-        
+
         if !output.success {
             return Err(Error::execution_failed("git", output.stderr));
         }
@@ -262,7 +274,7 @@ impl GitTool {
         args.extend(files);
 
         let output = self.run_git(&args, repo_path).await?;
-        
+
         if !output.success {
             return Err(Error::execution_failed("git", output.stderr));
         }
@@ -273,7 +285,7 @@ impl GitTool {
     /// Commit staged changes.
     pub async fn commit(&self, message: &str, repo_path: Option<&Path>) -> Result<String> {
         let output = self.run_git(&["commit", "-m", message], repo_path).await?;
-        
+
         if !output.success {
             return Err(Error::execution_failed("git", output.stderr));
         }
@@ -284,15 +296,15 @@ impl GitTool {
     /// List branches.
     pub async fn branches(&self, all: bool, repo_path: Option<&Path>) -> Result<String> {
         let mut args = vec!["branch"];
-        
+
         if all {
             args.push("-a");
         }
-        
+
         args.push("-v");
 
         let output = self.run_git(&args, repo_path).await?;
-        
+
         if !output.success {
             return Err(Error::execution_failed("git", output.stderr));
         }
@@ -301,17 +313,22 @@ impl GitTool {
     }
 
     /// Checkout a branch or file.
-    pub async fn checkout(&self, target: &str, create: bool, repo_path: Option<&Path>) -> Result<String> {
+    pub async fn checkout(
+        &self,
+        target: &str,
+        create: bool,
+        repo_path: Option<&Path>,
+    ) -> Result<String> {
         let mut args = vec!["checkout"];
-        
+
         if create {
             args.push("-b");
         }
-        
+
         args.push(target);
 
         let output = self.run_git(&args, repo_path).await?;
-        
+
         if !output.success {
             return Err(Error::execution_failed("git", output.stderr));
         }
@@ -326,7 +343,12 @@ impl GitTool {
     }
 
     /// Reset changes.
-    pub async fn reset(&self, hard: bool, target: Option<&str>, repo_path: Option<&Path>) -> Result<String> {
+    pub async fn reset(
+        &self,
+        hard: bool,
+        target: Option<&str>,
+        repo_path: Option<&Path>,
+    ) -> Result<String> {
         if hard && !self.config.allow_destructive {
             return Err(Error::execution_failed(
                 "git",
@@ -335,22 +357,26 @@ impl GitTool {
         }
 
         let mut args = vec!["reset"];
-        
+
         if hard {
             args.push("--hard");
         }
-        
+
         if let Some(t) = target {
             args.push(t);
         }
 
         let output = self.run_git(&args, repo_path).await?;
-        
+
         if !output.success {
             return Err(Error::execution_failed("git", output.stderr));
         }
 
-        Ok(if output.stdout.is_empty() { "Reset complete".to_string() } else { output.stdout })
+        Ok(if output.stdout.is_empty() {
+            "Reset complete".to_string()
+        } else {
+            output.stdout
+        })
     }
 
     /// Stash changes.
@@ -362,16 +388,25 @@ impl GitTool {
         };
 
         let output = self.run_git(&args, repo_path).await?;
-        
+
         if !output.success {
             return Err(Error::execution_failed("git", output.stderr));
         }
 
-        Ok(if output.stdout.is_empty() { output.stderr } else { output.stdout })
+        Ok(if output.stdout.is_empty() {
+            output.stderr
+        } else {
+            output.stdout
+        })
     }
 
     /// Show file at a specific revision.
-    pub async fn show(&self, revision: &str, file: Option<&str>, repo_path: Option<&Path>) -> Result<String> {
+    pub async fn show(
+        &self,
+        revision: &str,
+        file: Option<&str>,
+        repo_path: Option<&Path>,
+    ) -> Result<String> {
         let target = if let Some(f) = file {
             format!("{}:{}", revision, f)
         } else {
@@ -379,7 +414,7 @@ impl GitTool {
         };
 
         let output = self.run_git(&["show", &target], repo_path).await?;
-        
+
         if !output.success {
             return Err(Error::execution_failed("git", output.stderr));
         }
@@ -427,17 +462,24 @@ impl ToolHandler for GitTool {
             .map(Path::new);
 
         let result = match operation {
-            "status" => {
-                self.status(repo_path).await?
-            }
+            "status" => self.status(repo_path).await?,
             "diff" => {
-                let staged = arguments.get("staged").and_then(|v| v.as_bool()).unwrap_or(false);
+                let staged = arguments
+                    .get("staged")
+                    .and_then(|v| v.as_bool())
+                    .unwrap_or(false);
                 let file = arguments.get("target").and_then(|v| v.as_str());
                 self.diff(staged, file, repo_path).await?
             }
             "log" => {
-                let count = arguments.get("count").and_then(|v| v.as_u64()).unwrap_or(10) as usize;
-                let oneline = arguments.get("oneline").and_then(|v| v.as_bool()).unwrap_or(true);
+                let count = arguments
+                    .get("count")
+                    .and_then(|v| v.as_u64())
+                    .unwrap_or(10) as usize;
+                let oneline = arguments
+                    .get("oneline")
+                    .and_then(|v| v.as_bool())
+                    .unwrap_or(true);
                 self.log(count, oneline, repo_path).await?
             }
             "add" => {
@@ -447,7 +489,8 @@ impl ToolHandler for GitTool {
                     .map(|arr| arr.iter().filter_map(|v| v.as_str()).collect())
                     .unwrap_or_else(|| {
                         // If no files specified, check for target
-                        arguments.get("target")
+                        arguments
+                            .get("target")
                             .and_then(|v| v.as_str())
                             .map(|t| vec![t])
                             .unwrap_or_else(|| vec!["."])
@@ -458,28 +501,44 @@ impl ToolHandler for GitTool {
                 let message = arguments
                     .get("message")
                     .and_then(|v| v.as_str())
-                    .ok_or_else(|| Error::invalid_arguments("git", "Commit requires a 'message' parameter"))?;
+                    .ok_or_else(|| {
+                        Error::invalid_arguments("git", "Commit requires a 'message' parameter")
+                    })?;
                 self.commit(message, repo_path).await?
             }
             "branch" | "branches" => {
-                let all = arguments.get("all").and_then(|v| v.as_bool()).unwrap_or(false);
+                let all = arguments
+                    .get("all")
+                    .and_then(|v| v.as_bool())
+                    .unwrap_or(false);
                 self.branches(all, repo_path).await?
             }
             "checkout" => {
                 let target = arguments
                     .get("target")
                     .and_then(|v| v.as_str())
-                    .ok_or_else(|| Error::invalid_arguments("git", "Checkout requires a 'target' parameter"))?;
-                let create = arguments.get("create").and_then(|v| v.as_bool()).unwrap_or(false);
+                    .ok_or_else(|| {
+                        Error::invalid_arguments("git", "Checkout requires a 'target' parameter")
+                    })?;
+                let create = arguments
+                    .get("create")
+                    .and_then(|v| v.as_bool())
+                    .unwrap_or(false);
                 self.checkout(target, create, repo_path).await?
             }
             "reset" => {
-                let hard = arguments.get("hard").and_then(|v| v.as_bool()).unwrap_or(false);
+                let hard = arguments
+                    .get("hard")
+                    .and_then(|v| v.as_bool())
+                    .unwrap_or(false);
                 let target = arguments.get("target").and_then(|v| v.as_str());
                 self.reset(hard, target, repo_path).await?
             }
             "stash" => {
-                let pop = arguments.get("pop").and_then(|v| v.as_bool()).unwrap_or(false);
+                let pop = arguments
+                    .get("pop")
+                    .and_then(|v| v.as_bool())
+                    .unwrap_or(false);
                 self.stash(pop, repo_path).await?
             }
             "show" => {

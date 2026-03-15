@@ -32,8 +32,8 @@
 #![deny(missing_docs)]
 #![deny(unsafe_code)]
 
-pub mod error;
 pub mod embeddings;
+pub mod error;
 pub mod memory;
 
 #[cfg(feature = "sqlite")]
@@ -46,17 +46,18 @@ pub mod vector;
 pub use error::StorageError as Error;
 
 // Re-exports
-pub use error::{Result, StorageError};
 pub use embeddings::{
     cosine_similarity, euclidean_distance as embed_euclidean_distance, Embedder, EmbedderConfig,
     LocalEmbedder, OllamaEmbedder,
 };
-pub use memory::{DocId, Document, MemoryStats, SearchResult as VectorSearchResult, VectorMemory, VectorMemoryConfig};
+pub use error::{Result, StorageError};
+pub use memory::{
+    DocId, Document, MemoryStats, SearchResult as VectorSearchResult, VectorMemory,
+    VectorMemoryConfig,
+};
 
 #[cfg(feature = "sqlite")]
-pub use sqlite::{
-    ConversationRecord, MemoryRecord, MessageRecord, SqliteConfig, SqliteStorage,
-};
+pub use sqlite::{ConversationRecord, MemoryRecord, MessageRecord, SqliteConfig, SqliteStorage};
 
 #[cfg(feature = "vector")]
 pub use vector::{
@@ -65,8 +66,8 @@ pub use vector::{
 
 /// Prelude module for convenient imports.
 pub mod prelude {
-    pub use crate::error::{Result, StorageError};
     pub use crate::embeddings::{cosine_similarity, Embedder, LocalEmbedder};
+    pub use crate::error::{Result, StorageError};
     pub use crate::memory::{DocId, Document, VectorMemory, VectorMemoryConfig};
 
     #[cfg(feature = "sqlite")]

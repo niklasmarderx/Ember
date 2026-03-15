@@ -8,8 +8,8 @@ use tracing::{debug, instrument};
 
 use crate::{
     provider::StreamResponse, CompletionRequest, CompletionResponse, ContentPart, Error,
-    FinishReason, ImageSource, LLMProvider, ModelInfo, Result, StreamChunk, TokenUsage,
-    ToolCall, ToolCallDelta,
+    FinishReason, ImageSource, LLMProvider, ModelInfo, Result, StreamChunk, TokenUsage, ToolCall,
+    ToolCallDelta,
 };
 
 use futures::StreamExt;
@@ -93,15 +93,14 @@ impl LLMProvider for AnthropicProvider {
         let status = response.status();
 
         if !status.is_success() {
-            let error_body: AnthropicError = response.json().await.unwrap_or_else(|_| {
-                AnthropicError {
+            let error_body: AnthropicError =
+                response.json().await.unwrap_or_else(|_| AnthropicError {
                     r#type: "error".to_string(),
                     error: AnthropicErrorDetail {
                         r#type: "unknown".to_string(),
                         message: "Unknown error".to_string(),
                     },
-                }
-            });
+                });
 
             return match status.as_u16() {
                 401 => Err(Error::api_key_missing("anthropic")),
@@ -130,15 +129,14 @@ impl LLMProvider for AnthropicProvider {
         let status = response.status();
 
         if !status.is_success() {
-            let error_body: AnthropicError = response.json().await.unwrap_or_else(|_| {
-                AnthropicError {
+            let error_body: AnthropicError =
+                response.json().await.unwrap_or_else(|_| AnthropicError {
                     r#type: "error".to_string(),
                     error: AnthropicErrorDetail {
                         r#type: "unknown".to_string(),
                         message: "Unknown error".to_string(),
                     },
-                }
-            });
+                });
 
             return match status.as_u16() {
                 401 => Err(Error::api_key_missing("anthropic")),

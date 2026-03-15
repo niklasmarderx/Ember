@@ -21,9 +21,8 @@ impl RoutingRule {
     /// Create a new routing rule
     pub fn new(pattern: &str, provider: impl Into<String>) -> Result<Self> {
         Ok(Self {
-            pattern: Regex::new(pattern).map_err(|e| {
-                crate::Error::ConfigError(format!("Invalid regex pattern: {}", e))
-            })?,
+            pattern: Regex::new(pattern)
+                .map_err(|e| crate::Error::ConfigError(format!("Invalid regex pattern: {}", e)))?,
             provider: provider.into(),
             priority: 0,
         })
@@ -127,7 +126,7 @@ mod tests {
     #[test]
     fn test_routing_rule() {
         let rule = RoutingRule::new(r"(?i)code|programming|debug", "anthropic").unwrap();
-        
+
         assert!(rule.matches("Help me debug this code"));
         assert!(rule.matches("Programming question"));
         assert!(!rule.matches("What's the weather?"));
@@ -136,7 +135,9 @@ mod tests {
     #[test]
     fn test_routing_rule_priority() {
         let rule1 = RoutingRule::new(".*", "default").unwrap().with_priority(0);
-        let rule2 = RoutingRule::new("code", "anthropic").unwrap().with_priority(10);
+        let rule2 = RoutingRule::new("code", "anthropic")
+            .unwrap()
+            .with_priority(10);
 
         assert_eq!(rule1.priority, 0);
         assert_eq!(rule2.priority, 10);

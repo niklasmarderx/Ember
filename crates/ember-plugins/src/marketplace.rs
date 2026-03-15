@@ -141,7 +141,7 @@ impl PluginCache {
     /// Create a new plugin cache.
     pub async fn new(cache_dir: PathBuf) -> Result<Self> {
         fs::create_dir_all(&cache_dir).await?;
-        
+
         let index_path = cache_dir.join("index.json");
         let index = if index_path.exists() {
             let content = fs::read_to_string(&index_path).await?;
@@ -149,30 +149,30 @@ impl PluginCache {
         } else {
             HashMap::new()
         };
-        
+
         Ok(Self { cache_dir, index })
     }
-    
+
     /// Get the cache directory.
     pub fn cache_dir(&self) -> &Path {
         &self.cache_dir
     }
-    
+
     /// Check if a plugin is cached.
     pub fn is_cached(&self, name: &str) -> bool {
         self.index.contains_key(name)
     }
-    
+
     /// Get cached plugin info.
     pub fn get_cached(&self, name: &str) -> Option<&CachedPluginInfo> {
         self.index.get(name)
     }
-    
+
     /// List all cached plugins.
     pub fn list_cached(&self) -> Vec<&CachedPluginInfo> {
         self.index.values().collect()
     }
-    
+
     /// Add a plugin to the cache.
     pub async fn cache_plugin(
         &mut self,
@@ -183,21 +183,21 @@ impl PluginCache {
     ) -> Result<PathBuf> {
         let plugin_dir = self.cache_dir.join(name);
         fs::create_dir_all(&plugin_dir).await?;
-        
+
         let wasm_path = plugin_dir.join(format!("{}-{}.wasm", name, version));
         let manifest_path = plugin_dir.join("manifest.json");
-        
+
         // Write WASM file
         fs::write(&wasm_path, wasm_bytes).await?;
-        
+
         // Write manifest
         let manifest_json = serde_json::to_string_pretty(manifest)
             .map_err(|e| PluginError::Internal(e.to_string()))?;
         fs::write(&manifest_path, manifest_json).await?;
-        
+
         // Calculate checksum
         let checksum = format!("{:x}", md5::compute(wasm_bytes));
-        
+
         // Update index
         let info = CachedPluginInfo {
             name: name.to_string(),
@@ -208,15 +208,15 @@ impl PluginCache {
             checksum,
         };
         self.index.insert(name.to_string(), info);
-        
+
         // Save index
         self.save_index().await?;
-        
+
         info!(name = %name, version = %version, "Plugin cached");
-        
+
         Ok(wasm_path)
     }
-    
+
     /// Remove a plugin from the cache.
     pub async fn remove_plugin(&mut self, name: &str) -> Result<()> {
         if let Some(info) = self.index.remove(name) {
@@ -225,16 +225,16 @@ impl PluginCache {
             if plugin_dir.exists() {
                 fs::remove_dir_all(plugin_dir).await?;
             }
-            
+
             // Save index
             self.save_index().await?;
-            
+
             info!(name = %name, "Plugin removed from cache");
         }
-        
+
         Ok(())
     }
-    
+
     /// Clear the entire cache.
     pub async fn clear(&mut self) -> Result<()> {
         // Remove all plugin directories
@@ -245,29 +245,29 @@ impl PluginCache {
                 fs::remove_dir_all(&path).await?;
             }
         }
-        
+
         self.index.clear();
         self.save_index().await?;
-        
+
         info!("Plugin cache cleared");
-        
+
         Ok(())
     }
-    
+
     /// Get the total cache size in bytes.
     pub async fn cache_size(&self) -> Result<u64> {
         let mut total = 0u64;
-        
+
         for info in self.index.values() {
             if info.wasm_path.exists() {
                 let metadata = fs::metadata(&info.wasm_path).await?;
                 total += metadata.len();
             }
         }
-        
+
         Ok(total)
     }
-    
+
     /// Save the index to disk.
     async fn save_index(&self) -> Result<()> {
         let index_path = self.cache_dir.join("index.json");
@@ -291,12 +291,12 @@ pub struct MarketplaceClient {
 impl MarketplaceClient {
     /// Default marketplace URL.
     pub const DEFAULT_MARKETPLACE_URL: &'static str = "https://plugins.ember.dev/api/v1";
-    
+
     /// Create a new marketplace client.
     pub async fn new(cache_dir: PathBuf) -> Result<Self> {
         Self::with_url(Self::DEFAULT_MARKETPLACE_URL, cache_dir).await
     }
-    
+
     /// Create a marketplace client with a custom URL.
     pub async fn with_url(base_url: &str, cache_dir: PathBuf) -> Result<Self> {
         let client = reqwest::Client::builder()
@@ -304,78 +304,80 @@ impl MarketplaceClient {
             .timeout(std::time::Duration::from_secs(30))
             .build()
             .map_err(|e| PluginError::Internal(e.to_string()))?;
-        
+
         let cache = PluginCache::new(cache_dir).await?;
-        
+
         Ok(Self {
             base_url: base_url.to_string(),
             client,
             cache,
         })
     }
-    
+
     /// Search for plugins.
     pub async fn search(&self, query: PluginSearchQuery) -> Result<PluginSearchResults> {
         let url = format!("{}/plugins/search", self.base_url);
-        
-        let response = self.client
+
+        let response = self
+            .client
             .post(&url)
             .json(&query)
             .send()
             .await
             .map_err(|e| PluginError::Internal(format!("Search request failed: {}", e)))?;
-        
+
         if !response.status().is_success() {
             return Err(PluginError::Internal(format!(
                 "Search failed with status: {}",
                 response.status()
             )));
         }
-        
+
         let results: PluginSearchResults = response
             .json()
             .await
             .map_err(|e| PluginError::Internal(format!("Failed to parse search results: {}", e)))?;
-        
+
         Ok(results)
     }
-    
+
     /// Get plugin details by name.
     pub async fn get_plugin(&self, name: &str) -> Result<PluginRegistryEntry> {
         let url = format!("{}/plugins/{}", self.base_url, name);
-        
-        let response = self.client
+
+        let response = self
+            .client
             .get(&url)
             .send()
             .await
             .map_err(|e| PluginError::Internal(format!("Get plugin request failed: {}", e)))?;
-        
+
         if response.status() == reqwest::StatusCode::NOT_FOUND {
             return Err(PluginError::NotFound(name.to_string()));
         }
-        
+
         if !response.status().is_success() {
             return Err(PluginError::Internal(format!(
                 "Get plugin failed with status: {}",
                 response.status()
             )));
         }
-        
+
         let entry: PluginRegistryEntry = response
             .json()
             .await
             .map_err(|e| PluginError::Internal(format!("Failed to parse plugin details: {}", e)))?;
-        
+
         Ok(entry)
     }
-    
+
     /// Download and install a plugin.
     pub async fn install(&mut self, name: &str, version: Option<&str>) -> Result<PathBuf> {
         // Get plugin info
         let entry = self.get_plugin(name).await?;
-        
+
         let target_version = version.unwrap_or(&entry.manifest.version);
-        
+
         // Check if already cached
         if let Some(cached) = self.cache.get_cached(name) {
             if cached.version == target_version {
@@ -383,28 +385,29 @@ impl MarketplaceClient {
                 return Ok(cached.wasm_path.clone());
             }
         }
-        
+
         // Download WASM file
         info!(name = %name, version = %target_version, "Downloading plugin");
-        
-        let response = self.client
+
+        let response = self
+            .client
             .get(&entry.download_url)
             .send()
             .await
             .map_err(|e| PluginError::Internal(format!("Download failed: {}", e)))?;
-        
+
         if !response.status().is_success() {
             return Err(PluginError::Internal(format!(
                 "Download failed with status: {}",
                 response.status()
             )));
         }
-        
+
         let wasm_bytes = response
             .bytes()
             .await
             .map_err(|e| PluginError::Internal(format!("Failed to read download: {}", e)))?;
-        
+
         // Verify checksum
         let computed_checksum = format!("{:x}", md5::compute(&wasm_bytes));
         if computed_checksum != entry.checksum {
@@ -413,34 +416,32 @@ impl MarketplaceClient {
                 entry.checksum, computed_checksum
             )));
         }
-        
+
         // Cache the plugin
-        let path = self.cache.cache_plugin(
-            name,
-            target_version,
-            &wasm_bytes,
-            &entry.manifest,
-        ).await?;
-        
+        let path = self
+            .cache
+            .cache_plugin(name, target_version, &wasm_bytes, &entry.manifest)
+            .await?;
+
         info!(name = %name, version = %target_version, "Plugin installed");
-        
+
         Ok(path)
     }
-    
+
     /// Uninstall a plugin.
     pub async fn uninstall(&mut self, name: &str) -> Result<()> {
         self.cache.remove_plugin(name).await
     }
-    
+
     /// List installed plugins.
     pub fn list_installed(&self) -> Vec<&CachedPluginInfo> {
         self.cache.list_cached()
     }
-    
+
     /// Check for updates.
     pub async fn check_updates(&self) -> Result<Vec<(String, String, String)>> {
         let mut updates = Vec::new();
-        
+
         for info in self.cache.list_cached() {
             match self.get_plugin(&info.name).await {
                 Ok(entry) => {
@@ -457,17 +458,17 @@ impl MarketplaceClient {
                 }
             }
         }
-        
+
         Ok(updates)
     }
-    
+
     /// Update a plugin to the latest version.
     pub async fn update(&mut self, name: &str) -> Result<PathBuf> {
         // Remove old version and install new
         self.cache.remove_plugin(name).await?;
         self.install(name, None).await
     }
-    
+
     /// Get cache statistics.
     pub async fn cache_stats(&self) -> Result<CacheStats> {
         Ok(CacheStats {
@@ -506,50 +507,51 @@ impl MarketplaceClient {
     /// Get featured plugins.
     pub async fn get_featured(&self) -> Result<FeaturedPlugins> {
         let url = format!("{}/plugins/featured", self.base_url);
-        
-        let response = self.client
+
+        let response = self
+            .client
             .get(&url)
             .send()
             .await
             .map_err(|e| PluginError::Internal(format!("Featured request failed: {}", e)))?;
-        
+
         if !response.status().is_success() {
             return Err(PluginError::Internal(format!(
                 "Featured request failed with status: {}",
                 response.status()
             )));
         }
-        
-        let featured: FeaturedPlugins = response
-            .json()
-            .await
-            .map_err(|e| PluginError::Internal(format!("Failed to parse featured plugins: {}", e)))?;
-        
+
+        let featured: FeaturedPlugins = response.json().await.map_err(|e| {
+            PluginError::Internal(format!("Failed to parse featured plugins: {}", e))
+        })?;
+
         Ok(featured)
     }
-    
+
     /// Get all available tags.
     pub async fn get_tags(&self) -> Result<Vec<TagInfo>> {
         let url = format!("{}/tags", self.base_url);
-        
-        let response = self.client
+
+        let response = self
+            .client
             .get(&url)
             .send()
             .await
             .map_err(|e| PluginError::Internal(format!("Tags request failed: {}", e)))?;
-        
+
         if !response.status().is_success() {
             return Err(PluginError::Internal(format!(
                 "Tags request failed with status: {}",
                 response.status()
             )));
         }
-        
+
         let tags: Vec<TagInfo> = response
             .json()
             .await
             .map_err(|e| PluginError::Internal(format!("Failed to parse tags: {}", e)))?;
-        
+
         Ok(tags)
     }
 }
@@ -569,51 +571,59 @@ pub struct TagInfo {
 mod tests {
     use super::*;
     use tempfile::tempdir;
-    
+
     #[tokio::test]
     async fn test_plugin_cache_creation() {
         let temp_dir = tempdir().unwrap();
-        let cache = PluginCache::new(temp_dir.path().to_path_buf()).await.unwrap();
-        
+        let cache = PluginCache::new(temp_dir.path().to_path_buf())
+            .await
+            .unwrap();
+
         assert!(cache.list_cached().is_empty());
     }
-    
+
     #[tokio::test]
     async fn test_cache_plugin() {
         let temp_dir = tempdir().unwrap();
-        let mut cache = PluginCache::new(temp_dir.path().to_path_buf()).await.unwrap();
-        
-        let manifest = PluginManifest::new("test-plugin", "1.0.0", "A test plugin");
-        let wasm_bytes = b"fake wasm content";
-        
-        let path = cache.cache_plugin("test-plugin", "1.0.0", wasm_bytes, &manifest)
+        let mut cache = PluginCache::new(temp_dir.path().to_path_buf())
             .await
             .unwrap();
-        
+
+        let manifest = PluginManifest::new("test-plugin", "1.0.0", "A test plugin");
+        let wasm_bytes = b"fake wasm content";
+
+        let path = cache
+            .cache_plugin("test-plugin", "1.0.0", wasm_bytes, &manifest)
+            .await
+            .unwrap();
+
         assert!(path.exists());
         assert!(cache.is_cached("test-plugin"));
-        
+
         let info = cache.get_cached("test-plugin").unwrap();
         assert_eq!(info.version, "1.0.0");
     }
-    
+
     #[tokio::test]
     async fn test_remove_plugin() {
         let temp_dir = tempdir().unwrap();
-        let mut cache = PluginCache::new(temp_dir.path().to_path_buf()).await.unwrap();
-        
-        let manifest = PluginManifest::new("test-plugin", "1.0.0", "A test plugin");
-        let wasm_bytes = b"fake wasm content";
-        
-        cache.cache_plugin("test-plugin", "1.0.0", wasm_bytes, &manifest)
+        let mut cache = PluginCache::new(temp_dir.path().to_path_buf())
             .await
             .unwrap();
-        
+
+        let manifest = PluginManifest::new("test-plugin", "1.0.0", "A test plugin");
+        let wasm_bytes = b"fake wasm content";
+
+        cache
+            .cache_plugin("test-plugin", "1.0.0", wasm_bytes, &manifest)
+            .await
+            .unwrap();
+
         cache.remove_plugin("test-plugin").await.unwrap();
-        
+
         assert!(!cache.is_cached("test-plugin"));
     }
-    
+
     #[test]
     fn test_search_query_default() {
         let query = PluginSearchQuery::default();

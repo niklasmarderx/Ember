@@ -10,8 +10,8 @@ pub fn init(force: bool) -> Result<()> {
 
     if config_path.exists() && !force {
         println!(
-        "{} Configuration file already exists at:",
-        "[!]".bright_yellow()
+            "{} Configuration file already exists at:",
+            "[!]".bright_yellow()
         );
         println!("   {}", config_path.display().to_string().bright_blue());
         println!();
@@ -22,10 +22,7 @@ pub fn init(force: bool) -> Result<()> {
     let config = AppConfig::default();
     config.save(None)?;
 
-    println!(
-        "{} Configuration file created at:",
-        "[OK]".bright_green()
-    );
+    println!("{} Configuration file created at:", "[OK]".bright_green());
     println!("   {}", config_path.display().to_string().bright_blue());
     println!();
     println!("{}", "Default settings:".bright_yellow());
@@ -100,7 +97,12 @@ pub fn show(config: &AppConfig) -> Result<()> {
         "  system_prompt = {}",
         format!(
             "\"{}...\"",
-            config.agent.system_prompt.chars().take(50).collect::<String>()
+            config
+                .agent
+                .system_prompt
+                .chars()
+                .take(50)
+                .collect::<String>()
         )
         .bright_green()
     );
@@ -143,10 +145,11 @@ pub fn show(config: &AppConfig) -> Result<()> {
 /// Set a configuration value.
 pub fn set(key: &str, value: &str) -> Result<()> {
     let mut config = AppConfig::load(None)?;
-    
-    config.set(key, value)
+
+    config
+        .set(key, value)
         .context(format!("Failed to set configuration key: {}", key))?;
-    
+
     config.save(None)?;
 
     println!(
@@ -183,19 +186,16 @@ pub fn get(config: &AppConfig, key: &str) -> Result<()> {
 /// Show configuration file path.
 pub fn path() -> Result<()> {
     let config_path = AppConfig::config_path()?;
-    
+
     println!("{}", "Configuration file path:".bright_yellow());
     println!("  {}", config_path.display().to_string().bright_blue());
-    
+
     if config_path.exists() {
         println!("  Status: {}", "exists".bright_green());
     } else {
         println!("  Status: {}", "not created".bright_yellow());
         println!();
-        println!(
-            "Run {} to create it.",
-            "ember config init".bright_cyan()
-        );
+        println!("Run {} to create it.", "ember config init".bright_cyan());
     }
 
     Ok(())
@@ -219,10 +219,6 @@ fn print_available_keys() {
     ];
 
     for (key, description) in keys {
-        println!(
-            "  {} - {}",
-            key.bright_cyan(),
-            description.bright_white()
-        );
+        println!("  {} - {}", key.bright_cyan(), description.bright_white());
     }
 }

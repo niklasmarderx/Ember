@@ -536,7 +536,11 @@ impl ResourceContent {
     }
 
     /// Create binary resource content
-    pub fn blob(uri: impl Into<String>, data: impl Into<String>, mime_type: impl Into<String>) -> Self {
+    pub fn blob(
+        uri: impl Into<String>,
+        data: impl Into<String>,
+        mime_type: impl Into<String>,
+    ) -> Self {
         Self {
             uri: uri.into(),
             mime_type: Some(mime_type.into()),
@@ -657,10 +661,9 @@ mod tests {
 
     #[test]
     fn test_serialization() {
-        let req = JsonRpcRequest::new("test-id", "initialize")
-            .with_params(serde_json::json!({
-                "protocolVersion": PROTOCOL_VERSION
-            }));
+        let req = JsonRpcRequest::new("test-id", "initialize").with_params(serde_json::json!({
+            "protocolVersion": PROTOCOL_VERSION
+        }));
 
         let json = serde_json::to_string(&req).unwrap();
         assert!(json.contains("initialize"));

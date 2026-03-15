@@ -80,13 +80,13 @@ impl fmt::Display for ThinkingType {
 pub struct ThinkingBlock {
     /// Type of thinking
     pub thinking_type: ThinkingType,
-    
+
     /// The thinking content
     pub content: String,
-    
+
     /// Optional title or subject
     pub title: Option<String>,
-    
+
     /// Position in the original text (start index)
     pub position: usize,
 }
@@ -174,7 +174,7 @@ impl ThinkingExtractor {
             // Find the end of the opening tag
             let after_start = &remaining[start_idx..];
             let tag_end = after_start.find('>').map(|i| i + 1);
-            
+
             if let Some(tag_end) = tag_end {
                 // Parse attributes from opening tag
                 let opening_tag = &after_start[..tag_end];
@@ -185,29 +185,28 @@ impl ThinkingExtractor {
                 let content_start = &after_start[tag_end..];
                 if let Some(end_idx) = content_start.find("</thinking>") {
                     let content = content_start[..end_idx].trim().to_string();
-                    
+
                     // Infer type before creating the block if needed
                     let inferred_type = if thinking_type.is_none() {
                         Some(Self::infer_type(&content))
                     } else {
                         None
                     };
-                    
-                    let mut block = ThinkingBlock::new(content)
-                        .with_position(position);
-                    
+
+                    let mut block = ThinkingBlock::new(content).with_position(position);
+
                     if let Some(t) = thinking_type {
                         block = block.with_type(t);
                     } else if let Some(t) = inferred_type {
                         block = block.with_type(t);
                     }
-                    
+
                     if let Some(title) = title {
                         block = block.with_title(title);
                     }
-                    
+
                     blocks.push(block);
-                    
+
                     // Move past the closing tag
                     let skip = start_idx + tag_end + end_idx + "</thinking>".len();
                     remaining = &remaining[skip..];
@@ -239,7 +238,7 @@ impl ThinkingExtractor {
     fn parse_type_attribute(tag: &str) -> Option<ThinkingType> {
         // Look for type="..." or type='...'
         let type_patterns = ["type=\"", "type='"];
-        
+
         for pattern in &type_patterns {
             if let Some(start) = tag.find(pattern) {
                 let value_start = start + pattern.len();
@@ -264,7 +263,7 @@ impl ThinkingExtractor {
     /// Parse title attribute from opening tag.
     fn parse_title_attribute(tag: &str) -> Option<String> {
         let title_patterns = ["title=\"", "title='"];
-        
+
         for pattern in &title_patterns {
             if let Some(start) = tag.find(pattern) {
                 let value_start = start + pattern.len();
@@ -280,10 +279,10 @@ impl ThinkingExtractor {
     /// Infer the thinking type from content.
     fn infer_type(content: &str) -> ThinkingType {
         let lower = content.to_lowercase();
-        
+
         // Check for planning indicators
-        if lower.contains("i will") 
-            || lower.contains("i'll") 
+        if lower.contains("i will")
+            || lower.contains("i'll")
             || lower.contains("plan to")
             || lower.contains("steps:")
             || lower.contains("step 1")
@@ -436,7 +435,9 @@ Your response goes here, outside the thinking tags.
             String::new()
         };
 
-        format!("{}\n\n{}", self.base_prompt, thinking_instruction).trim().to_string()
+        format!("{}\n\n{}", self.base_prompt, thinking_instruction)
+            .trim()
+            .to_string()
     }
 
     /// Get description for a thinking type.
@@ -463,16 +464,16 @@ impl Default for ThinkingPromptBuilder {
 pub struct ThinkingStats {
     /// Number of thinking blocks
     pub block_count: usize,
-    
+
     /// Total characters in thinking
     pub total_chars: usize,
-    
+
     /// Types of thinking used
     pub types_used: Vec<ThinkingType>,
-    
+
     /// Whether planning was included
     pub has_planning: bool,
-    
+
     /// Whether reflection was included
     pub has_reflection: bool,
 }
@@ -511,7 +512,7 @@ This is my reasoning.
 Here is my response.
 "#;
         let (blocks, cleaned) = ThinkingExtractor::extract(text);
-        
+
         assert_eq!(blocks.len(), 1);
         assert!(blocks[0].content.contains("This is my reasoning"));
         assert!(cleaned.contains("Here is my response"));
@@ -529,7 +530,7 @@ Step 2: Do that
 I will help you.
 "#;
         let (blocks, _) = ThinkingExtractor::extract(text);
-        
+
         assert_eq!(blocks.len(), 1);
         assert_eq!(blocks[0].thinking_type, ThinkingType::Planning);
     }
@@ -550,7 +551,7 @@ The plan.
 Final response.
 "#;
         let (blocks, cleaned) = ThinkingExtractor::extract(text);
-        
+
         assert_eq!(blocks.len(), 2);
         assert_eq!(blocks[0].thinking_type, ThinkingType::Reasoning);
         assert_eq!(blocks[1].thinking_type, ThinkingType::Planning);
@@ -574,7 +575,8 @@ Final response.
 
     #[test]
     fn test_thinking_block_summary() {
-        let block = ThinkingBlock::new("This is a very long thinking block content that goes on and on.");
+        let block =
+            ThinkingBlock::new("This is a very long thinking block content that goes on and on.");
         let summary = block.summary(20);
         assert!(summary.len() <= 20);
         assert!(summary.ends_with("..."));
@@ -586,9 +588,9 @@ Final response.
             ThinkingBlock::new("Reasoning").with_type(ThinkingType::Reasoning),
             ThinkingBlock::new("Planning").with_type(ThinkingType::Planning),
         ];
-        
+
         let stats = ThinkingStats::from_blocks(&blocks);
-        
+
         assert_eq!(stats.block_count, 2);
         assert!(stats.has_planning);
         assert!(!stats.has_reflection);
@@ -600,7 +602,7 @@ Final response.
             .base_prompt("You are a helpful assistant.")
             .require_thinking(true)
             .build();
-        
+
         assert!(prompt.contains("helpful assistant"));
         assert!(prompt.contains("<thinking>"));
     }

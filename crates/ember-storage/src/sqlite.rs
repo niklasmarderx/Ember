@@ -100,7 +100,7 @@ impl SqliteStorage {
     /// Returns an error if migrations fail.
     pub async fn migrate(&self) -> Result<()> {
         let conn = self.conn.lock().await;
-        
+
         conn.execute_batch(
             r#"
             -- Conversations table
@@ -153,7 +153,8 @@ impl SqliteStorage {
             CREATE INDEX IF NOT EXISTS idx_memories_last_accessed ON memories(last_accessed DESC);
             CREATE INDEX IF NOT EXISTS idx_agent_state_agent ON agent_state(agent_id);
             "#,
-        ).map_err(|e| StorageError::MigrationFailed(e.to_string()))?;
+        )
+        .map_err(|e| StorageError::MigrationFailed(e.to_string()))?;
 
         info!("Database migrations completed");
         Ok(())
@@ -201,7 +202,11 @@ impl SqliteStorage {
     }
 
     /// List all conversations.
-    pub async fn list_conversations(&self, limit: usize, offset: usize) -> Result<Vec<ConversationRecord>> {
+    pub async fn list_conversations(
+        &self,
+        limit: usize,
+        offset: usize,
+    ) -> Result<Vec<ConversationRecord>> {
         let conn = self.conn.lock().await;
         let mut stmt = conn.prepare(
             "SELECT id, title, created_at, updated_at, metadata FROM conversations ORDER BY updated_at DESC LIMIT ?1 OFFSET ?2",
@@ -237,12 +242,16 @@ impl SqliteStorage {
     // =========================================================================
 
     /// Add a message to a conversation.
-    pub async fn add_message(&self, conversation_id: &str, message: &MessageRecord) -> Result<String> {
+    pub async fn add_message(
+        &self,
+        conversation_id: &str,
+        message: &MessageRecord,
+    ) -> Result<String> {
         let id = Uuid::new_v4().to_string();
         let now = Utc::now().to_rfc3339();
 
         let conn = self.conn.lock().await;
-        
+
         // Insert message
         conn.execute(
             "INSERT INTO messages (id, conversation_id, role, content, created_at, token_count, metadata) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
@@ -268,9 +277,13 @@ impl SqliteStorage {
     }
 
     /// Get messages for a conversation.
-    pub async fn get_messages(&self, conversation_id: &str, limit: Option<usize>) -> Result<Vec<MessageRecord>> {
+    pub async fn get_messages(
+        &self,
+        conversation_id: &str,
+        limit: Option<usize>,
+    ) -> Result<Vec<MessageRecord>> {
         let conn = self.conn.lock().await;
-        
+
         let query = match limit {
             Some(l) => format!(
                 "SELECT id, conversation_id, role, content, created_at, token_count, metadata FROM messages WHERE conversation_id = ?1 ORDER BY created_at ASC LIMIT {}",
@@ -308,7 +321,11 @@ impl SqliteStorage {
     pub async fn store_memory(&self, memory: &MemoryRecord) -> Result<String> {
         let id = Uuid::new_v4().to_string();
         let now = Utc::now().to_rfc3339();
-        let tags_json = memory.tags.as_ref().map(|t| serde_json::to_string(t).ok()).flatten();
+        let tags_json = memory
+            .tags
+            .as_ref()
+            .map(|t| serde_json::to_string(t).ok())
+            .flatten();
 
         let conn = self.conn.lock().await;
         conn.execute(
@@ -330,7 +347,11 @@ impl SqliteStorage {
     }
 
     /// Get memories by importance.
-    pub async fn get_memories_by_importance(&self, min_importance: f32, limit: usize) -> Result<Vec<MemoryRecord>> {
+    pub async fn get_memories_by_importance(
+        &self,
+        min_importance: f32,
+        limit: usize,
+    ) -> Result<Vec<MemoryRecord>> {
         let conn = self.conn.lock().await;
         let mut stmt = conn.prepare(
             "SELECT id, content, importance, created_at, last_accessed, access_count, tags, metadata FROM memories WHERE importance >= ?1 ORDER BY importance DESC LIMIT ?2",
@@ -339,7 +360,7 @@ impl SqliteStorage {
         let rows = stmt.query_map(params![min_importance, limit as i64], |row| {
             let tags_json: Option<String> = row.get(6)?;
             let tags = tags_json.and_then(|t| serde_json::from_str(&t).ok());
-            
+
             Ok(MemoryRecord {
                 id: Some(row.get(0)?),
                 content: row.get(1)?,
@@ -370,7 +391,7 @@ impl SqliteStorage {
         let rows = stmt.query_map(params![limit as i64], |row| {
             let tags_json: Option<String> = row.get(6)?;
             let tags = tags_json.and_then(|t| serde_json::from_str(&t).ok());
-            
+
             Ok(MemoryRecord {
                 id: Some(row.get(0)?),
                 content: row.get(1)?,
@@ -414,7 +435,12 @@ impl SqliteStorage {
     // =========================================================================
 
     /// Store agent state.
-    pub async fn store_state<T: Serialize>(&self, agent_id: &str, key: &str, value: &T) -> Result<()> {
+    pub async fn store_state<T: Serialize>(
+        &self,
+        agent_id: &str,
+        key: &str,
+        value: &T,
+    ) -> Result<()> {
         let id = Uuid::new_v4().to_string();
         let now = Utc::now().to_rfc3339();
         let value_json = serde_json::to_string(value)?;
@@ -430,7 +456,11 @@ impl SqliteStorage {
     }
 
     /// Get agent state.
-    pub async fn get_state<T: DeserializeOwned>(&self, agent_id: &str, key: &str) -> Result<Option<T>> {
+    pub async fn get_state<T: DeserializeOwned>(
+        &self,
+        agent_id: &str,
+        key: &str,
+    ) -> Result<Option<T>> {
         let conn = self.conn.lock().await;
         let result: Option<String> = conn
             .query_row(
@@ -543,7 +573,10 @@ mod tests {
         storage.migrate().await.unwrap();
 
         // Create
-        let id = storage.create_conversation(Some("Test Chat")).await.unwrap();
+        let id = storage
+            .create_conversation(Some("Test Chat"))
+            .await
+            .unwrap();
         assert!(!id.is_empty());
 
         // Read
@@ -627,14 +660,19 @@ mod tests {
         let agent_id = "agent-1";
         let value = serde_json::json!({"counter": 42});
 
-        storage.store_state(agent_id, "my_state", &value).await.unwrap();
+        storage
+            .store_state(agent_id, "my_state", &value)
+            .await
+            .unwrap();
 
-        let retrieved: Option<serde_json::Value> = storage.get_state(agent_id, "my_state").await.unwrap();
+        let retrieved: Option<serde_json::Value> =
+            storage.get_state(agent_id, "my_state").await.unwrap();
         assert!(retrieved.is_some());
         assert_eq!(retrieved.unwrap()["counter"], 42);
 
         storage.delete_state(agent_id, "my_state").await.unwrap();
-        let retrieved: Option<serde_json::Value> = storage.get_state(agent_id, "my_state").await.unwrap();
+        let retrieved: Option<serde_json::Value> =
+            storage.get_state(agent_id, "my_state").await.unwrap();
         assert!(retrieved.is_none());
     }
 }

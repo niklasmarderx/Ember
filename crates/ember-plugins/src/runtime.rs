@@ -172,9 +172,8 @@ impl PluginRuntime {
         #[cfg(feature = "wasmtime")]
         {
             let wasm_bytes = tokio::fs::read(path).await?;
-            let module = Module::new(&self.engine, &wasm_bytes).map_err(|e| {
-                PluginError::WasmCompilation(e.to_string())
-            })?;
+            let module = Module::new(&self.engine, &wasm_bytes)
+                .map_err(|e| PluginError::WasmCompilation(e.to_string()))?;
             plugin.module = Some(module);
         }
 
@@ -188,7 +187,7 @@ impl PluginRuntime {
     /// Unload a plugin.
     pub async fn unload_plugin(&self, name: &str) -> Result<()> {
         let mut plugins = self.plugins.write().await;
-        
+
         if plugins.remove(name).is_none() {
             return Err(PluginError::NotFound(name.to_string()));
         }
@@ -212,7 +211,7 @@ impl PluginRuntime {
     /// Enable a plugin.
     pub async fn enable_plugin(&self, name: &str) -> Result<()> {
         let mut plugins = self.plugins.write().await;
-        
+
         if let Some(plugin) = plugins.get_mut(name) {
             plugin.enabled = true;
             info!(plugin = %name, "Plugin enabled");
@@ -225,7 +224,7 @@ impl PluginRuntime {
     /// Disable a plugin.
     pub async fn disable_plugin(&self, name: &str) -> Result<()> {
         let mut plugins = self.plugins.write().await;
-        
+
         if let Some(plugin) = plugins.get_mut(name) {
             plugin.enabled = false;
             info!(plugin = %name, "Plugin disabled");
@@ -250,9 +249,9 @@ impl PluginRuntime {
         let start = std::time::Instant::now();
 
         let plugins = self.plugins.read().await;
-        let plugin = plugins.get(plugin_name).ok_or_else(|| {
-            PluginError::NotFound(plugin_name.to_string())
-        })?;
+        let plugin = plugins
+            .get(plugin_name)
+            .ok_or_else(|| PluginError::NotFound(plugin_name.to_string()))?;
 
         if !plugin.enabled {
             return Err(PluginError::ExecutionFailed(format!(
@@ -262,7 +261,11 @@ impl PluginRuntime {
         }
 
         // Verify the function exists in the manifest
-        let export = plugin.manifest.exports.iter().find(|e| e.name == input.function);
+        let export = plugin
+            .manifest
+            .exports
+            .iter()
+            .find(|e| e.name == input.function);
         if export.is_none() {
             return Err(PluginError::FunctionNotFound {
                 plugin: plugin_name.to_string(),
@@ -270,9 +273,10 @@ impl PluginRuntime {
             });
         }
 
-        let module = plugin.module.as_ref().ok_or_else(|| {
-            PluginError::Internal("Module not compiled".to_string())
-        })?;
+        let module = plugin
+            .module
+            .as_ref()
+            .ok_or_else(|| PluginError::Internal("Module not compiled".to_string()))?;
 
         // Note: Full WASM execution requires proper WASI context setup.
         // For now, we simulate the execution. A complete implementation would:
@@ -285,7 +289,7 @@ impl PluginRuntime {
 
         // For now, return a placeholder - full implementation would call the actual function
         let duration = start.elapsed();
-        
+
         warn!(
             plugin = %plugin_name,
             function = %input.function,
@@ -308,16 +312,19 @@ impl PluginRuntime {
     #[cfg(not(feature = "wasmtime"))]
     pub async fn call(&self, plugin_name: &str, input: PluginInput) -> Result<PluginOutput> {
         Err(PluginError::Internal(
-            "WASM runtime not available - compile with 'wasmtime' feature".to_string()
+            "WASM runtime not available - compile with 'wasmtime' feature".to_string(),
         ))
     }
 
     /// Get plugin configuration.
-    pub async fn get_plugin_config(&self, name: &str) -> Result<HashMap<String, serde_json::Value>> {
+    pub async fn get_plugin_config(
+        &self,
+        name: &str,
+    ) -> Result<HashMap<String, serde_json::Value>> {
         let plugins = self.plugins.read().await;
-        let plugin = plugins.get(name).ok_or_else(|| {
-            PluginError::NotFound(name.to_string())
-        })?;
+        let plugin = plugins
+            .get(name)
+            .ok_or_else(|| PluginError::NotFound(name.to_string()))?;
         Ok(plugin.config.clone())
     }
 
@@ -328,9 +335,9 @@ impl PluginRuntime {
         config: HashMap<String, serde_json::Value>,
     ) -> Result<()> {
         let mut plugins = self.plugins.write().await;
-        let plugin = plugins.get_mut(name).ok_or_else(|| {
-            PluginError::NotFound(name.to_string())
-        })?;
+        let plugin = plugins
+            .get_mut(name)
+            .ok_or_else(|| PluginError::NotFound(name.to_string()))?;
         plugin.config = config;
         debug!(plugin = %name, "Plugin configuration updated");
         Ok(())
@@ -379,7 +386,7 @@ mod tests {
         let manifest = PluginManifest::new("test", "1.0.0", "Test")
             .with_capabilities(PluginCapabilities::none().with_network());
         let plugin = LoadedPlugin::new(manifest, std::path::PathBuf::from("test.wasm"));
-        
+
         assert!(plugin.has_capability("network"));
         assert!(!plugin.has_capability("filesystem"));
     }

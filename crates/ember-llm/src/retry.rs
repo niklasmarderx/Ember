@@ -113,10 +113,12 @@ impl RetryConfig {
         }
 
         let base_delay = self.initial_delay.as_secs_f64()
-            * self.backoff_multiplier.powi(attempt.saturating_sub(1) as i32);
-        
+            * self
+                .backoff_multiplier
+                .powi(attempt.saturating_sub(1) as i32);
+
         let capped_delay = base_delay.min(self.max_delay.as_secs_f64());
-        
+
         let final_delay = if self.jitter {
             let jitter_range = capped_delay * self.jitter_factor;
             let jitter = (rand_simple() * 2.0 - 1.0) * jitter_range;
@@ -134,7 +136,7 @@ impl RetryConfig {
 fn rand_simple() -> f64 {
     use std::cell::Cell;
     use std::time::SystemTime;
-    
+
     thread_local! {
         static SEED: Cell<u64> = Cell::new(
             SystemTime::now()
@@ -143,11 +145,13 @@ fn rand_simple() -> f64 {
                 .as_nanos() as u64
         );
     }
-    
+
     SEED.with(|seed| {
         let s = seed.get();
         // LCG parameters from Numerical Recipes
-        let next = s.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+        let next = s
+            .wrapping_mul(6364136223846793005)
+            .wrapping_add(1442695040888963407);
         seed.set(next);
         (next >> 33) as f64 / (1u64 << 31) as f64
     })
@@ -204,10 +208,7 @@ pub async fn complete_with_retry(
         match provider.complete(request.clone()).await {
             Ok(response) => {
                 if attempt > 0 {
-                    debug!(
-                        attempt = attempt,
-                        "Request succeeded after retry"
-                    );
+                    debug!(attempt = attempt, "Request succeeded after retry");
                 }
                 return Ok(response);
             }
@@ -284,8 +285,8 @@ impl<P> RetryProvider<P> {
 #[cfg(feature = "retry-provider")]
 mod retry_provider_impl {
     use super::*;
-    use async_trait::async_trait;
     use crate::{ModelInfo, StreamResponse};
+    use async_trait::async_trait;
 
     #[async_trait]
     impl<P: LLMProvider> LLMProvider for RetryProvider<P> {

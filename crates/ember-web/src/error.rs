@@ -95,18 +95,16 @@ impl IntoResponse for WebError {
                 StatusCode::BAD_REQUEST,
                 ErrorResponse::new("VALIDATION_ERROR", msg),
             ),
-            WebError::NotFound(msg) => (
-                StatusCode::NOT_FOUND,
-                ErrorResponse::new("NOT_FOUND", msg),
-            ),
+            WebError::NotFound(msg) => {
+                (StatusCode::NOT_FOUND, ErrorResponse::new("NOT_FOUND", msg))
+            }
             WebError::Unauthorized(msg) => (
                 StatusCode::UNAUTHORIZED,
                 ErrorResponse::new("UNAUTHORIZED", msg),
             ),
-            WebError::Forbidden(msg) => (
-                StatusCode::FORBIDDEN,
-                ErrorResponse::new("FORBIDDEN", msg),
-            ),
+            WebError::Forbidden(msg) => {
+                (StatusCode::FORBIDDEN, ErrorResponse::new("FORBIDDEN", msg))
+            }
             WebError::RateLimited => (
                 StatusCode::TOO_MANY_REQUESTS,
                 ErrorResponse::new("RATE_LIMITED", "Too many requests"),
@@ -157,7 +155,7 @@ mod tests {
     fn test_error_response_with_details() {
         let response = ErrorResponse::new("TEST_ERROR", "Something went wrong")
             .with_details(serde_json::json!({"field": "email", "reason": "invalid format"}));
-        
+
         assert!(response.details.is_some());
     }
 

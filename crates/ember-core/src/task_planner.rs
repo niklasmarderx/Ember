@@ -39,7 +39,7 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use serde::{Deserialize, Serialize};
-use tokio::sync::{mpsc, RwLock, Mutex};
+use tokio::sync::{mpsc, Mutex, RwLock};
 use tracing::{debug, info, warn};
 use uuid::Uuid;
 
@@ -59,7 +59,7 @@ impl TaskId {
     pub fn new() -> Self {
         Self(Uuid::new_v4())
     }
-    
+
     /// Returns the inner UUID
     #[must_use]
     pub fn inner(&self) -> Uuid {
@@ -128,7 +128,7 @@ impl TaskStatus {
             Self::Completed | Self::Failed(_) | Self::Cancelled | Self::Skipped
         )
     }
-    
+
     /// Check if task can be executed
     #[must_use]
     pub fn is_runnable(&self) -> bool {
@@ -259,35 +259,35 @@ impl Task {
             metadata: HashMap::new(),
         }
     }
-    
+
     /// Set the task description
     #[must_use]
     pub fn with_description(mut self, description: impl Into<String>) -> Self {
         self.description = description.into();
         self
     }
-    
+
     /// Set the task type
     #[must_use]
     pub fn with_type(mut self, task_type: TaskType) -> Self {
         self.task_type = task_type;
         self
     }
-    
+
     /// Set the priority
     #[must_use]
     pub fn with_priority(mut self, priority: TaskPriority) -> Self {
         self.priority = priority;
         self
     }
-    
+
     /// Set the complexity
     #[must_use]
     pub fn with_complexity(mut self, complexity: TaskComplexity) -> Self {
         self.complexity = complexity;
         self
     }
-    
+
     /// Add a dependency
     #[must_use]
     pub fn depends_on(mut self, task_id: TaskId) -> Self {
@@ -296,41 +296,41 @@ impl Task {
         }
         self
     }
-    
+
     /// Add an input
     #[must_use]
     pub fn with_input(mut self, key: impl Into<String>, value: serde_json::Value) -> Self {
         self.inputs.insert(key.into(), value);
         self
     }
-    
+
     /// Add a tag
     #[must_use]
     pub fn with_tag(mut self, tag: impl Into<String>) -> Self {
         self.tags.insert(tag.into());
         self
     }
-    
+
     /// Enable rollback support
     #[must_use]
     pub fn with_rollback(mut self) -> Self {
         self.rollbackable = true;
         self
     }
-    
+
     /// Set max retries
     #[must_use]
     pub fn with_max_retries(mut self, max: u32) -> Self {
         self.max_retries = max;
         self
     }
-    
+
     /// Get estimated duration
     #[must_use]
     pub fn estimated_duration(&self) -> Duration {
         self.complexity.estimated_duration()
     }
-    
+
     /// Check if all dependencies are completed
     pub fn dependencies_met(&self, completed: &HashSet<TaskId>) -> bool {
         self.dependencies.iter().all(|dep| completed.contains(dep))
@@ -377,35 +377,35 @@ impl Goal {
             tags: HashSet::new(),
         }
     }
-    
+
     /// Add context
     #[must_use]
     pub fn with_context(mut self, context: impl Into<String>) -> Self {
         self.context = context.into();
         self
     }
-    
+
     /// Add a constraint
     #[must_use]
     pub fn with_constraint(mut self, constraint: impl Into<String>) -> Self {
         self.constraints.push(constraint.into());
         self
     }
-    
+
     /// Add a success criterion
     #[must_use]
     pub fn with_success_criterion(mut self, criterion: impl Into<String>) -> Self {
         self.success_criteria.push(criterion.into());
         self
     }
-    
+
     /// Set priority
     #[must_use]
     pub fn with_priority(mut self, priority: TaskPriority) -> Self {
         self.priority = priority;
         self
     }
-    
+
     /// Set deadline
     #[must_use]
     pub fn with_deadline(mut self, deadline: chrono::DateTime<chrono::Utc>) -> Self {
@@ -458,7 +458,7 @@ impl ExecutionPlan {
             metadata: HashMap::new(),
         }
     }
-    
+
     /// Add a task to the plan
     pub fn add_task(&mut self, task: Task) {
         let id = task.id;
@@ -466,43 +466,44 @@ impl ExecutionPlan {
         self.tasks.insert(id, task);
         self.modified_at = chrono::Utc::now();
     }
-    
+
     /// Get a task by ID
     #[must_use]
     pub fn get_task(&self, id: TaskId) -> Option<&Task> {
         self.tasks.get(&id)
     }
-    
+
     /// Get a mutable task by ID
     pub fn get_task_mut(&mut self, id: TaskId) -> Option<&mut Task> {
         self.tasks.get_mut(&id)
     }
-    
+
     /// Calculate execution stages based on dependencies
     pub fn calculate_stages(&mut self) {
         self.execution_stages.clear();
-        
+
         let mut completed: HashSet<TaskId> = HashSet::new();
         let mut remaining: HashSet<TaskId> = self.tasks.keys().copied().collect();
-        
+
         while !remaining.is_empty() {
             // Find all tasks whose dependencies are met
             let ready: Vec<TaskId> = remaining
                 .iter()
                 .filter(|id| {
-                    self.tasks.get(id)
+                    self.tasks
+                        .get(id)
                         .map(|t| t.dependencies_met(&completed))
                         .unwrap_or(false)
                 })
                 .copied()
                 .collect();
-            
+
             if ready.is_empty() {
                 // Circular dependency detected
                 warn!("Circular dependency detected in plan");
                 break;
             }
-            
+
             // Sort by priority within each stage
             let mut stage = ready;
             stage.sort_by(|a, b| {
@@ -513,25 +514,26 @@ impl ExecutionPlan {
                     _ => std::cmp::Ordering::Equal,
                 }
             });
-            
+
             for id in &stage {
                 completed.insert(*id);
                 remaining.remove(id);
             }
-            
+
             self.execution_stages.push(stage);
         }
     }
-    
+
     /// Get all tasks that are ready to execute
     #[must_use]
     pub fn get_ready_tasks(&self) -> Vec<TaskId> {
-        let completed: HashSet<TaskId> = self.tasks
+        let completed: HashSet<TaskId> = self
+            .tasks
             .iter()
             .filter(|(_, t)| matches!(t.status, TaskStatus::Completed))
             .map(|(id, _)| *id)
             .collect();
-        
+
         self.tasks
             .iter()
             .filter(|(_, t)| {
@@ -541,31 +543,35 @@ impl ExecutionPlan {
             .map(|(id, _)| *id)
             .collect()
     }
-    
+
     /// Get completion percentage
     #[must_use]
     pub fn completion_percentage(&self) -> f64 {
         if self.tasks.is_empty() {
             return 100.0;
         }
-        
-        let completed = self.tasks.values()
+
+        let completed = self
+            .tasks
+            .values()
             .filter(|t| matches!(t.status, TaskStatus::Completed))
             .count();
-        
+
         (completed as f64 / self.tasks.len() as f64) * 100.0
     }
-    
+
     /// Check if plan is complete
     #[must_use]
     pub fn is_complete(&self) -> bool {
         self.tasks.values().all(|t| t.status.is_terminal())
     }
-    
+
     /// Check if plan failed
     #[must_use]
     pub fn has_failed(&self) -> bool {
-        self.tasks.values().any(|t| matches!(t.status, TaskStatus::Failed(_)))
+        self.tasks
+            .values()
+            .any(|t| matches!(t.status, TaskStatus::Failed(_)))
     }
 }
 
@@ -608,10 +614,10 @@ pub type ProgressCallback = Arc<dyn Fn(ExecutionProgress) + Send + Sync>;
 pub trait TaskExecutor: Send + Sync {
     /// Execute a task and return the result
     async fn execute(&self, task: &Task) -> Result<HashMap<String, serde_json::Value>>;
-    
+
     /// Check if this executor can handle the task type
     fn can_execute(&self, task_type: &TaskType) -> bool;
-    
+
     /// Rollback a completed task
     async fn rollback(&self, task: &Task) -> Result<()> {
         let _ = task;
@@ -626,7 +632,7 @@ pub struct DefaultTaskExecutor;
 impl TaskExecutor for DefaultTaskExecutor {
     async fn execute(&self, task: &Task) -> Result<HashMap<String, serde_json::Value>> {
         debug!(task_id = %task.id, task_name = %task.name, "Executing task");
-        
+
         // Simulate task execution based on complexity
         let duration = match task.complexity {
             TaskComplexity::Trivial => Duration::from_millis(100),
@@ -635,9 +641,9 @@ impl TaskExecutor for DefaultTaskExecutor {
             TaskComplexity::Complex => Duration::from_secs(1),
             TaskComplexity::VeryComplex => Duration::from_secs(2),
         };
-        
+
         tokio::time::sleep(duration).await;
-        
+
         let mut outputs = HashMap::new();
         outputs.insert(
             "result".to_string(),
@@ -647,10 +653,10 @@ impl TaskExecutor for DefaultTaskExecutor {
                 "task_type": format!("{:?}", task.task_type),
             }),
         );
-        
+
         Ok(outputs)
     }
-    
+
     fn can_execute(&self, _task_type: &TaskType) -> bool {
         true
     }
@@ -714,42 +720,42 @@ impl PlannerConfigBuilder {
         self.config.max_concurrent_tasks = max;
         self
     }
-    
+
     /// Enable/disable auto replanning
     #[must_use]
     pub fn auto_replan(mut self, enabled: bool) -> Self {
         self.config.auto_replan = enabled;
         self
     }
-    
+
     /// Set max replan attempts
     #[must_use]
     pub fn max_replan_attempts(mut self, max: u32) -> Self {
         self.config.max_replan_attempts = max;
         self
     }
-    
+
     /// Enable/disable parallel execution
     #[must_use]
     pub fn parallel_execution(mut self, enabled: bool) -> Self {
         self.config.parallel_execution = enabled;
         self
     }
-    
+
     /// Set task timeout
     #[must_use]
     pub fn task_timeout(mut self, timeout: Duration) -> Self {
         self.config.task_timeout = timeout;
         self
     }
-    
+
     /// Continue on failure
     #[must_use]
     pub fn continue_on_failure(mut self, enabled: bool) -> Self {
         self.config.continue_on_failure = enabled;
         self
     }
-    
+
     /// Build the configuration
     #[must_use]
     pub fn build(self) -> PlannerConfig {
@@ -799,25 +805,25 @@ impl TaskPlanner {
             stats: RwLock::new(PlannerStats::default()),
         }
     }
-    
+
     /// Register a task executor
     pub async fn register_executor(&self, executor: Arc<dyn TaskExecutor>) {
         let mut executors = self.executors.write().await;
         executors.push(executor);
     }
-    
+
     /// Create an execution plan for a goal
     ///
     /// This method analyzes the goal and generates a structured plan
     /// with tasks, dependencies, and execution stages.
     pub async fn create_plan(&self, goal: Goal) -> Result<ExecutionPlan> {
         info!(goal_id = %goal.id, goal = %goal.description, "Creating execution plan");
-        
+
         let mut plan = ExecutionPlan::new(goal.clone());
-        
+
         // Generate tasks based on goal analysis
         let tasks = self.decompose_goal(&goal).await?;
-        
+
         if tasks.len() > self.config.max_tasks {
             return Err(Error::Configuration(format!(
                 "Plan exceeds maximum tasks: {} > {}",
@@ -825,44 +831,44 @@ impl TaskPlanner {
                 self.config.max_tasks
             )));
         }
-        
+
         // Add all tasks to the plan
         for task in tasks {
             plan.add_task(task);
         }
-        
+
         // Calculate execution stages
         plan.calculate_stages();
-        
+
         // Update statistics
         {
             let mut stats = self.stats.write().await;
             stats.plans_created += 1;
         }
-        
+
         // Store the plan
         {
             let mut active = self.active_plans.write().await;
             active.insert(plan.id, Arc::new(Mutex::new(plan.clone())));
         }
-        
+
         info!(
             plan_id = %plan.id,
             tasks = plan.tasks.len(),
             stages = plan.execution_stages.len(),
             "Execution plan created"
         );
-        
+
         Ok(plan)
     }
-    
+
     /// Decompose a goal into tasks
     async fn decompose_goal(&self, goal: &Goal) -> Result<Vec<Task>> {
         // In a real implementation, this would use an LLM to analyze the goal
         // For now, we create a sample decomposition
-        
+
         let mut tasks = Vec::new();
-        
+
         // Analysis phase
         let analysis = Task::new("Analyze Requirements")
             .with_description(format!("Analyze the goal: {}", goal.description))
@@ -872,7 +878,7 @@ impl TaskPlanner {
             .with_tag("phase:analysis");
         let analysis_id = analysis.id;
         tasks.push(analysis);
-        
+
         // Planning phase
         let planning = Task::new("Create Implementation Plan")
             .with_description("Create detailed implementation plan based on analysis")
@@ -883,7 +889,7 @@ impl TaskPlanner {
             .with_tag("phase:planning");
         let planning_id = planning.id;
         tasks.push(planning);
-        
+
         // Implementation phase - multiple parallel tasks
         let impl1 = Task::new("Implement Core Logic")
             .with_description("Implement the core functionality")
@@ -895,7 +901,7 @@ impl TaskPlanner {
             .with_tag("phase:implementation");
         let impl1_id = impl1.id;
         tasks.push(impl1);
-        
+
         let impl2 = Task::new("Implement Supporting Features")
             .with_description("Implement supporting features and utilities")
             .with_type(TaskType::Generation)
@@ -906,7 +912,7 @@ impl TaskPlanner {
             .with_tag("phase:implementation");
         let impl2_id = impl2.id;
         tasks.push(impl2);
-        
+
         // Integration phase
         let integration = Task::new("Integrate Components")
             .with_description("Integrate all implemented components")
@@ -918,7 +924,7 @@ impl TaskPlanner {
             .with_tag("phase:integration");
         let integration_id = integration.id;
         tasks.push(integration);
-        
+
         // Validation phase
         let validation = Task::new("Validate Implementation")
             .with_description("Validate the implementation against success criteria")
@@ -929,7 +935,7 @@ impl TaskPlanner {
             .with_tag("phase:validation");
         let validation_id = validation.id;
         tasks.push(validation);
-        
+
         // Review phase
         let review = Task::new("Final Review")
             .with_description("Perform final review and documentation")
@@ -939,13 +945,11 @@ impl TaskPlanner {
             .depends_on(validation_id)
             .with_tag("phase:review");
         tasks.push(review);
-        
+
         // Update dependents
-        let task_ids: HashMap<TaskId, usize> = tasks.iter()
-            .enumerate()
-            .map(|(i, t)| (t.id, i))
-            .collect();
-        
+        let task_ids: HashMap<TaskId, usize> =
+            tasks.iter().enumerate().map(|(i, t)| (t.id, i)).collect();
+
         for i in 0..tasks.len() {
             let deps = tasks[i].dependencies.clone();
             for dep_id in deps {
@@ -955,10 +959,10 @@ impl TaskPlanner {
                 }
             }
         }
-        
+
         Ok(tasks)
     }
-    
+
     /// Execute a plan with progress tracking
     pub async fn execute(
         &self,
@@ -966,25 +970,33 @@ impl TaskPlanner {
         progress_callback: Option<ProgressCallback>,
     ) -> Result<ExecutionPlan> {
         let start_time = Instant::now();
-        
+
         info!(plan_id = %plan.id, "Starting plan execution");
-        
+
         // Calculate stages if not done
         if plan.execution_stages.is_empty() {
             plan.calculate_stages();
         }
-        
+
         let total_tasks = plan.tasks.len();
         let mut completed_tasks = 0;
         let mut current_stage = 0;
-        
+
         for stage in &plan.execution_stages.clone() {
             current_stage += 1;
-            
+
             if self.config.parallel_execution && stage.len() > 1 {
                 // Execute tasks in parallel
                 completed_tasks += self
-                    .execute_stage_parallel(&mut plan, stage, &progress_callback, completed_tasks, total_tasks, current_stage, start_time)
+                    .execute_stage_parallel(
+                        &mut plan,
+                        stage,
+                        &progress_callback,
+                        completed_tasks,
+                        total_tasks,
+                        current_stage,
+                        start_time,
+                    )
                     .await?;
             } else {
                 // Execute tasks sequentially
@@ -996,7 +1008,7 @@ impl TaskPlanner {
                         warn!(task_id = %task_id, error = %e, "Task failed, continuing");
                     }
                     completed_tasks += 1;
-                    
+
                     // Send progress update
                     if let Some(ref callback) = progress_callback {
                         let progress = ExecutionProgress {
@@ -1015,7 +1027,7 @@ impl TaskPlanner {
                 }
             }
         }
-        
+
         // Update statistics
         {
             let mut stats = self.stats.write().await;
@@ -1026,17 +1038,17 @@ impl TaskPlanner {
             }
             stats.tasks_executed += completed_tasks as u64;
         }
-        
+
         info!(
             plan_id = %plan.id,
             duration = ?start_time.elapsed(),
             completed = completed_tasks,
             "Plan execution complete"
         );
-        
+
         Ok(plan)
     }
-    
+
     /// Execute a stage of tasks in parallel
     async fn execute_stage_parallel(
         &self,
@@ -1048,9 +1060,12 @@ impl TaskPlanner {
         current_stage: usize,
         start_time: Instant,
     ) -> Result<usize> {
-        let semaphore = Arc::new(tokio::sync::Semaphore::new(self.config.max_concurrent_tasks));
-        let (tx, mut rx) = mpsc::channel::<(TaskId, Result<HashMap<String, serde_json::Value>>)>(stage.len());
-        
+        let semaphore = Arc::new(tokio::sync::Semaphore::new(
+            self.config.max_concurrent_tasks,
+        ));
+        let (tx, mut rx) =
+            mpsc::channel::<(TaskId, Result<HashMap<String, serde_json::Value>>)>(stage.len());
+
         // Send progress with running tasks
         let running_tasks: Vec<TaskId> = stage.to_vec();
         if let Some(ref callback) = progress_callback {
@@ -1063,25 +1078,31 @@ impl TaskPlanner {
                 elapsed: start_time.elapsed(),
                 current_stage,
                 total_stages: plan.execution_stages.len(),
-                messages: vec![format!("Executing stage {} with {} parallel tasks", current_stage, stage.len())],
+                messages: vec![format!(
+                    "Executing stage {} with {} parallel tasks",
+                    current_stage,
+                    stage.len()
+                )],
             };
             callback(progress);
         }
-        
+
         // Spawn all tasks
         for &task_id in stage {
-            let permit = semaphore.clone().acquire_owned().await.map_err(|_| {
-                Error::Internal("Semaphore closed".into())
-            })?;
-            
+            let permit = semaphore
+                .clone()
+                .acquire_owned()
+                .await
+                .map_err(|_| Error::Internal("Semaphore closed".into()))?;
+
             let task = plan.tasks.get(&task_id).cloned();
             let executors = self.executors.read().await.clone();
             let tx = tx.clone();
             let timeout = self.config.task_timeout;
-            
+
             tokio::spawn(async move {
                 let _permit = permit;
-                
+
                 if let Some(task) = task {
                     let result = tokio::time::timeout(timeout, async {
                         for executor in &executors {
@@ -1089,22 +1110,26 @@ impl TaskPlanner {
                                 return executor.execute(&task).await;
                             }
                         }
-                        Err(Error::NotFound(format!("No executor for task type {:?}", task.task_type)))
-                    }).await;
-                    
+                        Err(Error::NotFound(format!(
+                            "No executor for task type {:?}",
+                            task.task_type
+                        )))
+                    })
+                    .await;
+
                     let result = match result {
                         Ok(r) => r,
                         Err(_) => Err(Error::Timeout("Task execution timed out")),
                     };
-                    
+
                     let _ = tx.send((task_id, result)).await;
                 }
             });
         }
-        
+
         // Drop our copy of tx so the channel closes when all tasks complete
         drop(tx);
-        
+
         // Collect results
         let mut stage_completed = 0;
         while let Some((task_id, result)) = rx.recv().await {
@@ -1125,16 +1150,18 @@ impl TaskPlanner {
             }
             stage_completed += 1;
             completed_tasks += 1;
-            
+
             // Send progress update
             if let Some(ref callback) = progress_callback {
                 let progress = ExecutionProgress {
                     percentage: (completed_tasks as f64 / total_tasks as f64) * 100.0,
                     completed_tasks,
                     total_tasks,
-                    running_tasks: running_tasks.iter()
+                    running_tasks: running_tasks
+                        .iter()
                         .filter(|id| {
-                            plan.tasks.get(id)
+                            plan.tasks
+                                .get(id)
                                 .map(|t| !t.status.is_terminal())
                                 .unwrap_or(false)
                         })
@@ -1149,38 +1176,38 @@ impl TaskPlanner {
                 callback(progress);
             }
         }
-        
+
         Ok(stage_completed)
     }
-    
+
     /// Execute a single task
     async fn execute_task(&self, plan: &mut ExecutionPlan, task_id: TaskId) -> Result<()> {
         // Extract task info before mutable borrow
         let (task_type, task_clone) = {
-            let task = plan.tasks.get(&task_id).ok_or_else(|| {
-                Error::NotFound(format!("Task not found: {}", task_id))
-            })?;
+            let task = plan
+                .tasks
+                .get(&task_id)
+                .ok_or_else(|| Error::NotFound(format!("Task not found: {}", task_id)))?;
             (task.task_type.clone(), task.clone())
         };
-        
+
         // Mark as running
         if let Some(t) = plan.tasks.get_mut(&task_id) {
             t.status = TaskStatus::Running;
             t.started_at = Some(chrono::Utc::now());
         }
-        
+
         // Find executor
         let executors = self.executors.read().await;
-        let executor = executors.iter()
+        let executor = executors
+            .iter()
             .find(|e| e.can_execute(&task_type))
             .ok_or_else(|| Error::NotFound(format!("No executor for task type {:?}", task_type)))?;
-        
+
         // Execute with timeout
-        let result = tokio::time::timeout(
-            self.config.task_timeout,
-            executor.execute(&task_clone),
-        ).await;
-        
+        let result =
+            tokio::time::timeout(self.config.task_timeout, executor.execute(&task_clone)).await;
+
         match result {
             Ok(Ok(outputs)) => {
                 if let Some(t) = plan.tasks.get_mut(&task_id) {
@@ -1205,26 +1232,27 @@ impl TaskPlanner {
             }
         }
     }
-    
+
     /// Replan based on execution state
     pub async fn replan(&self, plan: &mut ExecutionPlan) -> Result<()> {
         if !self.config.auto_replan {
             return Err(Error::Configuration("Auto replan is disabled".into()));
         }
-        
+
         info!(plan_id = %plan.id, version = plan.version, "Replanning");
-        
+
         // Find failed tasks
-        let failed: Vec<TaskId> = plan.tasks
+        let failed: Vec<TaskId> = plan
+            .tasks
             .iter()
             .filter(|(_, t)| matches!(t.status, TaskStatus::Failed(_)))
             .map(|(id, _)| *id)
             .collect();
-        
+
         // Reset failed tasks and their dependents
         let mut to_reset: HashSet<TaskId> = failed.iter().copied().collect();
         let mut queue: VecDeque<TaskId> = failed.into_iter().collect();
-        
+
         while let Some(task_id) = queue.pop_front() {
             if let Some(task) = plan.tasks.get(&task_id) {
                 for dep in &task.dependents {
@@ -1234,7 +1262,7 @@ impl TaskPlanner {
                 }
             }
         }
-        
+
         // Reset tasks
         for task_id in to_reset {
             if let Some(task) = plan.tasks.get_mut(&task_id) {
@@ -1244,28 +1272,28 @@ impl TaskPlanner {
                 task.completed_at = None;
             }
         }
-        
+
         // Increment version
         plan.version += 1;
         plan.modified_at = chrono::Utc::now();
-        
+
         // Recalculate stages
         plan.calculate_stages();
-        
+
         // Update stats
         {
             let mut stats = self.stats.write().await;
             stats.replan_count += 1;
         }
-        
+
         Ok(())
     }
-    
+
     /// Get planner statistics
     pub async fn stats(&self) -> PlannerStats {
         self.stats.read().await.clone()
     }
-    
+
     /// Get an active plan by ID
     pub async fn get_plan(&self, plan_id: Uuid) -> Option<ExecutionPlan> {
         let active = self.active_plans.read().await;
@@ -1296,23 +1324,23 @@ impl TaskPlanBuilder {
             tasks: Vec::new(),
         }
     }
-    
+
     /// Add a task
     #[must_use]
     pub fn add_task(mut self, task: Task) -> Self {
         self.tasks.push(task);
         self
     }
-    
+
     /// Build the execution plan
     #[must_use]
     pub fn build(self) -> ExecutionPlan {
         let mut plan = ExecutionPlan::new(self.goal);
-        
+
         for task in self.tasks {
             plan.add_task(task);
         }
-        
+
         plan.calculate_stages();
         plan
     }
@@ -1325,7 +1353,7 @@ impl TaskPlanBuilder {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn test_task_creation() {
         let task = Task::new("Test Task")
@@ -1334,126 +1362,125 @@ mod tests {
             .with_priority(TaskPriority::High)
             .with_complexity(TaskComplexity::Simple)
             .with_tag("test");
-        
+
         assert_eq!(task.name, "Test Task");
         assert_eq!(task.description, "A test task");
         assert!(matches!(task.task_type, TaskType::Analysis));
         assert!(matches!(task.priority, TaskPriority::High));
         assert!(task.tags.contains("test"));
     }
-    
+
     #[test]
     fn test_goal_creation() {
         let goal = Goal::new("Build a REST API")
             .with_context("Using Rust")
             .with_constraint("Must be fast")
             .with_success_criterion("All tests pass");
-        
+
         assert_eq!(goal.description, "Build a REST API");
         assert_eq!(goal.context, "Using Rust");
         assert_eq!(goal.constraints.len(), 1);
         assert_eq!(goal.success_criteria.len(), 1);
     }
-    
+
     #[test]
     fn test_task_dependencies() {
         let task1 = Task::new("Task 1");
         let task1_id = task1.id;
-        
-        let task2 = Task::new("Task 2")
-            .depends_on(task1_id);
-        
+
+        let task2 = Task::new("Task 2").depends_on(task1_id);
+
         assert!(task2.dependencies.contains(&task1_id));
-        
+
         let completed: HashSet<TaskId> = [task1_id].into_iter().collect();
         assert!(task2.dependencies_met(&completed));
-        
+
         let empty: HashSet<TaskId> = HashSet::new();
         assert!(!task2.dependencies_met(&empty));
     }
-    
+
     #[test]
     fn test_execution_plan_stages() {
         let goal = Goal::new("Test Goal");
         let mut plan = ExecutionPlan::new(goal);
-        
+
         let task1 = Task::new("Task 1");
         let task1_id = task1.id;
-        
+
         let task2 = Task::new("Task 2");
         let task2_id = task2.id;
-        
+
         let task3 = Task::new("Task 3")
             .depends_on(task1_id)
             .depends_on(task2_id);
-        
+
         plan.add_task(task1);
         plan.add_task(task2);
         plan.add_task(task3);
-        
+
         plan.calculate_stages();
-        
+
         // First stage should have task1 and task2 (no deps)
         assert_eq!(plan.execution_stages.len(), 2);
         assert_eq!(plan.execution_stages[0].len(), 2);
         assert_eq!(plan.execution_stages[1].len(), 1);
     }
-    
+
     #[tokio::test]
     async fn test_planner_create_plan() {
         let planner = TaskPlanner::new(PlannerConfig::default());
         let goal = Goal::new("Build a web application");
-        
+
         let plan = planner.create_plan(goal).await.unwrap();
-        
+
         assert!(!plan.tasks.is_empty());
         assert!(!plan.execution_stages.is_empty());
     }
-    
+
     #[tokio::test]
     async fn test_planner_execute() {
         let config = PlannerConfig::builder()
             .parallel_execution(false)
             .task_timeout(Duration::from_secs(5))
             .build();
-        
+
         let planner = TaskPlanner::new(config);
         let goal = Goal::new(String::from("Simple test"));
-        
+
         let plan = planner.create_plan(goal).await.unwrap();
         let result = planner.execute(plan, None).await.unwrap();
-        
+
         assert!(result.completion_percentage() > 99.0);
         assert!(result.is_complete());
     }
-    
+
     #[tokio::test]
     async fn test_planner_parallel_execution() {
         let config = PlannerConfig::builder()
             .parallel_execution(true)
             .max_concurrent_tasks(4)
             .build();
-        
+
         let planner = TaskPlanner::new(config);
         let goal = Goal::new("Parallel test");
-        
+
         let plan = planner.create_plan(goal).await.unwrap();
-        
+
         let progress_updates = Arc::new(RwLock::new(Vec::new()));
         let progress_clone = progress_updates.clone();
-        
+
         let callback: ProgressCallback = Arc::new(move |progress| {
             let updates = progress_clone.clone();
             tokio::spawn(async move {
                 updates.write().await.push(progress);
             });
         });
-        
+
         let result = planner.execute(plan, Some(callback)).await.unwrap();
-        
+
         assert!(result.is_complete());
     }
-    
+
     #[test]
     fn test_task_status() {
         assert!(TaskStatus::Completed.is_terminal());
@@ -1461,30 +1488,42 @@ mod tests {
         assert!(TaskStatus::Cancelled.is_terminal());
         assert!(!TaskStatus::Pending.is_terminal());
         assert!(!TaskStatus::Running.is_terminal());
-        
+
         assert!(TaskStatus::Ready.is_runnable());
         assert!(!TaskStatus::Pending.is_runnable());
     }
-    
+
     #[test]
     fn test_task_complexity_duration() {
-        assert!(TaskComplexity::Trivial.estimated_duration() < TaskComplexity::Simple.estimated_duration());
-        assert!(TaskComplexity::Simple.estimated_duration() < TaskComplexity::Medium.estimated_duration());
-        assert!(TaskComplexity::Medium.estimated_duration() < TaskComplexity::Complex.estimated_duration());
-        assert!(TaskComplexity::Complex.estimated_duration() < TaskComplexity::VeryComplex.estimated_duration());
+        assert!(
+            TaskComplexity::Trivial.estimated_duration()
+                < TaskComplexity::Simple.estimated_duration()
+        );
+        assert!(
+            TaskComplexity::Simple.estimated_duration()
+                < TaskComplexity::Medium.estimated_duration()
+        );
+        assert!(
+            TaskComplexity::Medium.estimated_duration()
+                < TaskComplexity::Complex.estimated_duration()
+        );
+        assert!(
+            TaskComplexity::Complex.estimated_duration()
+                < TaskComplexity::VeryComplex.estimated_duration()
+        );
     }
-    
+
     #[test]
     fn test_plan_builder() {
         let goal = Goal::new(String::from("Test"));
         let task1 = Task::new(String::from("Task 1"));
         let task2 = Task::new(String::from("Task 2")).depends_on(task1.id);
-        
+
         let plan = TaskPlanBuilder::new(goal)
             .add_task(task1)
             .add_task(task2)
             .build();
-        
+
         assert_eq!(plan.tasks.len(), 2);
         assert_eq!(plan.execution_stages.len(), 2);
     }

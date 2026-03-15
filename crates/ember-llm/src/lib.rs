@@ -36,9 +36,9 @@
 #![deny(unsafe_code)]
 
 mod error;
-mod types;
 mod provider;
 pub mod retry;
+mod types;
 
 #[cfg(feature = "openai")]
 pub mod openai;
@@ -59,8 +59,8 @@ pub mod mock;
 
 // Re-exports
 pub use error::{Error, Result};
-pub use types::*;
 pub use provider::LLMProvider;
+pub use types::*;
 
 #[cfg(feature = "openai")]
 pub use openai::OpenAIProvider;
@@ -74,8 +74,8 @@ pub use ollama::OllamaProvider;
 #[cfg(feature = "groq")]
 pub use groq::GroqProvider;
 
+pub use retry::{complete_with_retry, RetryConfig};
 pub use router::LLMRouter;
-pub use retry::{RetryConfig, complete_with_retry};
 
 #[cfg(any(test, feature = "mock"))]
 pub use mock::MockProvider;

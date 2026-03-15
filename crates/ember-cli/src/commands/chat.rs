@@ -7,8 +7,8 @@
 use crate::config::AppConfig;
 use anyhow::{Context, Result};
 use colored::Colorize;
-use ember_llm::{CompletionRequest, LLMProvider, Message, OpenAIProvider, OllamaProvider};
-use ember_tools::{ToolRegistry, ShellTool, FilesystemTool, WebTool};
+use ember_llm::{CompletionRequest, LLMProvider, Message, OllamaProvider, OpenAIProvider};
+use ember_tools::{FilesystemTool, ShellTool, ToolRegistry, WebTool};
 use futures::StreamExt;
 use std::io::{self, Write};
 use std::sync::Arc;
@@ -131,11 +131,9 @@ pub async fn run(
     let provider_name = provider.unwrap_or_else(|| config.provider.default.clone());
 
     // Determine the model to use
-    let model_name = model.unwrap_or_else(|| {
-        match provider_name.as_str() {
-            "ollama" => config.provider.ollama.model.clone(),
-            _ => config.provider.openai.model.clone(),
-        }
+    let model_name = model.unwrap_or_else(|| match provider_name.as_str() {
+        "ollama" => config.provider.ollama.model.clone(),
+        _ => config.provider.openai.model.clone(),
     });
 
     // Determine system prompt
@@ -151,18 +149,43 @@ pub async fn run(
     if let Some(ref tool_names) = tools {
         // Agent mode with tools
         let registry = create_tool_registry(tool_names)?;
-        
+
         if let Some(msg) = message {
             // One-shot agent mode
-            agent_one_shot(llm_provider, &model_name, &system_prompt, temp, &msg, streaming, registry).await?;
+            agent_one_shot(
+                llm_provider,
+                &model_name,
+                &system_prompt,
+                temp,
+                &msg,
+                streaming,
+                registry,
+            )
+            .await?;
         } else {
             // Interactive agent mode
-            agent_interactive(llm_provider, &model_name, &system_prompt, temp, streaming, registry).await?;
+            agent_interactive(
+                llm_provider,
+                &model_name,
+                &system_prompt,
+                temp,
+                streaming,
+                registry,
+            )
+            .await?;
         }
     } else {
         // Simple chat mode (no tools)
         if let Some(msg) = message {
-            one_shot_chat(llm_provider, &model_name, &system_prompt, temp, &msg, streaming).await?;
+            one_shot_chat(
+                llm_provider,
+                &model_name,
+                &system_prompt,
+                temp,
+                &msg,
+                streaming,
+            )
+            .await?;
         } else {
             interactive_chat(llm_provider, &model_name, &system_prompt, temp, streaming).await?;
         }
@@ -223,10 +246,12 @@ fn create_provider(config: &AppConfig, provider_name: &str) -> Result<Arc<dyn LL
                 .api_key
                 .clone()
                 .or_else(|| std::env::var("OPENAI_API_KEY").ok())
-                .context("OpenAI API key not found. Set OPENAI_API_KEY or configure in config file.")?;
+                .context(
+                    "OpenAI API key not found. Set OPENAI_API_KEY or configure in config file.",
+                )?;
 
-            let mut provider = OpenAIProvider::new(api_key)
-                .with_default_model(&config.provider.openai.model);
+            let mut provider =
+                OpenAIProvider::new(api_key).with_default_model(&config.provider.openai.model);
 
             if let Some(ref base_url) = config.provider.openai.base_url {
                 provider = provider.with_base_url(base_url);
@@ -238,18 +263,12 @@ fn create_provider(config: &AppConfig, provider_name: &str) -> Result<Arc<dyn LL
 }
 
 /// Run a task and exit.
-pub async fn run_task(
-    config: AppConfig,
-    task: String,
-    model: Option<String>,
-) -> Result<()> {
+pub async fn run_task(config: AppConfig, task: String, model: Option<String>) -> Result<()> {
     let provider_name = config.provider.default.clone();
-    
-    let model_name = model.unwrap_or_else(|| {
-        match provider_name.as_str() {
-            "ollama" => config.provider.ollama.model.clone(),
-            _ => config.provider.openai.model.clone(),
-        }
+
+    let model_name = model.unwrap_or_else(|| match provider_name.as_str() {
+        "ollama" => config.provider.ollama.model.clone(),
+        _ => config.provider.openai.model.clone(),
     });
 
     let system_prompt = format!(
@@ -258,7 +277,15 @@ pub async fn run_task(
     );
 
     let llm_provider = create_provider(&config, &provider_name)?;
-    one_shot_chat(llm_provider, &model_name, &system_prompt, config.agent.temperature, &task, true).await
+    one_shot_chat(
+        llm_provider,
+        &model_name,
+        &system_prompt,
+        config.agent.temperature,
+        &task,
+        true,
+    )
+    .await
 }
 
 /// Agent one-shot mode: execute a single message with tool support.
@@ -288,18 +315,14 @@ async fn agent_one_shot(
     let tools = registry.llm_tool_definitions();
 
     // Build initial conversation
-    let mut history: Vec<Message> = vec![
-        Message::system(system_prompt),
-        Message::user(message),
-    ];
+    let mut history: Vec<Message> = vec![Message::system(system_prompt), Message::user(message)];
 
     // Tool execution loop
     for iteration in 0..MAX_TOOL_ITERATIONS {
         debug!("Tool iteration {}", iteration + 1);
 
         // Build request with tools
-        let mut request = CompletionRequest::new(model)
-            .with_temperature(temperature);
+        let mut request = CompletionRequest::new(model).with_temperature(temperature);
 
         for msg in &history {
             request = request.with_message(msg.clone());
@@ -309,7 +332,9 @@ async fn agent_one_shot(
         request = request.with_tools(tools.clone());
 
         // Get LLM response
-        let response = provider.complete(request).await
+        let response = provider
+            .complete(request)
+            .await
             .context("Failed to get response from LLM")?;
 
         // Check for tool calls
@@ -329,33 +354,21 @@ async fn agent_one_shot(
                 );
 
                 let result = registry.execute_tool_call(call).await;
-                
+
                 match &result {
                     Ok(tool_result) => {
                         let preview = truncate_str(&tool_result.output, 100);
                         if tool_result.success {
-                            println!(
-                                "{} {}",
-                                "[result]".bright_green(),
-                                preview
-                            );
+                            println!("{} {}", "[result]".bright_green(), preview);
                         } else {
-                            println!(
-                                "{} {}",
-                                "[error]".bright_red(),
-                                preview
-                            );
+                            println!("{} {}", "[error]".bright_red(), preview);
                         }
                         // Add tool result to history
                         history.push(Message::tool_result(&call.id, &tool_result.output));
                     }
                     Err(e) => {
                         let error_msg = format!("Tool execution failed: {}", e);
-                        println!(
-                            "{} {}",
-                            "[error]".bright_red(),
-                            &error_msg
-                        );
+                        println!("{} {}", "[error]".bright_red(), &error_msg);
                         history.push(Message::tool_result(&call.id, &error_msg));
                     }
                 }
@@ -373,7 +386,7 @@ async fn agent_one_shot(
         } else {
             println!("{}", response.content);
         }
-        
+
         return Ok(());
     }
 
@@ -411,7 +424,11 @@ async fn agent_interactive(
         registry.len().to_string().bright_green(),
         registry.tool_names().join(", ").bright_cyan()
     );
-    println!("   Type {} to exit, {} for help", "exit".bright_red(), "/help".bright_cyan());
+    println!(
+        "   Type {} to exit, {} for help",
+        "exit".bright_red(),
+        "/help".bright_cyan()
+    );
     if streaming {
         println!("   {} enabled", "Streaming".bright_green());
     }
@@ -489,8 +506,7 @@ async fn agent_interactive(
             debug!("Interactive tool iteration {}", iteration + 1);
 
             // Build request with tools
-            let mut request = CompletionRequest::new(model)
-                .with_temperature(temperature);
+            let mut request = CompletionRequest::new(model).with_temperature(temperature);
 
             for msg in &history {
                 request = request.with_message(msg.clone());
@@ -535,32 +551,20 @@ async fn agent_interactive(
                     );
 
                     let result = registry.execute_tool_call(call).await;
-                    
+
                     match &result {
                         Ok(tool_result) => {
                             let preview = truncate_str(&tool_result.output, 80);
                             if tool_result.success {
-                                println!(
-                                    "  {} {}",
-                                    "[ok]".bright_green(),
-                                    preview.dimmed()
-                                );
+                                println!("  {} {}", "[ok]".bright_green(), preview.dimmed());
                             } else {
-                                println!(
-                                    "  {} {}",
-                                    "[fail]".bright_red(),
-                                    preview
-                                );
+                                println!("  {} {}", "[fail]".bright_red(), preview);
                             }
                             history.push(Message::tool_result(&call.id, &tool_result.output));
                         }
                         Err(e) => {
                             let error_msg = format!("Tool error: {}", e);
-                            println!(
-                                "  {} {}",
-                                "[error]".bright_red(),
-                                &error_msg
-                            );
+                            println!("  {} {}", "[error]".bright_red(), &error_msg);
                             history.push(Message::tool_result(&call.id, &error_msg));
                         }
                     }
@@ -624,7 +628,7 @@ async fn one_shot_chat(
 
         // Streaming mode
         let stream_result = provider.complete_stream(request).await;
-        
+
         // Stop progress indicator
         progress.stop().await;
 
@@ -667,14 +671,14 @@ async fn one_shot_chat(
 
         let start_time = Instant::now();
         let result = provider.complete(request).await;
-        
+
         progress.stop().await;
 
         let response = result.context("Failed to get response from LLM")?;
         let token_count = (response.content.len() + 3) / 4;
-        
+
         println!("{}", response.content);
-        
+
         let stats = ResponseStats {
             tokens: token_count,
             duration: start_time.elapsed(),
@@ -703,7 +707,11 @@ async fn interactive_chat(
         provider.name().bright_blue(),
         model.bright_green()
     );
-    println!("   Type {} to exit, {} for help", "exit".bright_red(), "/help".bright_cyan());
+    println!(
+        "   Type {} to exit, {} for help",
+        "exit".bright_red(),
+        "/help".bright_cyan()
+    );
     if streaming {
         println!("   {} enabled", "Streaming".bright_green());
     }
@@ -770,8 +778,7 @@ async fn interactive_chat(
         history.push(Message::user(input));
 
         // Build request with full history
-        let mut request = CompletionRequest::new(model)
-            .with_temperature(temperature);
+        let mut request = CompletionRequest::new(model).with_temperature(temperature);
 
         for msg in &history {
             request = request.with_message(msg.clone());
@@ -786,7 +793,7 @@ async fn interactive_chat(
             match provider.complete_stream(request).await {
                 Ok(mut stream) => {
                     let mut full_response = String::new();
-                    
+
                     while let Some(chunk_result) = stream.next().await {
                         match chunk_result {
                             Ok(chunk) => {
@@ -806,7 +813,7 @@ async fn interactive_chat(
                         }
                     }
                     println!();
-                    
+
                     // Add assistant response to history
                     if !full_response.is_empty() {
                         history.push(Message::assistant(&full_response));
@@ -871,7 +878,11 @@ fn print_agent_help(registry: &ToolRegistry) {
     println!("  {} - Show current model", "/model".bright_cyan());
     println!("  {}  - Exit the chat", "/exit".bright_cyan());
     println!();
-    println!("{} ({} enabled)", "Available Tools:".bright_yellow().bold(), registry.len());
+    println!(
+        "{} ({} enabled)",
+        "Available Tools:".bright_yellow().bold(),
+        registry.len()
+    );
     for tool in registry.tool_definitions() {
         println!("  {} - {}", tool.name.bright_cyan(), tool.description);
     }
@@ -902,9 +913,10 @@ fn print_history(history: &[Message]) {
 
     println!();
     println!("{}", "Conversation History:".bright_yellow().bold());
-    
+
     let mut turn = 0;
-    for msg in history.iter().skip(1) {  // Skip system prompt
+    for msg in history.iter().skip(1) {
+        // Skip system prompt
         match msg.role {
             ember_llm::Role::User => {
                 turn += 1;
@@ -918,7 +930,12 @@ fn print_history(history: &[Message]) {
             ember_llm::Role::Tool => {
                 let preview: String = msg.content.chars().take(60).collect();
                 let suffix = if msg.content.len() > 60 { "..." } else { "" };
-                println!("   {}: {}{}", "[tool result]".dimmed(), preview.dimmed(), suffix);
+                println!(
+                    "   {}: {}{}",
+                    "[tool result]".dimmed(),
+                    preview.dimmed(),
+                    suffix
+                );
             }
             _ => {}
         }

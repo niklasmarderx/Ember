@@ -152,7 +152,8 @@ impl LLMProvider for OllamaProvider {
                         continue;
                     }
 
-                    if let Ok(chunk_response) = serde_json::from_str::<OllamaStreamResponse>(&line) {
+                    if let Ok(chunk_response) = serde_json::from_str::<OllamaStreamResponse>(&line)
+                    {
                         let stream_chunk = StreamChunk {
                             content: if chunk_response.message.content.is_empty() {
                                 None
@@ -220,13 +221,9 @@ impl LLMProvider for OllamaProvider {
     }
 
     async fn health_check(&self) -> Result<()> {
-        self.client
-            .get(&self.base_url)
-            .send()
-            .await
-            .map_err(|e| {
-                Error::provider_unavailable("ollama", format!("Ollama is not running: {}", e))
-            })?;
+        self.client.get(&self.base_url).send().await.map_err(|e| {
+            Error::provider_unavailable("ollama", format!("Ollama is not running: {}", e))
+        })?;
         Ok(())
     }
 
@@ -301,16 +298,16 @@ struct OllamaModel {
 
 impl From<CompletionRequest> for OllamaRequest {
     fn from(req: CompletionRequest) -> Self {
-        let options = if req.temperature.is_some() || req.max_tokens.is_some() || req.top_p.is_some()
-        {
-            Some(OllamaOptions {
-                temperature: req.temperature,
-                num_predict: req.max_tokens,
-                top_p: req.top_p,
-            })
-        } else {
-            None
-        };
+        let options =
+            if req.temperature.is_some() || req.max_tokens.is_some() || req.top_p.is_some() {
+                Some(OllamaOptions {
+                    temperature: req.temperature,
+                    num_predict: req.max_tokens,
+                    top_p: req.top_p,
+                })
+            } else {
+                None
+            };
 
         Self {
             model: req.model,

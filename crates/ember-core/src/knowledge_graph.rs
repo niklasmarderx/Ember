@@ -63,7 +63,7 @@ impl EntityId {
     pub fn new() -> Self {
         Self(Uuid::new_v4())
     }
-    
+
     /// Get the inner UUID
     #[must_use]
     pub fn inner(&self) -> Uuid {
@@ -216,47 +216,51 @@ impl Entity {
             metadata: HashMap::new(),
         }
     }
-    
+
     /// Add a property to the entity
     #[must_use]
-    pub fn with_property(mut self, key: impl Into<String>, value: impl Into<PropertyValue>) -> Self {
+    pub fn with_property(
+        mut self,
+        key: impl Into<String>,
+        value: impl Into<PropertyValue>,
+    ) -> Self {
         self.properties.insert(key.into(), value.into());
         self
     }
-    
+
     /// Add a tag
     #[must_use]
     pub fn with_tag(mut self, tag: impl Into<String>) -> Self {
         self.tags.insert(tag.into());
         self
     }
-    
+
     /// Set confidence score
     #[must_use]
     pub fn with_confidence(mut self, confidence: f64) -> Self {
         self.confidence = confidence.clamp(0.0, 1.0);
         self
     }
-    
+
     /// Set source
     #[must_use]
     pub fn with_source(mut self, source: impl Into<String>) -> Self {
         self.source = Some(source.into());
         self
     }
-    
+
     /// Get a property value
     #[must_use]
     pub fn get_property(&self, key: &str) -> Option<&PropertyValue> {
         self.properties.get(key)
     }
-    
+
     /// Check if entity has a specific tag
     #[must_use]
     pub fn has_tag(&self, tag: &str) -> bool {
         self.tags.contains(tag)
     }
-    
+
     /// Update a property
     pub fn set_property(&mut self, key: impl Into<String>, value: impl Into<PropertyValue>) {
         self.properties.insert(key.into(), value.into());
@@ -305,11 +309,7 @@ pub struct Relationship {
 impl Relationship {
     /// Create a new relationship
     #[must_use]
-    pub fn new(
-        source: EntityId,
-        relation_type: impl Into<String>,
-        target: EntityId,
-    ) -> Self {
+    pub fn new(source: EntityId, relation_type: impl Into<String>, target: EntityId) -> Self {
         Self {
             id: RelationshipId::new(),
             source,
@@ -322,28 +322,32 @@ impl Relationship {
             source_info: None,
         }
     }
-    
+
     /// Add a property
     #[must_use]
-    pub fn with_property(mut self, key: impl Into<String>, value: impl Into<PropertyValue>) -> Self {
+    pub fn with_property(
+        mut self,
+        key: impl Into<String>,
+        value: impl Into<PropertyValue>,
+    ) -> Self {
         self.properties.insert(key.into(), value.into());
         self
     }
-    
+
     /// Set confidence
     #[must_use]
     pub fn with_confidence(mut self, confidence: f64) -> Self {
         self.confidence = confidence.clamp(0.0, 1.0);
         self
     }
-    
+
     /// Set weight
     #[must_use]
     pub fn with_weight(mut self, weight: f64) -> Self {
         self.weight = weight;
         self
     }
-    
+
     /// Set source info
     #[must_use]
     pub fn with_source_info(mut self, source: impl Into<String>) -> Self {
@@ -395,49 +399,49 @@ impl GraphQuery {
     pub fn new() -> Self {
         Self::default()
     }
-    
+
     /// Filter by entity type
     #[must_use]
     pub fn entity_type(mut self, entity_type: impl Into<String>) -> Self {
         self.entity_type = Some(entity_type.into());
         self
     }
-    
+
     /// Add a property filter
     #[must_use]
     pub fn property_filter(mut self, filter: PropertyFilter) -> Self {
         self.property_filters.push(filter);
         self
     }
-    
+
     /// Require a tag
     #[must_use]
     pub fn require_tag(mut self, tag: impl Into<String>) -> Self {
         self.required_tags.insert(tag.into());
         self
     }
-    
+
     /// Filter by relationship type
     #[must_use]
     pub fn relationship_type(mut self, rel_type: impl Into<String>) -> Self {
         self.relationship_type = Some(rel_type.into());
         self
     }
-    
+
     /// Set minimum confidence
     #[must_use]
     pub fn min_confidence(mut self, confidence: f64) -> Self {
         self.min_confidence = confidence;
         self
     }
-    
+
     /// Set result limit
     #[must_use]
     pub fn limit(mut self, limit: usize) -> Self {
         self.limit = limit;
         self
     }
-    
+
     /// Set text query
     #[must_use]
     pub fn text(mut self, query: impl Into<String>) -> Self {
@@ -467,7 +471,7 @@ impl PropertyFilter {
             value: value.into(),
         }
     }
-    
+
     /// Create a contains filter
     #[must_use]
     pub fn contains(key: impl Into<String>, value: impl Into<PropertyValue>) -> Self {
@@ -477,7 +481,7 @@ impl PropertyFilter {
             value: value.into(),
         }
     }
-    
+
     /// Create a greater than filter
     #[must_use]
     pub fn greater_than(key: impl Into<String>, value: impl Into<PropertyValue>) -> Self {
@@ -487,7 +491,7 @@ impl PropertyFilter {
             value: value.into(),
         }
     }
-    
+
     /// Create a less than filter
     #[must_use]
     pub fn less_than(key: impl Into<String>, value: impl Into<PropertyValue>) -> Self {
@@ -570,28 +574,28 @@ impl TraversalOptions {
     pub fn new() -> Self {
         Self::default()
     }
-    
+
     /// Set max depth
     #[must_use]
     pub fn max_depth(mut self, depth: usize) -> Self {
         self.max_depth = depth;
         self
     }
-    
+
     /// Add relationship type to follow
     #[must_use]
     pub fn follow_relationship(mut self, rel_type: impl Into<String>) -> Self {
         self.relationship_types.insert(rel_type.into());
         self
     }
-    
+
     /// Set traversal direction
     #[must_use]
     pub fn direction(mut self, direction: RelationDirection) -> Self {
         self.direction = direction;
         self
     }
-    
+
     /// Set max entities
     #[must_use]
     pub fn max_entities(mut self, max: usize) -> Self {
@@ -684,7 +688,7 @@ impl KnowledgeGraph {
     pub fn new() -> Self {
         Self::with_config(GraphConfig::default())
     }
-    
+
     /// Create a new knowledge graph with custom configuration
     #[must_use]
     pub fn with_config(config: GraphConfig) -> Self {
@@ -700,7 +704,7 @@ impl KnowledgeGraph {
             stats: RwLock::new(GraphStats::default()),
         }
     }
-    
+
     /// Add an entity to the graph
     pub async fn add_entity(&self, entity: Entity) -> Result<EntityId> {
         let entities = self.entities.read().await;
@@ -711,29 +715,29 @@ impl KnowledgeGraph {
             )));
         }
         drop(entities);
-        
+
         let id = entity.id;
         let name = entity.name.clone();
         let entity_type = entity.entity_type.clone();
-        
+
         // Add to main store
         {
             let mut entities = self.entities.write().await;
             entities.insert(id, entity);
         }
-        
+
         // Update type index
         {
             let mut type_idx = self.type_index.write().await;
             type_idx.entry(entity_type.clone()).or_default().insert(id);
         }
-        
+
         // Update name index
         {
             let mut name_idx = self.name_index.write().await;
             name_idx.insert(name.to_lowercase(), id);
         }
-        
+
         // Initialize relationship indices
         {
             let mut out = self.outgoing.write().await;
@@ -743,25 +747,28 @@ impl KnowledgeGraph {
             let mut inc = self.incoming.write().await;
             inc.entry(id).or_default();
         }
-        
+
         // Update stats
         {
             let mut stats = self.stats.write().await;
             stats.entity_count += 1;
-            *stats.entities_by_type.entry(entity_type.clone()).or_default() += 1;
+            *stats
+                .entities_by_type
+                .entry(entity_type.clone())
+                .or_default() += 1;
         }
-        
+
         debug!(entity_id = %id, "Added entity to knowledge graph");
-        
+
         Ok(id)
     }
-    
+
     /// Get an entity by ID
     pub async fn get_entity(&self, id: EntityId) -> Option<Entity> {
         let entities = self.entities.read().await;
         entities.get(&id).cloned()
     }
-    
+
     /// Get an entity by name
     pub async fn get_entity_by_name(&self, name: &str) -> Option<Entity> {
         let name_idx = self.name_index.read().await;
@@ -771,9 +778,13 @@ impl KnowledgeGraph {
             None
         }
     }
-    
+
     /// Update an entity
-    pub async fn update_entity(&self, id: EntityId, update_fn: impl FnOnce(&mut Entity)) -> Result<()> {
+    pub async fn update_entity(
+        &self,
+        id: EntityId,
+        update_fn: impl FnOnce(&mut Entity),
+    ) -> Result<()> {
         let mut entities = self.entities.write().await;
         if let Some(entity) = entities.get_mut(&id) {
             update_fn(entity);
@@ -783,16 +794,17 @@ impl KnowledgeGraph {
             Err(Error::NotFound(format!("Entity not found: {}", id)))
         }
     }
-    
+
     /// Remove an entity and all its relationships
     pub async fn remove_entity(&self, id: EntityId) -> Result<Entity> {
         // Get the entity
         let entity = {
             let mut entities = self.entities.write().await;
-            entities.remove(&id)
+            entities
+                .remove(&id)
                 .ok_or_else(|| Error::NotFound(format!("Entity not found: {}", id)))?
         };
-        
+
         // Remove from type index
         {
             let mut type_idx = self.type_index.write().await;
@@ -800,18 +812,18 @@ impl KnowledgeGraph {
                 set.remove(&id);
             }
         }
-        
+
         // Remove from name index
         {
             let mut name_idx = self.name_index.write().await;
             name_idx.remove(&entity.name.to_lowercase());
         }
-        
+
         // Remove relationships
         let rels_to_remove: Vec<RelationshipId> = {
             let out = self.outgoing.read().await;
             let inc = self.incoming.read().await;
-            
+
             let mut rels = Vec::new();
             if let Some(outgoing) = out.get(&id) {
                 rels.extend(outgoing.iter().copied());
@@ -821,11 +833,11 @@ impl KnowledgeGraph {
             }
             rels
         };
-        
+
         for rel_id in rels_to_remove {
             let _ = self.remove_relationship(rel_id).await;
         }
-        
+
         // Remove from relationship indices
         {
             let mut out = self.outgoing.write().await;
@@ -835,7 +847,7 @@ impl KnowledgeGraph {
             let mut inc = self.incoming.write().await;
             inc.remove(&id);
         }
-        
+
         // Update stats
         {
             let mut stats = self.stats.write().await;
@@ -844,23 +856,29 @@ impl KnowledgeGraph {
                 *count = count.saturating_sub(1);
             }
         }
-        
+
         Ok(entity)
     }
-    
+
     /// Add a relationship between two entities
     pub async fn add_relationship(&self, relationship: Relationship) -> Result<RelationshipId> {
         // Verify both entities exist
         {
             let entities = self.entities.read().await;
             if !entities.contains_key(&relationship.source) {
-                return Err(Error::NotFound(format!("Source entity not found: {}", relationship.source)));
+                return Err(Error::NotFound(format!(
+                    "Source entity not found: {}",
+                    relationship.source
+                )));
             }
             if !entities.contains_key(&relationship.target) {
-                return Err(Error::NotFound(format!("Target entity not found: {}", relationship.target)));
+                return Err(Error::NotFound(format!(
+                    "Target entity not found: {}",
+                    relationship.target
+                )));
             }
         }
-        
+
         // Check capacity
         {
             let rels = self.relationships.read().await;
@@ -871,18 +889,18 @@ impl KnowledgeGraph {
                 )));
             }
         }
-        
+
         let id = relationship.id;
         let source = relationship.source;
         let target = relationship.target;
         let rel_type = relationship.relation_type.clone();
-        
+
         // Add to main store
         {
             let mut rels = self.relationships.write().await;
             rels.insert(id, relationship);
         }
-        
+
         // Update indices
         {
             let mut out = self.outgoing.write().await;
@@ -896,19 +914,19 @@ impl KnowledgeGraph {
             let mut rel_idx = self.rel_type_index.write().await;
             rel_idx.entry(rel_type.clone()).or_default().insert(id);
         }
-        
+
         // Update stats
         {
             let mut stats = self.stats.write().await;
             stats.relationship_count += 1;
             *stats.relationships_by_type.entry(rel_type).or_default() += 1;
         }
-        
+
         debug!(rel_id = %id, source = %source, target = %target, "Added relationship");
-        
+
         Ok(id)
     }
-    
+
     /// Create a relationship using source, type, and target
     pub async fn relate(
         &self,
@@ -919,13 +937,13 @@ impl KnowledgeGraph {
         let rel = Relationship::new(source, relation_type, target);
         self.add_relationship(rel).await
     }
-    
+
     /// Get a relationship by ID
     pub async fn get_relationship(&self, id: RelationshipId) -> Option<Relationship> {
         let rels = self.relationships.read().await;
         rels.get(&id).cloned()
     }
-    
+
     /// Remove a relationship
     pub async fn remove_relationship(&self, id: RelationshipId) -> Result<Relationship> {
         let rel = {
@@ -933,7 +951,7 @@ impl KnowledgeGraph {
             rels.remove(&id)
                 .ok_or_else(|| Error::NotFound(format!("Relationship not found: {:?}", id)))?
         };
-        
+
         // Update indices
         {
             let mut out = self.outgoing.write().await;
@@ -953,7 +971,7 @@ impl KnowledgeGraph {
                 set.remove(&id);
             }
         }
-        
+
         // Update stats
         {
             let mut stats = self.stats.write().await;
@@ -962,10 +980,10 @@ impl KnowledgeGraph {
                 *count = count.saturating_sub(1);
             }
         }
-        
+
         Ok(rel)
     }
-    
+
     /// Get all relationships for an entity
     pub async fn get_relationships(
         &self,
@@ -973,27 +991,34 @@ impl KnowledgeGraph {
         direction: RelationDirection,
     ) -> Vec<Relationship> {
         let mut rel_ids = Vec::new();
-        
-        if matches!(direction, RelationDirection::Outgoing | RelationDirection::Both) {
+
+        if matches!(
+            direction,
+            RelationDirection::Outgoing | RelationDirection::Both
+        ) {
             let out = self.outgoing.read().await;
             if let Some(ids) = out.get(&entity_id) {
                 rel_ids.extend(ids.iter().copied());
             }
         }
-        
-        if matches!(direction, RelationDirection::Incoming | RelationDirection::Both) {
+
+        if matches!(
+            direction,
+            RelationDirection::Incoming | RelationDirection::Both
+        ) {
             let inc = self.incoming.read().await;
             if let Some(ids) = inc.get(&entity_id) {
                 rel_ids.extend(ids.iter().copied());
             }
         }
-        
+
         let rels = self.relationships.read().await;
-        rel_ids.iter()
+        rel_ids
+            .iter()
             .filter_map(|id| rels.get(id).cloned())
             .collect()
     }
-    
+
     /// Get neighbors of an entity
     pub async fn get_neighbors(
         &self,
@@ -1002,7 +1027,7 @@ impl KnowledgeGraph {
     ) -> Vec<Entity> {
         let rels = self.get_relationships(entity_id, direction).await;
         let entities = self.entities.read().await;
-        
+
         let mut neighbor_ids: HashSet<EntityId> = HashSet::new();
         for rel in &rels {
             if rel.source == entity_id {
@@ -1011,21 +1036,23 @@ impl KnowledgeGraph {
                 neighbor_ids.insert(rel.source);
             }
         }
-        
-        neighbor_ids.iter()
+
+        neighbor_ids
+            .iter()
             .filter_map(|id| entities.get(id).cloned())
             .collect()
     }
-    
+
     /// Query the knowledge graph
     pub async fn query(&self, query: GraphQuery) -> QueryResult {
         let start = std::time::Instant::now();
-        
+
         let entities = self.entities.read().await;
         let relationships = self.relationships.read().await;
-        
+
         // Filter entities
-        let mut matching_entities: Vec<Entity> = entities.values()
+        let mut matching_entities: Vec<Entity> = entities
+            .values()
             .filter(|e| {
                 // Type filter
                 if let Some(ref entity_type) = query.entity_type {
@@ -1033,26 +1060,26 @@ impl KnowledgeGraph {
                         return false;
                     }
                 }
-                
+
                 // Confidence filter
                 if e.confidence < query.min_confidence {
                     return false;
                 }
-                
+
                 // Tag filter
                 for tag in &query.required_tags {
                     if !e.tags.contains(tag) {
                         return false;
                     }
                 }
-                
+
                 // Property filters
                 for filter in &query.property_filters {
                     if !Self::check_property_filter(e, filter) {
                         return false;
                     }
                 }
-                
+
                 // Text query (simple name/type match)
                 if let Some(ref text) = query.text_query {
                     let lower_text = text.to_lowercase();
@@ -1062,20 +1089,21 @@ impl KnowledgeGraph {
                         return false;
                     }
                 }
-                
+
                 true
             })
             .cloned()
             .collect();
-        
+
         let total_count = matching_entities.len();
-        
+
         // Apply limit
         matching_entities.truncate(query.limit);
-        
+
         // Get related relationships
         let entity_ids: HashSet<EntityId> = matching_entities.iter().map(|e| e.id).collect();
-        let related_rels: Vec<Relationship> = relationships.values()
+        let related_rels: Vec<Relationship> = relationships
+            .values()
             .filter(|r| {
                 // Either source or target in our results
                 (entity_ids.contains(&r.source) || entity_ids.contains(&r.target))
@@ -1086,13 +1114,13 @@ impl KnowledgeGraph {
             })
             .cloned()
             .collect();
-        
+
         // Update stats
         {
             let mut stats = self.stats.write().await;
             stats.queries_executed += 1;
         }
-        
+
         QueryResult {
             entities: matching_entities,
             relationships: related_rels,
@@ -1100,53 +1128,43 @@ impl KnowledgeGraph {
             execution_time: start.elapsed(),
         }
     }
-    
+
     /// Check if an entity passes a property filter
     fn check_property_filter(entity: &Entity, filter: &PropertyFilter) -> bool {
         let Some(prop) = entity.properties.get(&filter.key) else {
             return matches!(filter.operation, FilterOperation::Exists);
         };
-        
+
         match filter.operation {
             FilterOperation::Equals => prop == &filter.value,
             FilterOperation::NotEquals => prop != &filter.value,
-            FilterOperation::Contains => {
-                match (prop, &filter.value) {
-                    (PropertyValue::String(s), PropertyValue::String(v)) => s.contains(v),
-                    (PropertyValue::List(l), v) => l.contains(v),
-                    _ => false,
-                }
-            }
-            FilterOperation::StartsWith => {
-                match (prop, &filter.value) {
-                    (PropertyValue::String(s), PropertyValue::String(v)) => s.starts_with(v),
-                    _ => false,
-                }
-            }
-            FilterOperation::EndsWith => {
-                match (prop, &filter.value) {
-                    (PropertyValue::String(s), PropertyValue::String(v)) => s.ends_with(v),
-                    _ => false,
-                }
-            }
-            FilterOperation::GreaterThan => {
-                match (prop, &filter.value) {
-                    (PropertyValue::Integer(a), PropertyValue::Integer(b)) => a > b,
-                    (PropertyValue::Float(a), PropertyValue::Float(b)) => a > b,
-                    _ => false,
-                }
-            }
-            FilterOperation::LessThan => {
-                match (prop, &filter.value) {
-                    (PropertyValue::Integer(a), PropertyValue::Integer(b)) => a < b,
-                    (PropertyValue::Float(a), PropertyValue::Float(b)) => a < b,
-                    _ => false,
-                }
-            }
+            FilterOperation::Contains => match (prop, &filter.value) {
+                (PropertyValue::String(s), PropertyValue::String(v)) => s.contains(v),
+                (PropertyValue::List(l), v) => l.contains(v),
+                _ => false,
+            },
+            FilterOperation::StartsWith => match (prop, &filter.value) {
+                (PropertyValue::String(s), PropertyValue::String(v)) => s.starts_with(v),
+                _ => false,
+            },
+            FilterOperation::EndsWith => match (prop, &filter.value) {
+                (PropertyValue::String(s), PropertyValue::String(v)) => s.ends_with(v),
+                _ => false,
+            },
+            FilterOperation::GreaterThan => match (prop, &filter.value) {
+                (PropertyValue::Integer(a), PropertyValue::Integer(b)) => a > b,
+                (PropertyValue::Float(a), PropertyValue::Float(b)) => a > b,
+                _ => false,
+            },
+            FilterOperation::LessThan => match (prop, &filter.value) {
+                (PropertyValue::Integer(a), PropertyValue::Integer(b)) => a < b,
+                (PropertyValue::Float(a), PropertyValue::Float(b)) => a < b,
+                _ => false,
+            },
             FilterOperation::Exists => true,
         }
     }
-    
+
     /// Traverse the graph from a starting entity
     pub async fn traverse(
         &self,
@@ -1155,39 +1173,45 @@ impl KnowledgeGraph {
     ) -> Result<TraversalResult> {
         let entities = self.entities.read().await;
         let relationships = self.relationships.read().await;
-        
+
         if !entities.contains_key(&start) {
-            return Err(Error::NotFound(format!("Start entity not found: {}", start)));
+            return Err(Error::NotFound(format!(
+                "Start entity not found: {}",
+                start
+            )));
         }
-        
+
         let mut visited: Vec<(Entity, usize)> = Vec::new();
         let mut visited_ids: HashSet<EntityId> = HashSet::new();
         let mut traversed_rels: Vec<Relationship> = Vec::new();
         let mut paths: HashMap<EntityId, Vec<RelationshipId>> = HashMap::new();
-        
+
         // BFS traversal
         let mut queue: VecDeque<(EntityId, usize, Vec<RelationshipId>)> = VecDeque::new();
         queue.push_back((start, 0, Vec::new()));
         visited_ids.insert(start);
-        
+
         while let Some((current, depth, path)) = queue.pop_front() {
             if visited.len() >= options.max_entities {
                 break;
             }
-            
+
             if let Some(entity) = entities.get(&current) {
                 visited.push((entity.clone(), depth));
                 paths.insert(current, path.clone());
             }
-            
+
             if depth >= options.max_depth {
                 continue;
             }
-            
+
             // Get neighbors based on direction
             let mut neighbor_rels: Vec<&Relationship> = Vec::new();
-            
-            if matches!(options.direction, RelationDirection::Outgoing | RelationDirection::Both) {
+
+            if matches!(
+                options.direction,
+                RelationDirection::Outgoing | RelationDirection::Both
+            ) {
                 let out = self.outgoing.read().await;
                 if let Some(rel_ids) = out.get(&current) {
                     for rel_id in rel_ids {
@@ -1197,8 +1221,11 @@ impl KnowledgeGraph {
                     }
                 }
             }
-            
-            if matches!(options.direction, RelationDirection::Incoming | RelationDirection::Both) {
+
+            if matches!(
+                options.direction,
+                RelationDirection::Incoming | RelationDirection::Both
+            ) {
                 let inc = self.incoming.read().await;
                 if let Some(rel_ids) = inc.get(&current) {
                     for rel_id in rel_ids {
@@ -1208,7 +1235,7 @@ impl KnowledgeGraph {
                     }
                 }
             }
-            
+
             for rel in neighbor_rels {
                 // Check relationship type filter
                 if !options.relationship_types.is_empty()
@@ -1216,14 +1243,18 @@ impl KnowledgeGraph {
                 {
                     continue;
                 }
-                
+
                 // Check confidence
                 if rel.confidence < options.min_confidence {
                     continue;
                 }
-                
-                let neighbor = if rel.source == current { rel.target } else { rel.source };
-                
+
+                let neighbor = if rel.source == current {
+                    rel.target
+                } else {
+                    rel.source
+                };
+
                 if visited_ids.insert(neighbor) {
                     let mut new_path = path.clone();
                     new_path.push(rel.id);
@@ -1232,7 +1263,7 @@ impl KnowledgeGraph {
                 }
             }
         }
-        
+
         Ok(TraversalResult {
             start,
             visited,
@@ -1240,7 +1271,7 @@ impl KnowledgeGraph {
             paths,
         })
     }
-    
+
     /// Find shortest path between two entities
     pub async fn find_path(
         &self,
@@ -1249,26 +1280,27 @@ impl KnowledgeGraph {
         options: TraversalOptions,
     ) -> Result<Option<Vec<Relationship>>> {
         let result = self.traverse(from, options).await?;
-        
+
         if let Some(path_ids) = result.paths.get(&to) {
             let relationships = self.relationships.read().await;
-            let path: Vec<Relationship> = path_ids.iter()
+            let path: Vec<Relationship> = path_ids
+                .iter()
                 .filter_map(|id| relationships.get(id).cloned())
                 .collect();
-            
+
             if path.len() == path_ids.len() {
                 return Ok(Some(path));
             }
         }
-        
+
         Ok(None)
     }
-    
+
     /// Get entities of a specific type
     pub async fn get_entities_by_type(&self, entity_type: &str) -> Vec<Entity> {
         let type_idx = self.type_index.read().await;
         let entities = self.entities.read().await;
-        
+
         if let Some(ids) = type_idx.get(entity_type) {
             ids.iter()
                 .filter_map(|id| entities.get(id).cloned())
@@ -1277,46 +1309,47 @@ impl KnowledgeGraph {
             Vec::new()
         }
     }
-    
+
     /// Get graph statistics
     pub async fn stats(&self) -> GraphStats {
         let mut stats = self.stats.read().await.clone();
-        
+
         // Calculate average confidences
         let entities = self.entities.read().await;
         if !entities.is_empty() {
             let total: f64 = entities.values().map(|e| e.confidence).sum();
             stats.avg_entity_confidence = total / entities.len() as f64;
         }
-        
+
         let rels = self.relationships.read().await;
         if !rels.is_empty() {
             let total: f64 = rels.values().map(|r| r.confidence).sum();
             stats.avg_relationship_confidence = total / rels.len() as f64;
         }
-        
+
         stats
     }
-    
+
     /// Clean up low-confidence entries
     pub async fn cleanup(&self, min_confidence: f64) -> (usize, usize) {
         let entities_removed;
         let rels_removed;
-        
+
         // Find low-confidence entities
         let to_remove: Vec<EntityId> = {
             let entities = self.entities.read().await;
-            entities.iter()
+            entities
+                .iter()
                 .filter(|(_, e)| e.confidence < min_confidence)
                 .map(|(id, _)| *id)
                 .collect()
         };
-        
+
         entities_removed = to_remove.len();
         for id in to_remove {
             let _ = self.remove_entity(id).await;
         }
-        
+
         // Find low-confidence relationships
         let rels_to_remove: Vec<RelationshipId> = {
             let rels = self.relationships.read().await;
@@ -1325,37 +1358,37 @@ impl KnowledgeGraph {
                 .map(|(id, _)| *id)
                 .collect()
         };
-        
+
         rels_removed = rels_to_remove.len();
         for id in rels_to_remove {
             let _ = self.remove_relationship(id).await;
         }
-        
+
         info!(
             entities_removed = entities_removed,
             relationships_removed = rels_removed,
             "Knowledge graph cleanup complete"
         );
-        
+
         (entities_removed, rels_removed)
     }
-    
+
     /// Merge two entities into one
-    pub async fn merge_entities(
-        &self,
-        keep: EntityId,
-        remove: EntityId,
-    ) -> Result<Entity> {
+    pub async fn merge_entities(&self, keep: EntityId, remove: EntityId) -> Result<Entity> {
         // Get both entities
         let (_keep_entity, remove_entity) = {
             let entities = self.entities.read().await;
-            let keep_e = entities.get(&keep).cloned()
+            let keep_e = entities
+                .get(&keep)
+                .cloned()
                 .ok_or_else(|| Error::NotFound(format!("Entity not found: {}", keep)))?;
-            let remove_e = entities.get(&remove).cloned()
+            let remove_e = entities
+                .get(&remove)
+                .cloned()
                 .ok_or_else(|| Error::NotFound(format!("Entity not found: {}", remove)))?;
             (keep_e, remove_e)
         };
-        
+
         // Merge properties from removed entity
         {
             let mut entities = self.entities.write().await;
@@ -1369,7 +1402,7 @@ impl KnowledgeGraph {
                 entity.updated_at = chrono::Utc::now();
             }
         }
-        
+
         // Redirect relationships from removed entity to kept entity
         let rels_to_update: Vec<(RelationshipId, bool)> = {
             let rels = self.relationships.read().await;
@@ -1385,7 +1418,7 @@ impl KnowledgeGraph {
                 })
                 .collect()
         };
-        
+
         {
             let mut rels = self.relationships.write().await;
             for (rel_id, is_source) in rels_to_update {
@@ -1398,46 +1431,47 @@ impl KnowledgeGraph {
                 }
             }
         }
-        
+
         // Remove the merged entity
         let _ = self.remove_entity(remove).await;
-        
+
         // Return updated entity
-        self.get_entity(keep).await
+        self.get_entity(keep)
+            .await
             .ok_or_else(|| Error::Internal("Failed to get merged entity".into()))
     }
-    
+
     /// Export the graph to a serializable format
     pub async fn export(&self) -> GraphExport {
         let entities = self.entities.read().await;
         let relationships = self.relationships.read().await;
-        
+
         GraphExport {
             entities: entities.values().cloned().collect(),
             relationships: relationships.values().cloned().collect(),
             exported_at: chrono::Utc::now(),
         }
     }
-    
+
     /// Import data into the graph
     pub async fn import(&self, data: GraphExport) -> Result<(usize, usize)> {
         let mut entities_added = 0;
         let mut rels_added = 0;
-        
+
         // Import entities
         for entity in data.entities {
             if self.add_entity(entity).await.is_ok() {
                 entities_added += 1;
             }
         }
-        
+
         // Import relationships
         for rel in data.relationships {
             if self.add_relationship(rel).await.is_ok() {
                 rels_added += 1;
             }
         }
-        
+
         Ok((entities_added, rels_added))
     }
 }
@@ -1466,109 +1500,123 @@ pub struct GraphExport {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[tokio::test]
     async fn test_add_entity() {
         let graph = KnowledgeGraph::new();
-        
+
         let entity = Entity::new("Rust", "ProgrammingLanguage")
             .with_property("paradigm", "systems")
             .with_tag("fast");
-        
+
         let id = graph.add_entity(entity).await.unwrap();
         let retrieved = graph.get_entity(id).await.unwrap();
-        
+
         assert_eq!(retrieved.name, "Rust");
         assert_eq!(retrieved.entity_type, "ProgrammingLanguage");
         assert!(retrieved.has_tag("fast"));
     }
-    
+
     #[tokio::test]
     async fn test_get_entity_by_name() {
         let graph = KnowledgeGraph::new();
-        
+
         let entity = Entity::new("Tokio", "Library");
         graph.add_entity(entity).await.unwrap();
-        
+
         let found = graph.get_entity_by_name("tokio").await;
         assert!(found.is_some());
         assert_eq!(found.unwrap().name, "Tokio");
     }
-    
+
     #[tokio::test]
     async fn test_add_relationship() {
         let graph = KnowledgeGraph::new();
-        
+
         let rust = Entity::new("Rust", "Language");
         let tokio = Entity::new("Tokio", "Library");
-        
+
         let rust_id = graph.add_entity(rust).await.unwrap();
         let tokio_id = graph.add_entity(tokio).await.unwrap();
-        
+
         graph.relate(tokio_id, "written_in", rust_id).await.unwrap();
-        
-        let neighbors = graph.get_neighbors(tokio_id, RelationDirection::Outgoing).await;
+
+        let neighbors = graph
+            .get_neighbors(tokio_id, RelationDirection::Outgoing)
+            .await;
         assert_eq!(neighbors.len(), 1);
         assert_eq!(neighbors[0].name, "Rust");
     }
-    
+
     #[tokio::test]
     async fn test_query() {
         let graph = KnowledgeGraph::new();
-        
-        graph.add_entity(Entity::new("Rust", "Language").with_tag("systems")).await.unwrap();
-        graph.add_entity(Entity::new("Python", "Language").with_tag("scripting")).await.unwrap();
-        graph.add_entity(Entity::new("Tokio", "Library")).await.unwrap();
-        
+
+        graph
+            .add_entity(Entity::new("Rust", "Language").with_tag("systems"))
+            .await
+            .unwrap();
+        graph
+            .add_entity(Entity::new("Python", "Language").with_tag("scripting"))
+            .await
+            .unwrap();
+        graph
+            .add_entity(Entity::new("Tokio", "Library"))
+            .await
+            .unwrap();
+
         let query = GraphQuery::new()
             .entity_type("Language")
             .require_tag("systems");
-        
+
         let result = graph.query(query).await;
-        
+
         assert_eq!(result.entities.len(), 1);
         assert_eq!(result.entities[0].name, "Rust");
     }
-    
+
     #[tokio::test]
     async fn test_traversal() {
         let graph = KnowledgeGraph::new();
-        
+
         let a = graph.add_entity(Entity::new("A", "Node")).await.unwrap();
         let b = graph.add_entity(Entity::new("B", "Node")).await.unwrap();
         let c = graph.add_entity(Entity::new("C", "Node")).await.unwrap();
         let d = graph.add_entity(Entity::new("D", "Node")).await.unwrap();
-        
+
         graph.relate(a, "connects_to", b).await.unwrap();
         graph.relate(b, "connects_to", c).await.unwrap();
         graph.relate(c, "connects_to", d).await.unwrap();
-        
+
         let options = TraversalOptions::new()
             .max_depth(3)
             .direction(RelationDirection::Outgoing);
-        
+
         let result = graph.traverse(a, options).await.unwrap();
-        
+
         assert_eq!(result.visited.len(), 4);
     }
-    
+
     #[tokio::test]
     async fn test_find_path() {
         let graph = KnowledgeGraph::new();
-        
+
         let a = graph.add_entity(Entity::new("A", "Node")).await.unwrap();
         let b = graph.add_entity(Entity::new("B", "Node")).await.unwrap();
         let c = graph.add_entity(Entity::new("C", "Node")).await.unwrap();
-        
+
         graph.relate(a, "to", b).await.unwrap();
         graph.relate(b, "to", c).await.unwrap();
-        
-        let path = graph.find_path(a, c, TraversalOptions::default()).await.unwrap();
-        
+
+        let path = graph
+            .find_path(a, c, TraversalOptions::default())
+            .await
+            .unwrap();
+
         assert!(path.is_some());
         assert_eq!(path.unwrap().len(), 2);
     }
-    
+
     #[tokio::test]
     async fn test_property_values() {
         let entity = Entity::new("Test", "Type")
@@ -1576,108 +1624,115 @@ mod tests {
             .with_property("int", 42i64)
             .with_property("float", 3.14f64)
             .with_property("bool", true);
-        
-        assert!(matches!(entity.get_property("string"), Some(PropertyValue::String(_))));
-        assert!(matches!(entity.get_property("int"), Some(PropertyValue::Integer(42))));
-        assert!(matches!(entity.get_property("bool"), Some(PropertyValue::Boolean(true))));
+
+        assert!(matches!(
+            entity.get_property("string"),
+            Some(PropertyValue::String(_))
+        ));
+        assert!(matches!(
+            entity.get_property("int"),
+            Some(PropertyValue::Integer(42))
+        ));
+        assert!(matches!(
+            entity.get_property("bool"),
+            Some(PropertyValue::Boolean(true))
+        ));
     }
-    
+
     #[tokio::test]
     async fn test_remove_entity() {
         let graph = KnowledgeGraph::new();
-        
+
         let entity = Entity::new("ToRemove", "Type");
         let id = graph.add_entity(entity).await.unwrap();
-        
+
         assert!(graph.get_entity(id).await.is_some());
-        
+
         graph.remove_entity(id).await.unwrap();
-        
+
         assert!(graph.get_entity(id).await.is_none());
     }
-    
+
     #[tokio::test]
     async fn test_merge_entities() {
         let graph = KnowledgeGraph::new();
-        
-        let e1 = Entity::new("Entity1", "Type")
-            .with_property("a", "1");
-        let e2 = Entity::new("Entity2", "Type")
-            .with_property("b", "2");
-        
+
+        let e1 = Entity::new("Entity1", "Type").with_property("a", "1");
+        let e2 = Entity::new("Entity2", "Type").with_property("b", "2");
+
         let id1 = graph.add_entity(e1).await.unwrap();
         let id2 = graph.add_entity(e2).await.unwrap();
-        
+
         let merged = graph.merge_entities(id1, id2).await.unwrap();
-        
+
         // Merged entity should have both properties
         assert!(merged.get_property("a").is_some());
         assert!(merged.get_property("b").is_some());
-        
+
         // Second entity should be gone
         assert!(graph.get_entity(id2).await.is_none());
     }
-    
+
     #[tokio::test]
     async fn test_export_import() {
         let graph = KnowledgeGraph::new();
-        
+
         let e1 = graph.add_entity(Entity::new("E1", "Type")).await.unwrap();
         let e2 = graph.add_entity(Entity::new("E2", "Type")).await.unwrap();
         graph.relate(e1, "relates_to", e2).await.unwrap();
-        
+
         let export = graph.export().await;
-        
+
         assert_eq!(export.entities.len(), 2);
         assert_eq!(export.relationships.len(), 1);
-        
+
         // Import into new graph
         let graph2 = KnowledgeGraph::new();
         let (entities, rels) = graph2.import(export).await.unwrap();
-        
+
         assert_eq!(entities, 2);
         assert_eq!(rels, 1);
     }
-    
+
     #[tokio::test]
     async fn test_stats() {
         let graph = KnowledgeGraph::new();
-        
+
         graph.add_entity(Entity::new("E1", "TypeA")).await.unwrap();
         graph.add_entity(Entity::new("E2", "TypeA")).await.unwrap();
         graph.add_entity(Entity::new("E3", "TypeB")).await.unwrap();
-        
+
         let stats = graph.stats().await;
-        
+
         assert_eq!(stats.entity_count, 3);
         assert_eq!(stats.entities_by_type.get("TypeA"), Some(&2));
         assert_eq!(stats.entities_by_type.get("TypeB"), Some(&1));
     }
-    
+
     #[test]
     fn test_filter_operations() {
         let entity = Entity::new("Test", "Type")
             .with_property("name", "hello world")
             .with_property("count", 10i64);
-        
+
         // Equals
         assert!(KnowledgeGraph::check_property_filter(
             &entity,
             &PropertyFilter::equals("name", "hello world")
         ));
-        
+
         // Contains
         assert!(KnowledgeGraph::check_property_filter(
             &entity,
             &PropertyFilter::contains("name", "world")
         ));
-        
+
         // Greater than
         assert!(KnowledgeGraph::check_property_filter(
             &entity,
             &PropertyFilter::greater_than("count", 5i64)
         ));
-        
+
         // Less than
         assert!(KnowledgeGraph::check_property_filter(
             &entity,

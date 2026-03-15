@@ -205,7 +205,9 @@ impl AgentConfig {
             return Err(crate::Error::config("Max iterations must be > 0"));
         }
         if self.temperature < 0.0 || self.temperature > 2.0 {
-            return Err(crate::Error::config("Temperature must be between 0.0 and 2.0"));
+            return Err(crate::Error::config(
+                "Temperature must be between 0.0 and 2.0",
+            ));
         }
         Ok(())
     }

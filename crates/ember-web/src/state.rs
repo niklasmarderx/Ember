@@ -222,7 +222,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_app_state_conversations() {
-        let state = AppState::new(ServerConfig::default().with_llm_provider(LLMProviderType::Ollama));
+        let state =
+            AppState::new(ServerConfig::default().with_llm_provider(LLMProviderType::Ollama));
 
         assert_eq!(state.conversation_count().await, 0);
 

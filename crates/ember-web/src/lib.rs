@@ -54,9 +54,9 @@ pub mod state;
 // Re-exports
 pub use error::{ErrorResponse, Result, WebError};
 pub use handlers::{
-    ChatRequest, ChatResponse, ConversationSummary, ConversationsResponse,
-    HealthResponse, InfoResponse, MessageInput, ModelInfo, ModelsResponse,
-    StreamEvent, TokenUsage, ToolInfo, ToolsResponse,
+    ChatRequest, ChatResponse, ConversationSummary, ConversationsResponse, HealthResponse,
+    InfoResponse, MessageInput, ModelInfo, ModelsResponse, StreamEvent, TokenUsage, ToolInfo,
+    ToolsResponse,
 };
 pub use routes::{create_router, create_router_with_static, paths, API_PREFIX};
 pub use state::{AppState, LLMProviderType, ServerConfig};
@@ -92,9 +92,11 @@ impl Server {
         let state = AppState::new(self.config.clone());
         let app = create_router(state);
 
-        let addr: SocketAddr = self.config.address().parse().map_err(|e| {
-            std::io::Error::new(std::io::ErrorKind::InvalidInput, e)
-        })?;
+        let addr: SocketAddr = self
+            .config
+            .address()
+            .parse()
+            .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidInput, e))?;
 
         info!(address = %addr, "Starting Ember web server");
 
@@ -120,9 +122,11 @@ impl Server {
         let state = AppState::new(self.config.clone());
         let app = create_router(state);
 
-        let addr: SocketAddr = self.config.address().parse().map_err(|e| {
-            std::io::Error::new(std::io::ErrorKind::InvalidInput, e)
-        })?;
+        let addr: SocketAddr = self
+            .config
+            .address()
+            .parse()
+            .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidInput, e))?;
 
         info!(address = %addr, "Starting Ember web server with graceful shutdown");
 
@@ -140,8 +144,8 @@ impl Server {
 pub mod prelude {
     pub use crate::error::{ErrorResponse, Result, WebError};
     pub use crate::handlers::{
-        ChatRequest, ChatResponse, HealthResponse, InfoResponse,
-        ModelsResponse, StreamEvent, ToolsResponse,
+        ChatRequest, ChatResponse, HealthResponse, InfoResponse, ModelsResponse, StreamEvent,
+        ToolsResponse,
     };
     pub use crate::routes::{create_router, create_router_with_static};
     pub use crate::state::{AppState, LLMProviderType, ServerConfig};

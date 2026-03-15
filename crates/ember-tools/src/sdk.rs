@@ -132,38 +132,38 @@ impl SimpleTool {
 impl ToolHandler for SimpleTool {
     fn definition(&self) -> ToolDefinition {
         let mut def = ToolDefinition::new(&self.config.name, &self.config.description);
-        
+
         // Build parameters schema
         let mut properties = serde_json::Map::new();
         let mut required = Vec::new();
-        
+
         for param in &self.config.params {
             let mut prop = serde_json::json!({
                 "type": param.param_type.as_schema_type(),
                 "description": param.description
             });
-            
+
             if let Some(default) = &param.default {
                 prop["default"] = default.clone();
             }
-            
+
             if let Some(enum_vals) = &param.enum_values {
                 prop["enum"] = serde_json::json!(enum_vals);
             }
-            
+
             properties.insert(param.name.clone(), prop);
-            
+
             if param.required {
                 required.push(param.name.clone());
             }
         }
-        
+
         def.parameters = serde_json::json!({
             "type": "object",
             "properties": properties,
             "required": required
         });
-        
+
         def
     }
 
@@ -215,12 +215,7 @@ impl SimpleToolBuilder {
     }
 
     /// Add a string parameter with a default value.
-    pub fn string_param_default(
-        mut self,
-        name: &str,
-        description: &str,
-        default: &str,
-    ) -> Self {
+    pub fn string_param_default(mut self, name: &str, description: &str, default: &str) -> Self {
         self.params.push(ParamDef {
             name: name.to_string(),
             description: description.to_string(),
@@ -265,12 +260,7 @@ impl SimpleToolBuilder {
     }
 
     /// Add an integer parameter with a default value.
-    pub fn integer_param_default(
-        mut self,
-        name: &str,
-        description: &str,
-        default: i64,
-    ) -> Self {
+    pub fn integer_param_default(mut self, name: &str, description: &str, default: i64) -> Self {
         self.params.push(ParamDef {
             name: name.to_string(),
             description: description.to_string(),
@@ -309,12 +299,7 @@ impl SimpleToolBuilder {
     }
 
     /// Add a boolean parameter with a default value.
-    pub fn boolean_param_default(
-        mut self,
-        name: &str,
-        description: &str,
-        default: bool,
-    ) -> Self {
+    pub fn boolean_param_default(mut self, name: &str, description: &str, default: bool) -> Self {
         self.params.push(ParamDef {
             name: name.to_string(),
             description: description.to_string(),
@@ -420,28 +405,28 @@ impl ToolHandler for AsyncTool {
     fn definition(&self) -> ToolDefinition {
         let mut properties = serde_json::Map::new();
         let mut required = Vec::new();
-        
+
         for param in &self.config.params {
             let mut prop = serde_json::json!({
                 "type": param.param_type.as_schema_type(),
                 "description": param.description
             });
-            
+
             if let Some(default) = &param.default {
                 prop["default"] = default.clone();
             }
-            
+
             if let Some(enum_vals) = &param.enum_values {
                 prop["enum"] = serde_json::json!(enum_vals);
             }
-            
+
             properties.insert(param.name.clone(), prop);
-            
+
             if param.required {
                 required.push(param.name.clone());
             }
         }
-        
+
         let mut def = ToolDefinition::new(&self.config.name, &self.config.description);
         def.parameters = serde_json::json!({
             "type": "object",
@@ -464,31 +449,31 @@ impl ToolHandler for AsyncTool {
 pub trait ParamExtractor {
     /// Extract a required string parameter.
     fn get_string(&self, name: &str) -> Result<&str>;
-    
+
     /// Extract an optional string parameter.
     fn get_string_opt(&self, name: &str) -> Option<&str>;
-    
+
     /// Extract a required integer parameter.
     fn get_integer(&self, name: &str) -> Result<i64>;
-    
+
     /// Extract an optional integer parameter.
     fn get_integer_opt(&self, name: &str) -> Option<i64>;
-    
+
     /// Extract a required number parameter.
     fn get_number(&self, name: &str) -> Result<f64>;
-    
+
     /// Extract an optional number parameter.
     fn get_number_opt(&self, name: &str) -> Option<f64>;
-    
+
     /// Extract a required boolean parameter.
     fn get_boolean(&self, name: &str) -> Result<bool>;
-    
+
     /// Extract an optional boolean parameter.
     fn get_boolean_opt(&self, name: &str) -> Option<bool>;
-    
+
     /// Extract a required array parameter.
     fn get_array(&self, name: &str) -> Result<&Vec<Value>>;
-    
+
     /// Extract an optional array parameter.
     fn get_array_opt(&self, name: &str) -> Option<&Vec<Value>>;
 }
@@ -499,47 +484,47 @@ impl ParamExtractor for Value {
             .and_then(|v| v.as_str())
             .ok_or_else(|| Error::MissingParameter(name.to_string()))
     }
-    
+
     fn get_string_opt(&self, name: &str) -> Option<&str> {
         self.get(name).and_then(|v| v.as_str())
     }
-    
+
     fn get_integer(&self, name: &str) -> Result<i64> {
         self.get(name)
             .and_then(|v| v.as_i64())
             .ok_or_else(|| Error::MissingParameter(name.to_string()))
     }
-    
+
     fn get_integer_opt(&self, name: &str) -> Option<i64> {
         self.get(name).and_then(|v| v.as_i64())
     }
-    
+
     fn get_number(&self, name: &str) -> Result<f64> {
         self.get(name)
             .and_then(|v| v.as_f64())
             .ok_or_else(|| Error::MissingParameter(name.to_string()))
     }
-    
+
     fn get_number_opt(&self, name: &str) -> Option<f64> {
         self.get(name).and_then(|v| v.as_f64())
     }
-    
+
     fn get_boolean(&self, name: &str) -> Result<bool> {
         self.get(name)
             .and_then(|v| v.as_bool())
             .ok_or_else(|| Error::MissingParameter(name.to_string()))
     }
-    
+
     fn get_boolean_opt(&self, name: &str) -> Option<bool> {
         self.get(name).and_then(|v| v.as_bool())
     }
-    
+
     fn get_array(&self, name: &str) -> Result<&Vec<Value>> {
         self.get(name)
             .and_then(|v| v.as_array())
             .ok_or_else(|| Error::MissingParameter(name.to_string()))
     }
-    
+
     fn get_array_opt(&self, name: &str) -> Option<&Vec<Value>> {
         self.get(name).and_then(|v| v.as_array())
     }
@@ -577,7 +562,7 @@ pub mod validation {
             name: param_name.to_string(),
             reason: format!("invalid pattern: {}", e),
         })?;
-        
+
         if !re.is_match(value) {
             return Err(Error::InvalidParameter {
                 name: param_name.to_string(),
@@ -618,7 +603,7 @@ mod tests {
         let def = tool.definition();
         assert_eq!(def.name, "test_tool");
         assert_eq!(def.description, "A test tool");
-        
+
         let required = def.parameters["required"].as_array().unwrap();
         assert!(required.contains(&Value::String("name".to_string())));
         assert!(!required.contains(&Value::String("count".to_string())));
@@ -636,7 +621,7 @@ mod tests {
 
         let args = serde_json::json!({ "name": "Alice" });
         let result = tool.execute(args).await.unwrap();
-        
+
         assert!(result.success);
         assert_eq!(result.output, "Hello, Alice!");
     }
@@ -655,7 +640,7 @@ mod tests {
 
         let args = serde_json::json!({ "name": "Bob" });
         let result = tool.execute(args).await.unwrap();
-        
+
         assert!(result.success);
         assert!(result.output.contains("Bob"));
     }
@@ -671,7 +656,7 @@ mod tests {
         let enum_vals = def.parameters["properties"]["style"]["enum"]
             .as_array()
             .unwrap();
-        
+
         assert_eq!(enum_vals.len(), 3);
     }
 

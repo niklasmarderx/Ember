@@ -194,7 +194,10 @@ impl Error {
                     )
                 }
             }
-            Self::RateLimitExceeded { provider, retry_after } => {
+            Self::RateLimitExceeded {
+                provider,
+                retry_after,
+            } => {
                 let retry_msg = retry_after
                     .map(|s| format!(" Try again in {} seconds.", s))
                     .unwrap_or_default();

@@ -11,8 +11,7 @@ use tracing::{debug, instrument};
 
 use crate::{
     provider::StreamResponse, CompletionRequest, CompletionResponse, ContentPart, Error,
-    FinishReason, LLMProvider, ModelInfo, Result, StreamChunk, TokenUsage,
-    ToolCall, ToolCallDelta,
+    FinishReason, LLMProvider, ModelInfo, Result, StreamChunk, TokenUsage, ToolCall, ToolCallDelta,
 };
 
 use tokio_stream::wrappers::ReceiverStream;

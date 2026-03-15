@@ -89,9 +89,7 @@ mod tests {
         }
 
         async fn complete_stream(&self, _request: CompletionRequest) -> Result<StreamResponse> {
-            Err(Error::InvalidRequest(
-                "Streaming not supported".to_string(),
-            ))
+            Err(Error::InvalidRequest("Streaming not supported".to_string()))
         }
 
         async fn list_models(&self) -> Result<Vec<ModelInfo>> {
@@ -120,8 +118,7 @@ mod tests {
     async fn test_mock_provider() {
         let provider = MockProvider;
 
-        let request =
-            CompletionRequest::new("mock-model").with_message(Message::user("Hello"));
+        let request = CompletionRequest::new("mock-model").with_message(Message::user("Hello"));
 
         let response = provider.complete(request).await.unwrap();
         assert_eq!(response.content, "Hello from mock!");

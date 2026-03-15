@@ -11,7 +11,7 @@ use crate::error::Error as CoreError;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::sync::Arc;
-use tokio::sync::{mpsc, RwLock, broadcast};
+use tokio::sync::{broadcast, mpsc, RwLock};
 
 // ============================================================================
 // Agent Communication Protocol (ACP)
@@ -29,7 +29,7 @@ impl SessionId {
     pub fn new(id: impl Into<String>) -> Self {
         Self(id.into())
     }
-    
+
     /// Generate a unique session ID.
     pub fn generate() -> Self {
         Self(uuid::Uuid::new_v4().to_string())
@@ -94,37 +94,37 @@ impl ACPMessage {
             metadata: HashMap::new(),
         }
     }
-    
+
     /// Set the recipient.
     pub fn to(mut self, recipient: impl Into<String>) -> Self {
         self.recipient = Some(recipient.into());
         self
     }
-    
+
     /// Set the priority.
     pub fn with_priority(mut self, priority: u8) -> Self {
         self.priority = priority;
         self
     }
-    
+
     /// Set the TTL.
     pub fn with_ttl(mut self, ttl_seconds: u64) -> Self {
         self.ttl = Some(ttl_seconds);
         self
     }
-    
+
     /// Set the correlation ID.
     pub fn with_correlation(mut self, id: impl Into<String>) -> Self {
         self.correlation_id = Some(id.into());
         self
     }
-    
+
     /// Add metadata.
     pub fn with_metadata(mut self, key: impl Into<String>, value: serde_json::Value) -> Self {
         self.metadata.insert(key.into(), value);
         self
     }
-    
+
     /// Check if the message has expired.
     pub fn is_expired(&self) -> bool {
         if let Some(ttl) = self.ttl {
@@ -134,7 +134,7 @@ impl ACPMessage {
             false
         }
     }
-    
+
     /// Create a reply to this message.
     pub fn reply(&self, sender: impl Into<String>, payload: serde_json::Value) -> Self {
         Self {
@@ -164,7 +164,7 @@ pub enum ACPMessageType {
     Discovery,
     /// Response to discovery query.
     DiscoveryResponse,
-    
+
     // Task Management
     /// Request to delegate a task.
     TaskRequest,
@@ -180,7 +180,7 @@ pub enum ACPMessageType {
     TaskFailed,
     /// Cancel a task.
     TaskCancel,
-    
+
     // Communication
     /// Request for information or action.
     Request,
@@ -192,7 +192,7 @@ pub enum ACPMessageType {
     HelpRequest,
     /// Offer to assist.
     HelpOffer,
-    
+
     // Consensus
     /// Propose a decision.
     Propose,
@@ -202,7 +202,7 @@ pub enum ACPMessageType {
     Consensus,
     /// Veto a proposal.
     Veto,
-    
+
     // Control
     /// Heartbeat/keepalive.
     Ping,
@@ -212,7 +212,7 @@ pub enum ACPMessageType {
     Leave,
     /// Error notification.
     Error,
-    
+
     // Custom
     /// Custom message type.
     Custom(String),
@@ -330,7 +330,7 @@ impl SharedMemory {
     pub fn new() -> Self {
         Self::with_history_size(1000)
     }
-    
+
     /// Create with custom history size.
     pub fn with_history_size(max_history: usize) -> Self {
         Self {
@@ -341,18 +341,18 @@ impl SharedMemory {
             max_history,
         }
     }
-    
+
     /// Get a value from shared memory.
     pub async fn get(&self, key: &str, agent_id: &str) -> Option<SharedValue> {
         // Check access
         if !self.can_read(key, agent_id).await {
             return None;
         }
-        
+
         let store = self.store.read().await;
         store.get(key).cloned()
     }
-    
+
     /// Set a value in shared memory.
     pub async fn set(
         &self,
@@ -360,9 +360,10 @@ impl SharedMemory {
         value: serde_json::Value,
         agent_id: &str,
     ) -> Result<u64, CoreError> {
-        self.set_with_tags(key, value, agent_id, HashSet::new()).await
+        self.set_with_tags(key, value, agent_id, HashSet::new())
+            .await
     }
-    
+
     /// Set a value with tags.
     pub async fn set_with_tags(
         &self,
@@ -378,10 +379,10 @@ impl SharedMemory {
                 agent_id, key
             )));
         }
-        
+
         let mut store = self.store.write().await;
         let now = chrono::Utc::now();
-        
+
         let (event, version) = if let Some(old) = store.get(key) {
             let new_value = SharedValue {
                 value,
@@ -397,7 +398,7 @@ impl SharedMemory {
                 new: new_value.clone(),
             };
             store.insert(key.to_string(), new_value.clone());
-            
+
             // Record history
             self.record_operation(SharedMemoryOperation {
                 op_type: SharedMemoryOpType::Update,
@@ -405,8 +406,9 @@ impl SharedMemory {
                 value: Some(new_value),
                 agent: agent_id.to_string(),
                 timestamp: now,
-            }).await;
-            
+            })
+            .await;
+
             (event, version)
         } else {
             let new_value = SharedValue {
@@ -422,16 +424,19 @@ impl SharedMemory {
                 value: new_value.clone(),
             };
             store.insert(key.to_string(), new_value.clone());
-            
+
             // Set default ACL
             drop(store);
             let mut acl = self.acl.write().await;
-            acl.insert(key.to_string(), AccessControl {
-                owner: agent_id.to_string(),
-                is_public: true,
-                ..Default::default()
-            });
-            
+            acl.insert(
+                key.to_string(),
+                AccessControl {
+                    owner: agent_id.to_string(),
+                    is_public: true,
+                    ..Default::default()
+                },
+            );
+
             // Record history
             self.record_operation(SharedMemoryOperation {
                 op_type: SharedMemoryOpType::Create,
@@ -439,17 +444,18 @@ impl SharedMemory {
                 value: Some(new_value),
                 agent: agent_id.to_string(),
                 timestamp: now,
-            }).await;
-            
+            })
+            .await;
+
             (event, version)
         };
-        
+
         // Notify subscribers
         self.notify_subscribers(key, event).await;
-        
+
         Ok(version)
     }
-    
+
     /// Delete a value from shared memory.
     pub async fn delete(&self, key: &str, agent_id: &str) -> Result<(), CoreError> {
         if !self.can_write(key, agent_id).await {
@@ -458,15 +464,15 @@ impl SharedMemory {
                 agent_id, key
             )));
         }
-        
+
         let mut store = self.store.write().await;
-        
+
         if let Some(old) = store.remove(key) {
             let event = SharedMemoryEvent::Deleted {
                 key: key.to_string(),
                 value: old,
             };
-            
+
             // Record history
             self.record_operation(SharedMemoryOperation {
                 op_type: SharedMemoryOpType::Delete,
@@ -474,15 +480,16 @@ impl SharedMemory {
                 value: None,
                 agent: agent_id.to_string(),
                 timestamp: chrono::Utc::now(),
-            }).await;
-            
+            })
+            .await;
+
             drop(store);
             self.notify_subscribers(key, event).await;
         }
-        
+
         Ok(())
     }
-    
+
     /// Compare and swap (optimistic locking).
     pub async fn compare_and_swap(
         &self,
@@ -492,7 +499,7 @@ impl SharedMemory {
         agent_id: &str,
     ) -> Result<u64, CoreError> {
         let store = self.store.read().await;
-        
+
         if let Some(current) = store.get(key) {
             if current.version != expected_version {
                 return Err(CoreError::Agent(format!(
@@ -501,17 +508,18 @@ impl SharedMemory {
                 )));
             }
         }
-        
+
         drop(store);
         self.set(key, new_value, agent_id).await
     }
-    
+
     /// List all keys matching a pattern.
     pub async fn list_keys(&self, pattern: Option<&str>) -> Vec<String> {
         let store = self.store.read().await;
-        
+
         if let Some(pattern) = pattern {
-            store.keys()
+            store
+                .keys()
                 .filter(|k| k.contains(pattern))
                 .cloned()
                 .collect()
@@ -519,34 +527,40 @@ impl SharedMemory {
             store.keys().cloned().collect()
         }
     }
-    
+
     /// Find values by tag.
     pub async fn find_by_tag(&self, tag: &str) -> Vec<(String, SharedValue)> {
         let store = self.store.read().await;
-        
-        store.iter()
+
+        store
+            .iter()
             .filter(|(_, v)| v.tags.contains(tag))
             .map(|(k, v)| (k.clone(), v.clone()))
             .collect()
     }
-    
+
     /// Subscribe to changes for a key pattern.
     pub async fn subscribe(&self, key_pattern: &str) -> mpsc::Receiver<SharedMemoryEvent> {
         let (tx, rx) = mpsc::channel(100);
-        
+
         let mut subscribers = self.subscribers.write().await;
         subscribers
             .entry(key_pattern.to_string())
             .or_default()
             .push(tx);
-        
+
         rx
     }
-    
+
     /// Set access control for a key.
-    pub async fn set_acl(&self, key: &str, acl: AccessControl, agent_id: &str) -> Result<(), CoreError> {
+    pub async fn set_acl(
+        &self,
+        key: &str,
+        acl: AccessControl,
+        agent_id: &str,
+    ) -> Result<(), CoreError> {
         let current_acl = self.acl.read().await;
-        
+
         if let Some(existing) = current_acl.get(key) {
             if existing.owner != agent_id {
                 return Err(CoreError::Agent(format!(
@@ -555,44 +569,44 @@ impl SharedMemory {
                 )));
             }
         }
-        
+
         drop(current_acl);
-        
+
         let mut acl_write = self.acl.write().await;
         acl_write.insert(key.to_string(), acl);
-        
+
         Ok(())
     }
-    
+
     /// Check if an agent can read a key.
     async fn can_read(&self, key: &str, agent_id: &str) -> bool {
         let acl = self.acl.read().await;
-        
+
         if let Some(access) = acl.get(key) {
-            access.is_public 
-                || access.owner == agent_id 
+            access.is_public
+                || access.owner == agent_id
                 || access.readers.contains(agent_id)
                 || access.writers.contains(agent_id)
         } else {
             true // No ACL = public access
         }
     }
-    
+
     /// Check if an agent can write to a key.
     async fn can_write(&self, key: &str, agent_id: &str) -> bool {
         let acl = self.acl.read().await;
-        
+
         if let Some(access) = acl.get(key) {
             access.owner == agent_id || access.writers.contains(agent_id)
         } else {
             true // No ACL = anyone can write
         }
     }
-    
+
     /// Notify subscribers of a change.
     async fn notify_subscribers(&self, key: &str, event: SharedMemoryEvent) {
         let subscribers = self.subscribers.read().await;
-        
+
         for (pattern, subs) in subscribers.iter() {
             if key.contains(pattern) || pattern == "*" {
                 for tx in subs {
@@ -601,15 +615,15 @@ impl SharedMemory {
             }
         }
     }
-    
+
     /// Record an operation in history.
     async fn record_operation(&self, op: SharedMemoryOperation) {
         let mut history = self.history.write().await;
-        
+
         if history.len() >= self.max_history {
             history.pop_front();
         }
-        
+
         history.push_back(op);
     }
 }
@@ -706,31 +720,31 @@ impl CollaborativeTask {
             metadata: HashMap::new(),
         }
     }
-    
+
     /// Set required capabilities.
     pub fn with_capabilities(mut self, capabilities: Vec<String>) -> Self {
         self.required_capabilities = capabilities;
         self
     }
-    
+
     /// Set priority.
     pub fn with_priority(mut self, priority: u8) -> Self {
         self.priority = priority.min(10);
         self
     }
-    
+
     /// Set deadline.
     pub fn with_deadline(mut self, deadline: chrono::DateTime<chrono::Utc>) -> Self {
         self.deadline = Some(deadline);
         self
     }
-    
+
     /// Set input data.
     pub fn with_input(mut self, input: serde_json::Value) -> Self {
         self.input = input;
         self
     }
-    
+
     /// Check if task is overdue.
     pub fn is_overdue(&self) -> bool {
         if let Some(deadline) = self.deadline {
@@ -800,7 +814,7 @@ impl TaskDelegator {
     pub fn new() -> Self {
         Self::with_max_tasks(5)
     }
-    
+
     /// Create with custom max tasks per agent.
     pub fn with_max_tasks(max_tasks: usize) -> Self {
         let (event_tx, _) = broadcast::channel(100);
@@ -812,39 +826,40 @@ impl TaskDelegator {
             event_tx,
         }
     }
-    
+
     /// Subscribe to task events.
     pub fn subscribe(&self) -> broadcast::Receiver<TaskEvent> {
         self.event_tx.subscribe()
     }
-    
+
     /// Register agent capabilities.
     pub async fn register_capabilities(&self, agent_id: &str, caps: HashSet<String>) {
         let mut capabilities = self.capabilities.write().await;
         capabilities.insert(agent_id.to_string(), caps);
-        
+
         let mut workload = self.workload.write().await;
         workload.entry(agent_id.to_string()).or_insert(0);
     }
-    
+
     /// Submit a new task.
     pub async fn submit_task(&self, task: CollaborativeTask) -> String {
         let task_id = task.id.clone();
-        
+
         let mut tasks = self.tasks.write().await;
         tasks.insert(task_id.clone(), task.clone());
-        
+
         let _ = self.event_tx.send(TaskEvent::Created(task));
-        
+
         task_id
     }
-    
+
     /// Find the best agent for a task.
     pub async fn find_best_agent(&self, task: &CollaborativeTask) -> Option<String> {
         let capabilities = self.capabilities.read().await;
         let workload = self.workload.read().await;
-        
-        let mut candidates: Vec<_> = capabilities.iter()
+
+        let mut candidates: Vec<_> = capabilities
+            .iter()
             .filter(|(agent_id, caps)| {
                 // Check if agent has required capabilities
                 task.required_capabilities.iter().all(|c| caps.contains(c))
@@ -852,24 +867,22 @@ impl TaskDelegator {
                     && workload.get(*agent_id).copied().unwrap_or(0) < self.max_tasks_per_agent
             })
             .collect();
-        
+
         // Sort by workload (least loaded first)
-        candidates.sort_by_key(|(agent_id, _)| {
-            workload.get(*agent_id).copied().unwrap_or(0)
-        });
-        
+        candidates.sort_by_key(|(agent_id, _)| workload.get(*agent_id).copied().unwrap_or(0));
+
         candidates.first().map(|(id, _)| (*id).clone())
     }
-    
+
     /// Assign a task to an agent.
     pub async fn assign_task(&self, task_id: &str, agent_id: &str) -> Result<(), CoreError> {
         let mut tasks = self.tasks.write().await;
         let mut workload = self.workload.write().await;
-        
-        let task = tasks.get_mut(task_id).ok_or_else(|| {
-            CoreError::Agent(format!("Task {} not found", task_id))
-        })?;
-        
+
+        let task = tasks
+            .get_mut(task_id)
+            .ok_or_else(|| CoreError::Agent(format!("Task {} not found", task_id)))?;
+
         // Check agent capacity
         let current_workload = workload.get(agent_id).copied().unwrap_or(0);
         if current_workload >= self.max_tasks_per_agent {
@@ -878,41 +891,41 @@ impl TaskDelegator {
                 agent_id
             )));
         }
-        
+
         task.assignee = Some(agent_id.to_string());
         task.status = TaskStatus::Assigned;
         task.updated_at = chrono::Utc::now();
-        
+
         *workload.entry(agent_id.to_string()).or_insert(0) += 1;
-        
+
         let _ = self.event_tx.send(TaskEvent::Assigned {
             task_id: task_id.to_string(),
             agent_id: agent_id.to_string(),
         });
-        
+
         Ok(())
     }
-    
+
     /// Update task progress.
     pub async fn update_progress(&self, task_id: &str, progress: u8) -> Result<(), CoreError> {
         let mut tasks = self.tasks.write().await;
-        
-        let task = tasks.get_mut(task_id).ok_or_else(|| {
-            CoreError::Agent(format!("Task {} not found", task_id))
-        })?;
-        
+
+        let task = tasks
+            .get_mut(task_id)
+            .ok_or_else(|| CoreError::Agent(format!("Task {} not found", task_id)))?;
+
         task.progress = progress.min(100);
         task.status = TaskStatus::InProgress;
         task.updated_at = chrono::Utc::now();
-        
+
         let _ = self.event_tx.send(TaskEvent::Progress {
             task_id: task_id.to_string(),
             progress,
         });
-        
+
         Ok(())
     }
-    
+
     /// Complete a task.
     pub async fn complete_task(
         &self,
@@ -921,74 +934,79 @@ impl TaskDelegator {
     ) -> Result<(), CoreError> {
         let mut tasks = self.tasks.write().await;
         let mut workload = self.workload.write().await;
-        
-        let task = tasks.get_mut(task_id).ok_or_else(|| {
-            CoreError::Agent(format!("Task {} not found", task_id))
-        })?;
-        
+
+        let task = tasks
+            .get_mut(task_id)
+            .ok_or_else(|| CoreError::Agent(format!("Task {} not found", task_id)))?;
+
         if let Some(ref agent_id) = task.assignee {
             if let Some(w) = workload.get_mut(agent_id) {
                 *w = w.saturating_sub(1);
             }
         }
-        
+
         task.status = TaskStatus::Completed;
         task.progress = 100;
         task.output = Some(output.clone());
         task.updated_at = chrono::Utc::now();
-        
+
         let _ = self.event_tx.send(TaskEvent::Completed {
             task_id: task_id.to_string(),
             output,
         });
-        
+
         Ok(())
     }
-    
+
     /// Fail a task.
-    pub async fn fail_task(&self, task_id: &str, error: impl Into<String>) -> Result<(), CoreError> {
+    pub async fn fail_task(
+        &self,
+        task_id: &str,
+        error: impl Into<String>,
+    ) -> Result<(), CoreError> {
         let error = error.into();
         let mut tasks = self.tasks.write().await;
         let mut workload = self.workload.write().await;
-        
-        let task = tasks.get_mut(task_id).ok_or_else(|| {
-            CoreError::Agent(format!("Task {} not found", task_id))
-        })?;
-        
+
+        let task = tasks
+            .get_mut(task_id)
+            .ok_or_else(|| CoreError::Agent(format!("Task {} not found", task_id)))?;
+
         if let Some(ref agent_id) = task.assignee {
             if let Some(w) = workload.get_mut(agent_id) {
                 *w = w.saturating_sub(1);
             }
         }
-        
+
         task.status = TaskStatus::Failed;
         task.error = Some(error.clone());
         task.updated_at = chrono::Utc::now();
-        
+
         let _ = self.event_tx.send(TaskEvent::Failed {
             task_id: task_id.to_string(),
             error,
         });
-        
+
         Ok(())
     }
-    
+
     /// Get a task by ID.
     pub async fn get_task(&self, task_id: &str) -> Option<CollaborativeTask> {
         let tasks = self.tasks.read().await;
         tasks.get(task_id).cloned()
     }
-    
+
     /// List all tasks.
     pub async fn list_tasks(&self, status_filter: Option<TaskStatus>) -> Vec<CollaborativeTask> {
         let tasks = self.tasks.read().await;
-        
-        tasks.values()
+
+        tasks
+            .values()
             .filter(|t| status_filter.map_or(true, |s| t.status == s))
             .cloned()
             .collect()
     }
-    
+
     /// Get agent workload.
     pub async fn get_workload(&self, agent_id: &str) -> usize {
         let workload = self.workload.read().await;
@@ -1056,7 +1074,7 @@ impl Proposal {
         for i in 0..options.len() {
             votes.insert(i.to_string(), 0);
         }
-        
+
         Self {
             id: uuid::Uuid::new_v4().to_string(),
             description: description.into(),
@@ -1070,54 +1088,54 @@ impl Proposal {
             winner: None,
         }
     }
-    
+
     /// Set the quorum requirement.
     pub fn with_quorum(mut self, quorum: u8) -> Self {
         self.quorum = quorum.min(100);
         self
     }
-    
+
     /// Cast a vote.
     pub fn vote(&mut self, agent_id: &str, option_index: usize) -> Result<(), String> {
         if self.status != ProposalStatus::Open {
             return Err("Proposal is not open for voting".to_string());
         }
-        
+
         if chrono::Utc::now() > self.deadline {
             return Err("Voting deadline has passed".to_string());
         }
-        
+
         if self.voters.contains(agent_id) {
             return Err("Agent has already voted".to_string());
         }
-        
+
         if option_index >= self.options.len() {
             return Err("Invalid option index".to_string());
         }
-        
+
         self.voters.insert(agent_id.to_string());
         *self.votes.entry(option_index.to_string()).or_insert(0) += 1;
-        
+
         Ok(())
     }
-    
+
     /// Check if quorum is reached.
     pub fn has_quorum(&self, total_agents: usize) -> bool {
         let participation = (self.voters.len() as f32 / total_agents as f32) * 100.0;
         participation >= self.quorum as f32
     }
-    
+
     /// Tally votes and determine winner.
     pub fn tally(&mut self, total_agents: usize) -> Option<usize> {
         if !self.has_quorum(total_agents) {
             self.status = ProposalStatus::Failed;
             return None;
         }
-        
+
         let mut max_votes = 0;
         let mut winner = None;
         let mut is_tie = false;
-        
+
         for (idx, count) in &self.votes {
             let idx: usize = idx.parse().unwrap_or(0);
             if *count > max_votes {
@@ -1128,7 +1146,7 @@ impl Proposal {
                 is_tie = true;
             }
         }
-        
+
         if is_tie {
             self.status = ProposalStatus::Failed;
             None
@@ -1138,7 +1156,7 @@ impl Proposal {
             winner
         }
     }
-    
+
     /// Veto the proposal.
     pub fn veto(&mut self, _agent_id: &str) {
         self.status = ProposalStatus::Vetoed;
@@ -1202,30 +1220,32 @@ impl ConsensusManager {
             event_tx,
         }
     }
-    
+
     /// Subscribe to consensus events.
     pub fn subscribe(&self) -> broadcast::Receiver<ConsensusEvent> {
         self.event_tx.subscribe()
     }
-    
+
     /// Set the number of agents.
     pub async fn set_agent_count(&self, count: usize) {
         let mut agent_count = self.agent_count.write().await;
         *agent_count = count;
     }
-    
+
     /// Create a new proposal.
     pub async fn create_proposal(&self, proposal: Proposal) -> String {
         let proposal_id = proposal.id.clone();
-        
+
         let mut proposals = self.proposals.write().await;
         proposals.insert(proposal_id.clone(), proposal.clone());
-        
-        let _ = self.event_tx.send(ConsensusEvent::ProposalCreated(proposal));
-        
+
+        let _ = self
+            .event_tx
+            .send(ConsensusEvent::ProposalCreated(proposal));
+
         proposal_id
     }
-    
+
     /// Cast a vote.
     pub async fn vote(
         &self,
@@ -1234,45 +1254,48 @@ impl ConsensusManager {
         option_index: usize,
     ) -> Result<(), CoreError> {
         let mut proposals = self.proposals.write().await;
-        
-        let proposal = proposals.get_mut(proposal_id).ok_or_else(|| {
-            CoreError::Agent(format!("Proposal {} not found", proposal_id))
-        })?;
-        
-        proposal.vote(agent_id, option_index)
+
+        let proposal = proposals
+            .get_mut(proposal_id)
+            .ok_or_else(|| CoreError::Agent(format!("Proposal {} not found", proposal_id)))?;
+
+        proposal
+            .vote(agent_id, option_index)
             .map_err(|e| CoreError::Agent(e))?;
-        
+
         let _ = self.event_tx.send(ConsensusEvent::VoteCast {
             proposal_id: proposal_id.to_string(),
             agent_id: agent_id.to_string(),
             option: option_index,
         });
-        
+
         // Check if we should tally
         let agent_count = *self.agent_count.read().await;
         if proposal.voters.len() >= agent_count {
             self.tally_proposal(proposal_id).await?;
         }
-        
+
         Ok(())
     }
-    
+
     /// Tally a proposal.
     pub async fn tally_proposal(&self, proposal_id: &str) -> Result<Option<usize>, CoreError> {
         let mut proposals = self.proposals.write().await;
         let agent_count = *self.agent_count.read().await;
-        
-        let proposal = proposals.get_mut(proposal_id).ok_or_else(|| {
-            CoreError::Agent(format!("Proposal {} not found", proposal_id))
-        })?;
-        
+
+        let proposal = proposals
+            .get_mut(proposal_id)
+            .ok_or_else(|| CoreError::Agent(format!("Proposal {} not found", proposal_id)))?;
+
         let winner = proposal.tally(agent_count);
-        
+
         if let Some(winner_idx) = winner {
-            let option = proposal.options.get(winner_idx)
+            let option = proposal
+                .options
+                .get(winner_idx)
                 .cloned()
                 .unwrap_or_default();
-            
+
             let _ = self.event_tx.send(ConsensusEvent::ConsensusReached {
                 proposal_id: proposal_id.to_string(),
                 winner: winner_idx,
@@ -1283,21 +1306,22 @@ impl ConsensusManager {
                 proposal_id: proposal_id.to_string(),
             });
         }
-        
+
         Ok(winner)
     }
-    
+
     /// Get a proposal.
     pub async fn get_proposal(&self, proposal_id: &str) -> Option<Proposal> {
         let proposals = self.proposals.read().await;
         proposals.get(proposal_id).cloned()
     }
-    
+
     /// List all proposals.
     pub async fn list_proposals(&self, status_filter: Option<ProposalStatus>) -> Vec<Proposal> {
         let proposals = self.proposals.read().await;
-        
-        proposals.values()
+
+        proposals
+            .values()
             .filter(|p| status_filter.map_or(true, |s| p.status == s))
             .cloned()
             .collect()
@@ -1317,7 +1341,7 @@ impl Default for ConsensusManager {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn test_acp_message_creation() {
         let session = SessionId::generate();
@@ -1329,12 +1353,12 @@ mod tests {
         )
         .to("agent-2")
         .with_priority(8);
-        
+
         assert_eq!(msg.sender, "agent-1");
         assert_eq!(msg.recipient, Some("agent-2".to_string()));
         assert_eq!(msg.priority, 8);
     }
-    
+
     #[test]
     fn test_acp_message_reply() {
         let session = SessionId::generate();
@@ -1344,59 +1368,68 @@ mod tests {
             ACPMessageType::Request,
             serde_json::json!({}),
         );
-        
+
         let reply = msg.reply("agent-2", serde_json::json!({"response": "ok"}));
-        
+
         assert_eq!(reply.sender, "agent-2");
         assert_eq!(reply.recipient, Some("agent-1".to_string()));
         assert_eq!(reply.correlation_id, Some(msg.id));
         assert_eq!(reply.message_type, ACPMessageType::Response);
     }
-    
+
     #[tokio::test]
     async fn test_shared_memory_basic() {
         let memory = SharedMemory::new();
-        
-        memory.set("key1", serde_json::json!("value1"), "agent-1").await.unwrap();
-        
+
+        memory
+            .set("key1", serde_json::json!("value1"), "agent-1")
+            .await
+            .unwrap();
+
         let value = memory.get("key1", "agent-1").await;
         assert!(value.is_some());
         assert_eq!(value.unwrap().value, serde_json::json!("value1"));
     }
-    
+
     #[tokio::test]
     async fn test_shared_memory_versioning() {
         let memory = SharedMemory::new();
-        
-        let v1 = memory.set("key", serde_json::json!(1), "agent-1").await.unwrap();
-        let v2 = memory.set("key", serde_json::json!(2), "agent-1").await.unwrap();
-        
+
+        let v1 = memory
+            .set("key", serde_json::json!(1), "agent-1")
+            .await
+            .unwrap();
+        let v2 = memory
+            .set("key", serde_json::json!(2), "agent-1")
+            .await
+            .unwrap();
+
         assert_eq!(v1, 1);
         assert_eq!(v2, 2);
     }
-    
+
     #[tokio::test]
     async fn test_task_delegation() {
         let delegator = TaskDelegator::new();
-        
+
         // Register agents
-        delegator.register_capabilities("agent-1", 
-            vec!["coding".to_string()].into_iter().collect()
-        ).await;
-        
+        delegator
+            .register_capabilities("agent-1", vec!["coding".to_string()].into_iter().collect())
+            .await;
+
         // Create task
         let task = CollaborativeTask::new("Write code", "user")
             .with_capabilities(vec!["coding".to_string()]);
-        
+
         let task_id = delegator.submit_task(task).await;
-        
+
         // Find best agent
         let task = delegator.get_task(&task_id).await.unwrap();
         let agent = delegator.find_best_agent(&task).await;
-        
+
         assert_eq!(agent, Some("agent-1".to_string()));
     }
-    
+
     #[test]
     fn test_proposal_voting() {
         let mut proposal = Proposal::new(
@@ -1405,16 +1438,16 @@ mod tests {
             vec!["red".to_string(), "blue".to_string()],
             chrono::Utc::now() + chrono::Duration::hours(1),
         );
-        
+
         proposal.vote("agent-2", 0).unwrap();
         proposal.vote("agent-3", 0).unwrap();
         proposal.vote("agent-4", 1).unwrap();
-        
+
         let winner = proposal.tally(4);
-        
+
         assert_eq!(winner, Some(0)); // Red wins
     }
-    
+
     #[test]
     fn test_proposal_tie() {
         let mut proposal = Proposal::new(
@@ -1423,12 +1456,12 @@ mod tests {
             vec!["red".to_string(), "blue".to_string()],
             chrono::Utc::now() + chrono::Duration::hours(1),
         );
-        
+
         proposal.vote("agent-2", 0).unwrap();
         proposal.vote("agent-3", 1).unwrap();
-        
+
         let winner = proposal.tally(2);
-        
+
         assert_eq!(winner, None);
         assert_eq!(proposal.status, ProposalStatus::Failed);
     }

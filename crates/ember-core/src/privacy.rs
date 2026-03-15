@@ -10,11 +10,11 @@
 //! - **Data Minimization**: Only send necessary data to LLM providers
 //! - **GDPR Compliance**: Built-in compliance helpers
 
+use regex::Regex;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use serde::{Deserialize, Serialize};
-use regex::Regex;
 
 /// Types of personally identifiable information (PII).
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -50,14 +50,16 @@ impl PiiType {
             Self::CreditCard => r"\b(?:\d{4}[-\s]?){3}\d{4}\b",
             Self::Ssn => r"\b\d{3}[-\s]?\d{2}[-\s]?\d{4}\b",
             Self::IpAddress => r"\b(?:\d{1,3}\.){3}\d{1,3}\b",
-            Self::Address => r"\d+\s+[\w\s]+(?:street|st|avenue|ave|road|rd|boulevard|blvd|drive|dr|lane|ln|court|ct|way|place|pl)\b",
+            Self::Address => {
+                r"\d+\s+[\w\s]+(?:street|st|avenue|ave|road|rd|boulevard|blvd|drive|dr|lane|ln|court|ct|way|place|pl)\b"
+            }
             Self::Name => r"\b[A-Z][a-z]+\s+[A-Z][a-z]+\b",
             Self::ApiKey => r"(?:sk|pk|api|key|token|secret|password)[-_]?[a-zA-Z0-9]{20,}",
             Self::Password => r"(?:password|passwd|pwd)\s*[:=]\s*\S+",
             Self::Custom(pattern) => pattern,
         }
     }
-    
+
     /// Get the redaction placeholder for this PII type.
     pub fn redaction_placeholder(&self) -> &str {
         match self {
@@ -224,24 +226,24 @@ impl PrivacyShield {
     pub fn new() -> Self {
         Self::with_config(PrivacyConfig::default())
     }
-    
+
     /// Create a privacy shield with custom configuration.
     pub fn with_config(config: PrivacyConfig) -> Self {
         let mut patterns = HashMap::new();
-        
+
         for pii_type in &config.detect_pii_types {
             if let Ok(regex) = Regex::new(pii_type.pattern()) {
                 patterns.insert(pii_type.clone(), regex);
             }
         }
-        
+
         // Add custom patterns
         for (name, pattern) in &config.custom_patterns {
             if let Ok(regex) = Regex::new(pattern) {
                 patterns.insert(PiiType::Custom(name.clone()), regex);
             }
         }
-        
+
         Self {
             config,
             patterns,
@@ -250,7 +252,7 @@ impl PrivacyShield {
             stats: Arc::new(RwLock::new(PrivacyStats::default())),
         }
     }
-    
+
     /// Create a strict privacy shield (maximum protection).
     pub fn strict() -> Self {
         let mut config = PrivacyConfig::default();
@@ -268,11 +270,11 @@ impl PrivacyShield {
         ];
         Self::with_config(config)
     }
-    
+
     /// Detect PII in text.
     pub async fn detect_pii(&self, text: &str) -> Vec<PiiMatch> {
         let mut matches = Vec::new();
-        
+
         for (pii_type, regex) in &self.patterns {
             for mat in regex.find_iter(text) {
                 matches.push(PiiMatch {
@@ -284,7 +286,7 @@ impl PrivacyShield {
                 });
             }
         }
-        
+
         // Update stats
         {
             let mut stats = self.stats.write().await;
@@ -295,10 +297,10 @@ impl PrivacyShield {
                 *stats.pii_by_type.entry(type_name).or_insert(0) += 1;
             }
         }
-        
+
         matches
     }
-    
+
     /// Calculate confidence score for a PII match.
     fn calculate_confidence(&self, pii_type: &PiiType, text: &str) -> f32 {
         match pii_type {
@@ -329,37 +331,37 @@ impl PrivacyShield {
             _ => 0.85, // Default confidence
         }
     }
-    
+
     /// Redact PII from text.
     pub async fn redact(&self, text: &str) -> String {
         let matches = self.detect_pii(text).await;
-        
+
         if matches.is_empty() {
             return text.to_string();
         }
-        
+
         let mut result = text.to_string();
         let mut redaction_map = self.redaction_map.write().await;
         let mut stats = self.stats.write().await;
-        
+
         // Sort matches by position (reverse order to avoid offset issues)
         let mut sorted_matches = matches;
         sorted_matches.sort_by(|a, b| b.start.cmp(&a.start));
-        
+
         for m in sorted_matches {
             let placeholder = m.pii_type.redaction_placeholder();
-            
+
             // Store mapping for potential restoration
             let key = format!("{}_{}", placeholder, redaction_map.len());
             redaction_map.insert(key.clone(), m.matched_text.clone());
-            
+
             result.replace_range(m.start..m.end, placeholder);
             stats.redactions_performed += 1;
         }
-        
+
         result
     }
-    
+
     /// Redact only high-confidence PII.
     pub async fn redact_confident(&self, text: &str, min_confidence: f32) -> String {
         let matches = self.detect_pii(text).await;
@@ -367,22 +369,22 @@ impl PrivacyShield {
             .into_iter()
             .filter(|m| m.confidence >= min_confidence)
             .collect();
-        
+
         if confident_matches.is_empty() {
             return text.to_string();
         }
-        
+
         let mut result = text.to_string();
         let mut sorted_matches = confident_matches;
         sorted_matches.sort_by(|a, b| b.start.cmp(&a.start));
-        
+
         for m in sorted_matches {
             result.replace_range(m.start..m.end, m.pii_type.redaction_placeholder());
         }
-        
+
         result
     }
-    
+
     /// Check if an external request should be allowed.
     pub async fn allow_external_request(&self, domain: &str) -> bool {
         match self.config.level {
@@ -394,19 +396,22 @@ impl PrivacyShield {
             }
             _ => {
                 // Check against allowed domains
-                let allowed = self.config.allowed_domains.iter()
+                let allowed = self
+                    .config
+                    .allowed_domains
+                    .iter()
                     .any(|d| domain.contains(d));
-                
+
                 if !allowed {
                     let mut stats = self.stats.write().await;
                     stats.requests_blocked += 1;
                 }
-                
+
                 allowed
             }
         }
     }
-    
+
     /// Process text before sending to LLM.
     pub async fn process_for_llm(&self, text: &str) -> String {
         match self.config.level {
@@ -419,40 +424,40 @@ impl PrivacyShield {
             }
         }
     }
-    
+
     /// Log an audit entry.
     pub async fn log_access(&self, entry: AuditEntry) {
         let mut log = self.audit_log.write().await;
         log.push(entry);
-        
+
         // Keep only recent entries (last 10000)
         if log.len() > 10000 {
             let excess = log.len() - 10000;
             log.drain(0..excess);
         }
     }
-    
+
     /// Get audit log entries.
     pub async fn get_audit_log(&self, limit: usize) -> Vec<AuditEntry> {
         let log = self.audit_log.read().await;
         log.iter().rev().take(limit).cloned().collect()
     }
-    
+
     /// Get privacy statistics.
     pub async fn get_stats(&self) -> PrivacyStats {
         self.stats.read().await.clone()
     }
-    
+
     /// Check if text contains PII.
     pub async fn contains_pii(&self, text: &str) -> bool {
         !self.detect_pii(text).await.is_empty()
     }
-    
+
     /// Get the current privacy level.
     pub fn privacy_level(&self) -> PrivacyLevel {
         self.config.level
     }
-    
+
     /// Update the privacy level.
     pub fn set_privacy_level(&mut self, level: PrivacyLevel) {
         self.config.level = level;
@@ -482,28 +487,29 @@ impl DataMinimizer {
             priority_keywords: Vec::new(),
         }
     }
-    
+
     /// Add priority keywords.
     pub fn with_keywords(mut self, keywords: Vec<String>) -> Self {
         self.priority_keywords = keywords;
         self
     }
-    
+
     /// Minimize text while preserving important content.
     pub fn minimize(&self, text: &str) -> String {
         if text.len() <= self.max_context_length {
             return text.to_string();
         }
-        
+
         // Split into sentences
-        let sentences: Vec<&str> = text.split(['.', '!', '?'])
+        let sentences: Vec<&str> = text
+            .split(['.', '!', '?'])
             .filter(|s| !s.trim().is_empty())
             .collect();
-        
+
         if sentences.is_empty() {
             return text.chars().take(self.max_context_length).collect();
         }
-        
+
         // Score sentences by importance
         let mut scored: Vec<(f32, &str)> = sentences
             .iter()
@@ -517,10 +523,10 @@ impl DataMinimizer {
                 (score, *s)
             })
             .collect();
-        
+
         // Sort by score (descending)
         scored.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap_or(std::cmp::Ordering::Equal));
-        
+
         // Take sentences until we reach the limit
         let mut result = String::new();
         for (_, sentence) in scored {
@@ -530,7 +536,7 @@ impl DataMinimizer {
             }
             result.push_str(&potential);
         }
-        
+
         result
     }
 }
@@ -538,39 +544,39 @@ impl DataMinimizer {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[tokio::test]
     async fn test_email_detection() {
         let shield = PrivacyShield::new();
         let text = "Contact me at john.doe@example.com for more info";
         let matches = shield.detect_pii(text).await;
-        
+
         assert_eq!(matches.len(), 1);
         assert_eq!(matches[0].pii_type, PiiType::Email);
         assert_eq!(matches[0].matched_text, "john.doe@example.com");
     }
-    
+
     #[tokio::test]
     async fn test_phone_detection() {
         let shield = PrivacyShield::new();
         let text = "Call me at 555-123-4567";
         let matches = shield.detect_pii(text).await;
-        
+
         assert_eq!(matches.len(), 1);
         assert_eq!(matches[0].pii_type, PiiType::Phone);
     }
-    
+
     #[tokio::test]
     async fn test_redaction() {
         let shield = PrivacyShield::new();
         let text = "Email: test@example.com, Phone: 555-123-4567";
         let redacted = shield.redact(text).await;
-        
+
         assert!(redacted.contains("[EMAIL_REDACTED]"));
         assert!(redacted.contains("[PHONE_REDACTED]"));
         assert!(!redacted.contains("test@example.com"));
     }
-    
+
     #[tokio::test]
     async fn test_api_key_detection() {
         let shield = PrivacyShield::new();
@@ -578,52 +584,51 @@ mod tests {
         // followed by optional - or _ and at least 20 alphanumeric characters
         let text = "My key is sk-abcdefghijklmnopqrstuvwxyz123456";
         let matches = shield.detect_pii(text).await;
-        
+
         assert!(matches.iter().any(|m| m.pii_type == PiiType::ApiKey));
     }
-    
+
     #[tokio::test]
     async fn test_privacy_levels() {
         let mut shield = PrivacyShield::new();
-        
+
         shield.set_privacy_level(PrivacyLevel::Maximum);
         assert!(!shield.allow_external_request("api.openai.com").await);
-        
+
         shield.set_privacy_level(PrivacyLevel::Standard);
         assert!(shield.allow_external_request("api.openai.com").await);
         assert!(!shield.allow_external_request("unknown.com").await);
     }
-    
+
     #[test]
     fn test_data_minimizer() {
-        let minimizer = DataMinimizer::new(100)
-            .with_keywords(vec!["important".to_string()]);
-        
+        let minimizer = DataMinimizer::new(100).with_keywords(vec!["important".to_string()]);
+
         let text = "This is a normal sentence. This is important content. Another sentence here. More text.";
         let minimized = minimizer.minimize(text);
-        
+
         assert!(minimized.len() <= 100);
         assert!(minimized.contains("important"));
     }
-    
+
     #[tokio::test]
     async fn test_contains_pii() {
         let shield = PrivacyShield::new();
-        
+
         assert!(shield.contains_pii("email: test@test.com").await);
         assert!(!shield.contains_pii("no personal info here").await);
     }
-    
+
     #[tokio::test]
     async fn test_strict_mode() {
         let shield = PrivacyShield::strict();
-        
+
         assert_eq!(shield.privacy_level(), PrivacyLevel::Strict);
-        
+
         // Should detect more PII types
         let text = "John Smith at 123 Main Street, email: john@test.com";
         let matches = shield.detect_pii(text).await;
-        
+
         // Should detect name, address, and email
         assert!(matches.len() >= 2);
     }

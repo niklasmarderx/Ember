@@ -38,28 +38,28 @@ impl std::fmt::Display for ConversationId {
 pub struct Turn {
     /// Turn identifier
     pub id: Uuid,
-    
+
     /// User's input message
     pub user_message: String,
-    
+
     /// Assistant's response
     pub assistant_response: String,
-    
+
     /// Tool calls made during this turn
     pub tool_calls: Vec<ToolCall>,
-    
+
     /// Results from tool calls
     pub tool_results: Vec<ToolResult>,
-    
+
     /// When this turn started
     pub started_at: DateTime<Utc>,
-    
+
     /// When this turn completed
     pub completed_at: Option<DateTime<Utc>>,
-    
+
     /// Number of tokens used (input + output)
     pub tokens_used: Option<TokenUsage>,
-    
+
     /// Any error that occurred
     pub error: Option<String>,
 }
@@ -150,22 +150,22 @@ impl TokenUsage {
 pub struct Conversation {
     /// Unique identifier
     pub id: ConversationId,
-    
+
     /// Conversation title (auto-generated or user-set)
     pub title: Option<String>,
-    
+
     /// System prompt used
     pub system_prompt: String,
-    
+
     /// All turns in this conversation
     pub turns: Vec<Turn>,
-    
+
     /// When the conversation was created
     pub created_at: DateTime<Utc>,
-    
+
     /// When the conversation was last updated
     pub updated_at: DateTime<Utc>,
-    
+
     /// Conversation metadata
     pub metadata: std::collections::HashMap<String, String>,
 }
@@ -235,34 +235,28 @@ impl Conversation {
     /// Convert to a list of messages for the LLM.
     pub fn to_messages(&self) -> Vec<Message> {
         let mut messages = Vec::with_capacity(self.turns.len() * 2 + 1);
-        
+
         // Add system message
         messages.push(Message::system(&self.system_prompt));
-        
+
         // Add all turns
         for turn in &self.turns {
             messages.push(Message::user(&turn.user_message));
-            
+
             // Add tool calls and results if any
             for (call, result) in turn.tool_calls.iter().zip(turn.tool_results.iter()) {
                 // Assistant message with tool calls
-                messages.push(
-                    Message::assistant("")
-                        .with_tool_calls(vec![call.clone()])
-                );
+                messages.push(Message::assistant("").with_tool_calls(vec![call.clone()]));
                 // Tool result message
-                messages.push(
-                    Message::tool_result(&call.id, &result.output)
-                        .with_name(&call.name)
-                );
+                messages.push(Message::tool_result(&call.id, &result.output).with_name(&call.name));
             }
-            
+
             // Add assistant response if not empty
             if !turn.assistant_response.is_empty() {
                 messages.push(Message::assistant(&turn.assistant_response));
             }
         }
-        
+
         messages
     }
 
@@ -310,11 +304,11 @@ mod tests {
     #[test]
     fn test_turn_management() {
         let mut conv = Conversation::new("System");
-        
+
         let turn = conv.start_turn("Hello!");
         turn.assistant_response = "Hi there!".to_string();
         turn.complete();
-        
+
         assert_eq!(conv.len(), 1);
         assert!(conv.current_turn().unwrap().is_complete());
     }
@@ -322,11 +316,11 @@ mod tests {
     #[test]
     fn test_to_messages() {
         let mut conv = Conversation::new("System prompt");
-        
+
         let turn = conv.start_turn("Hello");
         turn.assistant_response = "Hi!".to_string();
         turn.complete();
-        
+
         let messages = conv.to_messages();
         assert_eq!(messages.len(), 3); // System + User + Assistant
         assert!(matches!(messages[0].role, Role::System));
@@ -338,16 +332,19 @@ mod tests {
     fn test_auto_title() {
         let mut conv = Conversation::new("System");
         conv.start_turn("What is the capital of France?");
-        
+
         conv.auto_title();
-        assert_eq!(conv.title, Some("What is the capital of France?".to_string()));
+        assert_eq!(
+            conv.title,
+            Some("What is the capital of France?".to_string())
+        );
     }
 
     #[test]
     fn test_auto_title_truncation() {
         let mut conv = Conversation::new("System");
         conv.start_turn("This is a very long message that should be truncated because it exceeds fifty characters");
-        
+
         conv.auto_title();
         assert!(conv.title.as_ref().unwrap().ends_with("..."));
         assert!(conv.title.as_ref().unwrap().len() <= 53); // 50 + "..."
@@ -356,15 +353,15 @@ mod tests {
     #[test]
     fn test_token_tracking() {
         let mut conv = Conversation::new("System");
-        
+
         let turn1 = conv.start_turn("Hello");
         turn1.tokens_used = Some(TokenUsage::new(10, 20));
         turn1.complete();
-        
+
         let turn2 = conv.start_turn("World");
         turn2.tokens_used = Some(TokenUsage::new(15, 25));
         turn2.complete();
-        
+
         let total = conv.total_tokens();
         assert_eq!(total.input, 25);
         assert_eq!(total.output, 45);

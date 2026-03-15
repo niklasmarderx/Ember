@@ -196,9 +196,9 @@ impl BrowserController {
             // Would need to use Chrome args: --user-agent="..."
         }
 
-        let config = builder.build().map_err(|e| {
-            BrowserError::LaunchFailed(format!("Invalid browser config: {}", e))
-        })?;
+        let config = builder
+            .build()
+            .map_err(|e| BrowserError::LaunchFailed(format!("Invalid browser config: {}", e)))?;
 
         let (browser, mut handler) = Browser::launch(config)
             .await
@@ -235,16 +235,15 @@ impl BrowserController {
         info!("Navigating to: {}", url);
 
         let browser = self.browser.read().await;
-        let browser = browser
-            .as_ref()
-            .ok_or(BrowserError::NotInitialized)?;
+        let browser = browser.as_ref().ok_or(BrowserError::NotInitialized)?;
 
-        let page = browser.new_page(url).await.map_err(|e| {
-            BrowserError::NavigationFailed {
+        let page = browser
+            .new_page(url)
+            .await
+            .map_err(|e| BrowserError::NavigationFailed {
                 url: url.to_string(),
                 reason: e.to_string(),
-            }
-        })?;
+            })?;
 
         // Wait for page to load
         page.wait_for_navigation().await.ok();
@@ -254,9 +253,11 @@ impl BrowserController {
 
         *self.page.write().await = Some(Arc::new(page));
 
-        Ok(BrowserActionResult::success(format!("Navigated to {}", url))
-            .with_url(current_url)
-            .with_title(title))
+        Ok(
+            BrowserActionResult::success(format!("Navigated to {}", url))
+                .with_url(current_url)
+                .with_title(title),
+        )
     }
 
     /// Click an element by CSS selector.
@@ -265,19 +266,25 @@ impl BrowserController {
 
         let page = self.get_page().await?;
 
-        let element = page
-            .find_element(selector)
-            .await
-            .map_err(|_| BrowserError::ElementNotFound {
-                selector: selector.to_string(),
-            })?;
+        let element =
+            page.find_element(selector)
+                .await
+                .map_err(|_| BrowserError::ElementNotFound {
+                    selector: selector.to_string(),
+                })?;
 
-        element.click().await.map_err(|e| BrowserError::CdpError(e.to_string()))?;
+        element
+            .click()
+            .await
+            .map_err(|e| BrowserError::CdpError(e.to_string()))?;
 
         // Small delay for any animations/transitions
         tokio::time::sleep(Duration::from_millis(100)).await;
 
-        Ok(BrowserActionResult::success(format!("Clicked element: {}", selector)))
+        Ok(BrowserActionResult::success(format!(
+            "Clicked element: {}",
+            selector
+        )))
     }
 
     /// Type text into an element.
@@ -286,15 +293,18 @@ impl BrowserController {
 
         let page = self.get_page().await?;
 
-        let element = page
-            .find_element(selector)
-            .await
-            .map_err(|_| BrowserError::ElementNotFound {
-                selector: selector.to_string(),
-            })?;
+        let element =
+            page.find_element(selector)
+                .await
+                .map_err(|_| BrowserError::ElementNotFound {
+                    selector: selector.to_string(),
+                })?;
 
         element.click().await.ok(); // Focus first
-        element.type_str(text).await.map_err(|e| BrowserError::CdpError(e.to_string()))?;
+        element
+            .type_str(text)
+            .await
+            .map_err(|e| BrowserError::CdpError(e.to_string()))?;
 
         Ok(BrowserActionResult::success(format!(
             "Typed {} characters into {}",
@@ -307,12 +317,12 @@ impl BrowserController {
     pub async fn get_text(&self, selector: &str) -> Result<BrowserActionResult> {
         let page = self.get_page().await?;
 
-        let element = page
-            .find_element(selector)
-            .await
-            .map_err(|_| BrowserError::ElementNotFound {
-                selector: selector.to_string(),
-            })?;
+        let element =
+            page.find_element(selector)
+                .await
+                .map_err(|_| BrowserError::ElementNotFound {
+                    selector: selector.to_string(),
+                })?;
 
         let text = element
             .inner_text()
@@ -342,8 +352,7 @@ impl BrowserController {
 
         let base64_screenshot = BASE64.encode(&screenshot_data);
 
-        Ok(BrowserActionResult::success("Screenshot captured")
-            .with_screenshot(base64_screenshot))
+        Ok(BrowserActionResult::success("Screenshot captured").with_screenshot(base64_screenshot))
     }
 
     /// Execute JavaScript on the page.
@@ -359,8 +368,7 @@ impl BrowserController {
 
         let value: serde_json::Value = result.into_value().unwrap_or(serde_json::Value::Null);
 
-        Ok(BrowserActionResult::success("JavaScript executed")
-            .with_data(value))
+        Ok(BrowserActionResult::success("JavaScript executed").with_data(value))
     }
 
     /// Wait for an element to appear.
@@ -394,7 +402,11 @@ impl BrowserController {
     }
 
     /// Scroll the page.
-    pub async fn scroll(&self, direction: ScrollDirection, amount: u32) -> Result<BrowserActionResult> {
+    pub async fn scroll(
+        &self,
+        direction: ScrollDirection,
+        amount: u32,
+    ) -> Result<BrowserActionResult> {
         let page = self.get_page().await?;
 
         let script = match direction {

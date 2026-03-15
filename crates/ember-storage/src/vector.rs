@@ -73,7 +73,7 @@ impl VectorStorage {
             max_vectors = config.max_vectors,
             "Vector storage initialized"
         );
-        
+
         Self {
             config,
             vectors: Arc::new(RwLock::new(HashMap::new())),
@@ -164,7 +164,11 @@ impl VectorStorage {
             .collect();
 
         // Sort by score descending
-        results.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+        results.sort_by(|a, b| {
+            b.score
+                .partial_cmp(&a.score)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
 
         // Limit results
         results.truncate(limit);
@@ -210,7 +214,7 @@ impl VectorStorage {
         metadata: HashMap<String, String>,
     ) -> Result<bool> {
         let mut vectors = self.vectors.write().await;
-        
+
         if let Some(entry) = vectors.get_mut(id) {
             entry.metadata = metadata;
             Ok(true)
@@ -256,7 +260,11 @@ impl VectorStorage {
             .collect();
 
         // Sort by score descending
-        results.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+        results.sort_by(|a, b| {
+            b.score
+                .partial_cmp(&a.score)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
 
         // Limit results
         results.truncate(limit);
@@ -413,11 +421,19 @@ mod tests {
         metadata2.insert("category".to_string(), "B".to_string());
 
         storage
-            .store("Doc A".to_string(), vec![1.0, 0.0, 0.0, 0.0], Some(metadata1))
+            .store(
+                "Doc A".to_string(),
+                vec![1.0, 0.0, 0.0, 0.0],
+                Some(metadata1),
+            )
             .await
             .unwrap();
         storage
-            .store("Doc B".to_string(), vec![0.9, 0.1, 0.0, 0.0], Some(metadata2))
+            .store(
+                "Doc B".to_string(),
+                vec![0.9, 0.1, 0.0, 0.0],
+                Some(metadata2),
+            )
             .await
             .unwrap();
 
@@ -425,7 +441,10 @@ mod tests {
         let mut filter = HashMap::new();
         filter.insert("category".to_string(), "B".to_string());
 
-        let results = storage.search_with_filter(&query, 10, &filter).await.unwrap();
+        let results = storage
+            .search_with_filter(&query, 10, &filter)
+            .await
+            .unwrap();
 
         assert_eq!(results.len(), 1);
         assert_eq!(results[0].entry.content, "Doc B");

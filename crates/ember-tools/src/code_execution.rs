@@ -233,7 +233,7 @@ impl CodeExecutionTool {
 
         // Build command
         let mut cmd = Command::new(&cmd_name);
-        
+
         // Add language-specific args
         for arg in language.args() {
             cmd.arg(arg);
@@ -263,7 +263,10 @@ impl CodeExecutionTool {
 
         // Spawn process
         let mut child = cmd.spawn().map_err(|e| {
-            Error::execution_failed("execute_code", format!("Failed to spawn {}: {}", cmd_name, e))
+            Error::execution_failed(
+                "execute_code",
+                format!("Failed to spawn {}: {}", cmd_name, e),
+            )
         })?;
 
         // Write code to stdin
@@ -277,7 +280,7 @@ impl CodeExecutionTool {
         // Wait for completion with timeout
         let timeout_duration = self.config.timeout;
         let max_output = self.config.max_output_size;
-        
+
         let output_result = tokio::select! {
             result = child.wait_with_output() => {
                 match result {
@@ -329,7 +332,10 @@ impl CodeExecutionTool {
                 })
             }
             Err(e) if e.kind() == std::io::ErrorKind::TimedOut => {
-                warn!(timeout_secs = timeout_duration.as_secs(), "Code execution timed out");
+                warn!(
+                    timeout_secs = timeout_duration.as_secs(),
+                    "Code execution timed out"
+                );
 
                 Ok(ExecutionResult {
                     stdout: String::new(),
@@ -407,11 +413,13 @@ impl CodeExecutionTool {
             .arg("--version")
             .output()
             .await
-            .map_err(|e| Error::execution_failed("execute_code", format!("Failed to get version: {}", e)))?;
+            .map_err(|e| {
+                Error::execution_failed("execute_code", format!("Failed to get version: {}", e))
+            })?;
 
         let version = String::from_utf8_lossy(&output.stdout);
         let stderr = String::from_utf8_lossy(&output.stderr);
-        
+
         // Some tools output version to stderr
         let version_str = if version.trim().is_empty() {
             stderr.trim()
@@ -432,20 +440,29 @@ impl Default for CodeExecutionTool {
 #[async_trait]
 impl ToolHandler for CodeExecutionTool {
     fn definition(&self) -> ToolDefinition {
-        ToolDefinition::new("execute_code", "Execute code in Python, JavaScript, or shell")
-            .add_string_param("language", "Programming language (python, javascript, shell)", true)
-            .add_string_param("code", "The code to execute", true)
+        ToolDefinition::new(
+            "execute_code",
+            "Execute code in Python, JavaScript, or shell",
+        )
+        .add_string_param(
+            "language",
+            "Programming language (python, javascript, shell)",
+            true,
+        )
+        .add_string_param("code", "The code to execute", true)
     }
 
     async fn execute(&self, arguments: Value) -> Result<ToolOutput> {
         let language_str = arguments
             .get("language")
             .and_then(|v| v.as_str())
-            .ok_or_else(|| Error::invalid_arguments("execute_code", "Missing 'language' parameter"))?;
+            .ok_or_else(|| {
+                Error::invalid_arguments("execute_code", "Missing 'language' parameter")
+            })?;
 
-        let language: Language = language_str.parse().map_err(|e: String| {
-            Error::invalid_arguments("execute_code", e)
-        })?;
+        let language: Language = language_str
+            .parse()
+            .map_err(|e: String| Error::invalid_arguments("execute_code", e))?;
 
         let code = arguments
             .get("code")
@@ -510,7 +527,7 @@ impl ReplSession {
     /// Execute code and add to history.
     pub async fn execute(&mut self, code: &str) -> Result<ExecutionResult> {
         let tool = CodeExecutionTool::with_config(self.config.clone());
-        
+
         // For Python, we might want to maintain state across executions
         // This is a simplified version - a full REPL would need process persistence
         let full_code = match self.language {
@@ -526,9 +543,9 @@ impl ReplSession {
         };
 
         let result = tool.execute(self.language, &full_code).await?;
-        
+
         self.history.push((code.to_string(), result.clone()));
-        
+
         Ok(result)
     }
 
@@ -561,7 +578,10 @@ mod tests {
     fn test_language_parsing() {
         assert_eq!("python".parse::<Language>().unwrap(), Language::Python);
         assert_eq!("py".parse::<Language>().unwrap(), Language::Python);
-        assert_eq!("javascript".parse::<Language>().unwrap(), Language::JavaScript);
+        assert_eq!(
+            "javascript".parse::<Language>().unwrap(),
+            Language::JavaScript
+        );
         assert_eq!("js".parse::<Language>().unwrap(), Language::JavaScript);
         assert_eq!("shell".parse::<Language>().unwrap(), Language::Shell);
         assert!("unknown".parse::<Language>().is_err());
@@ -629,7 +649,10 @@ mod tests {
             return;
         }
 
-        let result = tool.execute_python("print('Hello from Python')").await.unwrap();
+        let result = tool
+            .execute_python("print('Hello from Python')")
+            .await
+            .unwrap();
         assert!(result.is_success());
         assert!(result.stdout.contains("Hello from Python"));
     }
@@ -655,7 +678,7 @@ mod tests {
     async fn test_timeout() {
         let mut config = CodeExecutionConfig::default();
         config.timeout = Duration::from_millis(100);
-        
+
         let tool = CodeExecutionTool::with_config(config);
         if !tool.is_available(Language::Python).await {
             return;

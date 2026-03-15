@@ -9,13 +9,13 @@ use std::collections::VecDeque;
 pub struct Context {
     /// System message (always first)
     system_message: Message,
-    
+
     /// Message history
     messages: VecDeque<Message>,
-    
+
     /// Current token count estimate
     token_count: usize,
-    
+
     /// Maximum tokens allowed
     max_tokens: usize,
 }
@@ -25,7 +25,7 @@ impl Context {
     pub fn new(system_prompt: impl Into<String>, max_tokens: usize) -> Self {
         let system_message = Message::system(system_prompt);
         let system_tokens = estimate_tokens(&system_message.content);
-        
+
         Self {
             system_message,
             messages: VecDeque::new(),
@@ -49,7 +49,7 @@ impl Context {
         let tokens = estimate_tokens(&message.content);
         self.messages.push_back(message);
         self.token_count += tokens;
-        
+
         // Trim old messages if we exceed the limit
         self.trim_to_fit();
     }
@@ -129,7 +129,7 @@ impl Context {
 pub struct ContextManager {
     /// Default system prompt
     default_system_prompt: String,
-    
+
     /// Default max tokens
     default_max_tokens: usize,
 }
@@ -188,9 +188,9 @@ mod tests {
         let mut ctx = Context::new("System", 1000);
         ctx.add_user_message("Hello");
         ctx.add_assistant_message("Hi there!");
-        
+
         assert_eq!(ctx.len(), 2);
-        
+
         let messages = ctx.messages();
         assert_eq!(messages.len(), 3); // Including system
         assert!(matches!(messages[0].role, Role::System));
@@ -201,12 +201,12 @@ mod tests {
     #[test]
     fn test_token_trimming() {
         let mut ctx = Context::new("System", 100);
-        
+
         // Add messages until we exceed limit
         for i in 0..50 {
             ctx.add_user_message(format!("Message {i} with some extra text"));
         }
-        
+
         // Should have trimmed old messages
         assert!(ctx.token_count() <= 100);
     }
@@ -216,10 +216,10 @@ mod tests {
         let mut ctx = Context::new("System", 1000);
         ctx.add_user_message("Hello");
         ctx.add_assistant_message("Hi!");
-        
+
         let initial_tokens = estimate_tokens("System");
         ctx.clear();
-        
+
         assert!(ctx.is_empty());
         assert_eq!(ctx.token_count(), initial_tokens);
     }
@@ -227,10 +227,10 @@ mod tests {
     #[test]
     fn test_context_manager() {
         let manager = ContextManager::new("Default prompt", 8192);
-        
+
         let ctx1 = manager.create_context();
         let ctx2 = manager.create_context_with_prompt("Custom prompt");
-        
+
         assert!(ctx1.messages()[0].content.contains("Default"));
         assert!(ctx2.messages()[0].content.contains("Custom"));
     }

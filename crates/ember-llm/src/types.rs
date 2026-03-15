@@ -55,7 +55,10 @@ impl ContentPart {
 
     /// Add alt text to an image content part
     pub fn with_alt_text(mut self, alt: impl Into<String>) -> Self {
-        if let ContentPart::Image { ref mut alt_text, .. } = self {
+        if let ContentPart::Image {
+            ref mut alt_text, ..
+        } = self
+        {
             *alt_text = Some(alt.into());
         }
         self
@@ -287,10 +290,7 @@ impl Message {
         Self {
             role: Role::User,
             content: text_str.clone(),
-            content_parts: vec![
-                ContentPart::text(text_str),
-                ContentPart::image_url(url),
-            ],
+            content_parts: vec![ContentPart::text(text_str), ContentPart::image_url(url)],
             name: None,
             tool_calls: Vec::new(),
             tool_call_id: None,
@@ -342,12 +342,17 @@ impl Message {
     }
 
     /// Add an image to this message (converts to multimodal)
-    pub fn with_image(mut self, image_base64: impl Into<String>, media_type: ImageMediaType) -> Self {
+    pub fn with_image(
+        mut self,
+        image_base64: impl Into<String>,
+        media_type: ImageMediaType,
+    ) -> Self {
         // If content_parts is empty, add the text content first
         if self.content_parts.is_empty() && !self.content.is_empty() {
             self.content_parts.push(ContentPart::text(&self.content));
         }
-        self.content_parts.push(ContentPart::image_base64(image_base64, media_type));
+        self.content_parts
+            .push(ContentPart::image_base64(image_base64, media_type));
         self
     }
 
@@ -434,10 +439,7 @@ impl ToolResult {
     }
 
     /// Create a failed tool result
-    pub fn failure(
-        tool_call_id: impl Into<String>,
-        error: impl Into<String>,
-    ) -> Self {
+    pub fn failure(tool_call_id: impl Into<String>, error: impl Into<String>) -> Self {
         let error_msg = error.into();
         Self {
             tool_call_id: tool_call_id.into(),
@@ -521,7 +523,7 @@ impl CompletionRequest {
     }
 
     /// Create a new completion request from messages
-    /// 
+    ///
     /// The model will be set to an empty string and should be filled in
     /// by the provider or via `with_model()`.
     pub fn from_messages(messages: Vec<Message>) -> Self {

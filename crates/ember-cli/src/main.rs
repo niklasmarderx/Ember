@@ -135,8 +135,7 @@ async fn main() -> Result<()> {
     init_logging(cli.verbose)?;
 
     // Load configuration
-    let config = AppConfig::load(cli.config.as_deref())
-        .context("Failed to load configuration")?;
+    let config = AppConfig::load(cli.config.as_deref()).context("Failed to load configuration")?;
 
     // Execute command
     match cli.command {

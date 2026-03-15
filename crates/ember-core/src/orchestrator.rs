@@ -10,11 +10,11 @@
 //! - **Result Aggregation**: Intelligent merging of agent outputs
 //! - **Consensus Building**: Agents can vote on best solutions
 
+use super::Error as CoreError;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
-use tokio::sync::{mpsc, RwLock, Mutex};
-use serde::{Deserialize, Serialize};
-use super::Error as CoreError;
+use tokio::sync::{mpsc, Mutex, RwLock};
 
 /// Unique identifier for an agent in the orchestrator.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -25,7 +25,7 @@ impl AgentId {
     pub fn new(id: impl Into<String>) -> Self {
         Self(id.into())
     }
-    
+
     /// Generate a unique agent ID.
     pub fn generate() -> Self {
         Self(uuid::Uuid::new_v4().to_string())
@@ -145,49 +145,49 @@ impl AgentConfigBuilder {
         self.config.id = id;
         self
     }
-    
+
     /// Set the agent's role.
     pub fn role(mut self, role: AgentRole) -> Self {
         self.config.role = role;
         self
     }
-    
+
     /// Set the agent's name.
     pub fn name(mut self, name: impl Into<String>) -> Self {
         self.config.name = name.into();
         self
     }
-    
+
     /// Set the agent's description.
     pub fn description(mut self, description: impl Into<String>) -> Self {
         self.config.description = description.into();
         self
     }
-    
+
     /// Set the maximum concurrent tasks.
     pub fn max_concurrent_tasks(mut self, max: usize) -> Self {
         self.config.max_concurrent_tasks = max;
         self
     }
-    
+
     /// Set the priority.
     pub fn priority(mut self, priority: u8) -> Self {
         self.config.priority = priority;
         self
     }
-    
+
     /// Set the model.
     pub fn model(mut self, model: impl Into<String>) -> Self {
         self.config.model = Some(model.into());
         self
     }
-    
+
     /// Set the temperature.
     pub fn temperature(mut self, temperature: f32) -> Self {
         self.config.temperature = Some(temperature);
         self
     }
-    
+
     /// Build the configuration.
     pub fn build(self) -> AgentConfig {
         self.config
@@ -226,25 +226,25 @@ impl OrchestratorTask {
             deadline: None,
         }
     }
-    
+
     /// Set the required role.
     pub fn with_role(mut self, role: AgentRole) -> Self {
         self.required_role = Some(role);
         self
     }
-    
+
     /// Set the priority.
     pub fn with_priority(mut self, priority: u8) -> Self {
         self.priority = priority;
         self
     }
-    
+
     /// Add a dependency.
     pub fn depends_on(mut self, task_id: impl Into<String>) -> Self {
         self.dependencies.push(task_id.into());
         self
     }
-    
+
     /// Set the input data.
     pub fn with_input(mut self, input: serde_json::Value) -> Self {
         self.input = input;
@@ -347,11 +347,11 @@ impl Orchestrator {
             shutdown: Arc::new(RwLock::new(false)),
         }
     }
-    
+
     /// Create an orchestrator with a default team of agents.
     pub fn with_default_team() -> Self {
         let orchestrator = Self::new();
-        
+
         // Add default agents
         let _agents = vec![
             AgentConfig::builder()
@@ -379,98 +379,96 @@ impl Orchestrator {
                 .priority(9)
                 .build(),
         ];
-        
+
         // Note: In async context, use register_agent_async
         // For now, this is a synchronous initialization helper
         orchestrator
     }
-    
+
     /// Register a new agent.
     pub async fn register_agent(&self, config: AgentConfig) -> Result<(), CoreError> {
         let mut agents = self.agents.write().await;
         let id = config.id.clone();
-        
+
         if agents.contains_key(&id) {
             return Err(CoreError::Agent(format!("Agent {} already registered", id)));
         }
-        
+
         agents.insert(id.clone(), config);
-        
+
         let mut statuses = self.statuses.write().await;
         statuses.insert(id, AgentStatus::Idle);
-        
+
         Ok(())
     }
-    
+
     /// Unregister an agent.
     pub async fn unregister_agent(&self, id: &AgentId) -> Result<(), CoreError> {
         let mut agents = self.agents.write().await;
-        
+
         if agents.remove(id).is_none() {
             return Err(CoreError::Agent(format!("Agent {} not found", id)));
         }
-        
+
         let mut statuses = self.statuses.write().await;
         statuses.remove(id);
-        
+
         Ok(())
     }
-    
+
     /// Get all registered agents.
     pub async fn list_agents(&self) -> Vec<AgentConfig> {
         let agents = self.agents.read().await;
         agents.values().cloned().collect()
     }
-    
+
     /// Get agent status.
     pub async fn get_agent_status(&self, id: &AgentId) -> Option<AgentStatus> {
         let statuses = self.statuses.read().await;
         statuses.get(id).cloned()
     }
-    
+
     /// Submit a task to the orchestrator.
     pub async fn submit_task(&self, task: OrchestratorTask) -> Result<String, CoreError> {
         let task_id = task.id.clone();
-        
+
         let mut tasks = self.pending_tasks.write().await;
         tasks.push(task);
-        
+
         // Sort by priority (higher first)
         tasks.sort_by(|a, b| b.priority.cmp(&a.priority));
-        
+
         Ok(task_id)
     }
-    
+
     /// Get task result.
     pub async fn get_result(&self, task_id: &str) -> Option<TaskResult> {
         let results = self.results.read().await;
         results.get(task_id).cloned()
     }
-    
+
     /// Find the best agent for a task.
     pub async fn find_best_agent(&self, task: &OrchestratorTask) -> Option<AgentId> {
         let agents = self.agents.read().await;
         let statuses = self.statuses.read().await;
-        
+
         // Filter available agents
         let available: Vec<_> = agents
             .iter()
-            .filter(|(id, _)| {
-                matches!(statuses.get(*id), Some(AgentStatus::Idle))
-            })
+            .filter(|(id, _)| matches!(statuses.get(*id), Some(AgentStatus::Idle)))
             .collect();
-        
+
         if available.is_empty() {
             return None;
         }
-        
+
         // If task requires a specific role, filter by that
         if let Some(ref required_role) = task.required_role {
             let matching: Vec<_> = available
                 .iter()
                 .filter(|(_, config)| &config.role == required_role)
                 .collect();
-            
+
             if !matching.is_empty() {
                 // Return highest priority matching agent
                 return matching
@@ -479,14 +477,14 @@ impl Orchestrator {
                     .map(|(id, _)| (*id).clone());
             }
         }
-        
+
         // Return highest priority available agent
         available
             .iter()
             .max_by_key(|(_, config)| config.priority)
             .map(|(id, _)| (*id).clone())
     }
-    
+
     /// Send a message between agents.
     pub async fn send_message(&self, message: AgentMessage) -> Result<(), CoreError> {
         self.message_tx
@@ -494,9 +492,13 @@ impl Orchestrator {
             .await
             .map_err(|e| CoreError::Agent(format!("Failed to send message: {}", e)))
     }
-    
+
     /// Broadcast a message to all agents.
-    pub async fn broadcast(&self, from: AgentId, content: serde_json::Value) -> Result<(), CoreError> {
+    pub async fn broadcast(
+        &self,
+        from: AgentId,
+        content: serde_json::Value,
+    ) -> Result<(), CoreError> {
         let message = AgentMessage {
             from,
             to: None,
@@ -506,7 +508,7 @@ impl Orchestrator {
         };
         self.send_message(message).await
     }
-    
+
     /// Request consensus from all agents on a decision.
     pub async fn request_consensus(
         &self,
@@ -516,12 +518,12 @@ impl Orchestrator {
     ) -> Result<String, CoreError> {
         // This is a simplified consensus mechanism
         // In production, you would implement proper voting
-        
+
         let content = serde_json::json!({
             "question": question,
             "options": options,
         });
-        
+
         let message = AgentMessage {
             from,
             to: None,
@@ -529,14 +531,14 @@ impl Orchestrator {
             content,
             timestamp: chrono::Utc::now(),
         };
-        
+
         self.send_message(message).await?;
-        
+
         // For now, return the first option
         // Real implementation would wait for votes
         Ok(options.into_iter().next().unwrap_or_default())
     }
-    
+
     /// Shutdown the orchestrator.
     pub async fn shutdown(&self) {
         let mut shutdown = self.shutdown.write().await;
@@ -556,13 +558,13 @@ impl WorkflowBuilder {
     pub fn new() -> Self {
         Self::default()
     }
-    
+
     /// Add a task to the workflow.
     pub fn add_task(mut self, task: OrchestratorTask) -> Self {
         self.tasks.push(task);
         self
     }
-    
+
     /// Add a dependency between tasks.
     pub fn add_dependency(mut self, task_id: &str, depends_on: &str) -> Self {
         self.dependencies
@@ -571,7 +573,7 @@ impl WorkflowBuilder {
             .push(depends_on.to_string());
         self
     }
-    
+
     /// Build the workflow and return tasks in execution order.
     pub fn build(self) -> Vec<OrchestratorTask> {
         // Apply dependencies
@@ -581,7 +583,7 @@ impl WorkflowBuilder {
                 task.dependencies = deps.clone();
             }
         }
-        
+
         // Topological sort would go here for proper ordering
         // For now, just return as-is
         tasks
@@ -591,7 +593,7 @@ impl WorkflowBuilder {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn test_agent_config_builder() {
         let config = AgentConfig::builder()
@@ -600,76 +602,82 @@ mod tests {
             .description("A test agent")
             .priority(10)
             .build();
-        
+
         assert_eq!(config.name, "TestAgent");
         assert_eq!(config.role, AgentRole::Coder);
         assert_eq!(config.priority, 10);
     }
-    
+
     #[test]
     fn test_task_creation() {
         let task = OrchestratorTask::new("Test task")
             .with_role(AgentRole::Coder)
             .with_priority(8);
-        
+
         assert_eq!(task.description, "Test task");
         assert_eq!(task.required_role, Some(AgentRole::Coder));
         assert_eq!(task.priority, 8);
     }
-    
+
     #[tokio::test]
     async fn test_orchestrator_registration() {
         let orchestrator = Orchestrator::new();
-        
+
         let config = AgentConfig::builder()
             .name("TestAgent")
             .role(AgentRole::Coder)
             .build();
-        
+
         let id = config.id.clone();
         orchestrator.register_agent(config).await.unwrap();
-        
+
         let agents = orchestrator.list_agents().await;
         assert_eq!(agents.len(), 1);
-        
+
         let status = orchestrator.get_agent_status(&id).await;
         assert_eq!(status, Some(AgentStatus::Idle));
     }
-    
+
     #[tokio::test]
     async fn test_task_submission() {
         let orchestrator = Orchestrator::new();
-        
+
         let task = OrchestratorTask::new("Test task");
         let task_id = orchestrator.submit_task(task).await.unwrap();
-        
+
         assert!(!task_id.is_empty());
     }
-    
+
     #[test]
     fn test_workflow_builder() {
         let task1 = OrchestratorTask::new("Task 1");
         let task1_id = task1.id.clone();
         let task2 = OrchestratorTask::new("Task 2");
         let task2_id = task2.id.clone();
-        
+
         let workflow = WorkflowBuilder::new()
             .add_task(task1)
             .add_task(task2)
             .add_dependency(&task2_id, &task1_id)
             .build();
-        
+
         assert_eq!(workflow.len(), 2);
-        
+
         // Find task2 and check its dependencies
         let task2 = workflow.iter().find(|t| t.id == task2_id).unwrap();
         assert!(task2.dependencies.contains(&task1_id));
     }
-    
+
     #[test]
     fn test_agent_role_prompt() {
-        assert!(AgentRole::Coder.system_prompt_modifier().contains("engineer"));
-        assert!(AgentRole::Researcher.system_prompt_modifier().contains("research"));
-        assert!(AgentRole::Reviewer.system_prompt_modifier().contains("review"));
+        assert!(AgentRole::Coder
+            .system_prompt_modifier()
+            .contains("engineer"));
+        assert!(AgentRole::Researcher
+            .system_prompt_modifier()
+            .contains("research"));
+        assert!(AgentRole::Reviewer
+            .system_prompt_modifier()
+            .contains("review"));
     }
 }

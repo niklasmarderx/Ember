@@ -13,7 +13,7 @@ use tokio::sync::mpsc;
 
 use super::ui;
 use crate::config::AppConfig;
-use ember_llm::{LLMProvider, Message, OpenAIProvider, OllamaProvider};
+use ember_llm::{LLMProvider, Message, OllamaProvider, OpenAIProvider};
 
 /// Application state
 #[allow(dead_code)]
@@ -277,9 +277,15 @@ pub async fn run(config: AppConfig) -> Result<()> {
                     tokio::spawn(async move {
                         let request = ember_llm::CompletionRequest::from_messages(messages)
                             .with_model(&model);
-                        
+
                         let result = provider.complete(request).await;
-                        let _ = tx.send(result.map(|r| (r.content, r.usage.total_tokens)).map_err(|e| anyhow::anyhow!("{}", e))).await;
+                        let _ = tx
+                            .send(
+                                result
+                                    .map(|r| (r.content, r.usage.total_tokens))
+                                    .map_err(|e| anyhow::anyhow!("{}", e)),
+                            )
+                            .await;
                     });
                 }
             }

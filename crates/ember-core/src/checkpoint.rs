@@ -3,7 +3,7 @@
 //! This module provides checkpointing capabilities that allow saving and
 //! restoring agent state, enabling undo operations and recovery from errors.
 
-use crate::{context::Context, conversation::Conversation, Result, Error};
+use crate::{context::Context, conversation::Conversation, Error, Result};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
@@ -97,9 +97,9 @@ impl Checkpoint {
 
     /// Get a display name
     pub fn display_name(&self) -> String {
-        self.name.clone().unwrap_or_else(|| {
-            format!("Checkpoint {}", self.timestamp.format("%Y-%m-%d %H:%M:%S"))
-        })
+        self.name
+            .clone()
+            .unwrap_or_else(|| format!("Checkpoint {}", self.timestamp.format("%Y-%m-%d %H:%M:%S")))
     }
 
     /// Get age in human-readable format
@@ -232,7 +232,9 @@ impl CheckpointManager {
         while self.checkpoints.len() > self.config.max_checkpoints {
             // Try to remove oldest non-preserved checkpoint
             let remove_idx = self.checkpoints.iter().position(|cp| {
-                !cp.tags.iter().any(|t| self.config.preserve_tags.contains(t))
+                !cp.tags
+                    .iter()
+                    .any(|t| self.config.preserve_tags.contains(t))
             });
 
             if let Some(idx) = remove_idx {
@@ -294,7 +296,7 @@ impl CheckpointManager {
     }
 
     /// Restore state from a checkpoint.
-    /// 
+    ///
     /// Returns the context messages and conversation to restore.
     pub fn restore(
         &self,
@@ -408,7 +410,7 @@ mod tests {
         let context = create_test_context();
 
         let id = manager.create_checkpoint(&context, None);
-        
+
         assert_eq!(manager.len(), 1);
         assert!(manager.get(id).is_some());
     }
@@ -436,7 +438,7 @@ mod tests {
         let context = create_test_context();
 
         let id = manager.create_checkpoint(&context, None);
-        
+
         let (messages, _) = manager.restore(id).unwrap();
         assert!(!messages.is_empty());
     }
@@ -468,7 +470,7 @@ mod tests {
         let context = create_test_context();
 
         manager.create_named_checkpoint("Test 1", &context, None);
-        
+
         let found = manager.find_by_tag("manual");
         assert_eq!(found.len(), 1);
     }

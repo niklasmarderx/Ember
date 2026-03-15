@@ -10,7 +10,6 @@ mod app;
 #[cfg(feature = "tui")]
 mod ui;
 
-
 #[cfg(feature = "tui")]
 pub async fn run(config: crate::config::AppConfig) -> anyhow::Result<()> {
     app::run(config).await

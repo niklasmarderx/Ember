@@ -47,10 +47,10 @@ pub mod git;
 pub mod code_execution;
 
 pub use error::{Error, Result};
-pub use registry::{ToolRegistry, ToolDefinition, ToolHandler, ToolOutput};
+pub use registry::{ToolDefinition, ToolHandler, ToolOutput, ToolRegistry};
 
 // SDK exports
-pub use sdk::{SimpleTool, AsyncTool, SimpleToolBuilder, ParamDef, ParamType, ParamExtractor};
+pub use sdk::{AsyncTool, ParamDef, ParamExtractor, ParamType, SimpleTool, SimpleToolBuilder};
 
 #[cfg(feature = "shell")]
 pub use shell::ShellTool;
@@ -65,26 +65,32 @@ pub use web::WebTool;
 pub use git::GitTool;
 
 #[cfg(feature = "code-execution")]
-pub use code_execution::{CodeExecutionTool, CodeExecutionConfig, ExecutionResult, Language, ReplSession};
+pub use code_execution::{
+    CodeExecutionConfig, CodeExecutionTool, ExecutionResult, Language, ReplSession,
+};
 
 /// Prelude for convenient imports.
 pub mod prelude {
-    pub use crate::{ToolRegistry, ToolDefinition, ToolHandler, ToolOutput, Error, Result};
-    pub use crate::sdk::{SimpleTool, AsyncTool, SimpleToolBuilder, ParamDef, ParamType, ParamExtractor};
     pub use crate::sdk::validation;
-    
+    pub use crate::sdk::{
+        AsyncTool, ParamDef, ParamExtractor, ParamType, SimpleTool, SimpleToolBuilder,
+    };
+    pub use crate::{Error, Result, ToolDefinition, ToolHandler, ToolOutput, ToolRegistry};
+
     #[cfg(feature = "shell")]
     pub use crate::ShellTool;
-    
+
     #[cfg(feature = "filesystem")]
     pub use crate::FilesystemTool;
-    
+
     #[cfg(feature = "web")]
     pub use crate::WebTool;
-    
+
     #[cfg(feature = "git")]
     pub use crate::GitTool;
-    
+
     #[cfg(feature = "code-execution")]
-    pub use crate::{CodeExecutionTool, CodeExecutionConfig, ExecutionResult, Language, ReplSession};
+    pub use crate::{
+        CodeExecutionConfig, CodeExecutionTool, ExecutionResult, Language, ReplSession,
+    };
 }

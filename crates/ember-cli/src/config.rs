@@ -224,10 +224,9 @@ impl AppConfig {
         };
 
         if config_path.exists() {
-            let content = std::fs::read_to_string(&config_path)
-                .context("Failed to read config file")?;
-            let config: Self = toml::from_str(&content)
-                .context("Failed to parse config file")?;
+            let content =
+                std::fs::read_to_string(&config_path).context("Failed to read config file")?;
+            let config: Self = toml::from_str(&content).context("Failed to parse config file")?;
             Ok(config)
         } else {
             // Return defaults if no config file exists
@@ -245,14 +244,11 @@ impl AppConfig {
 
         // Create parent directories if needed
         if let Some(parent) = config_path.parent() {
-            std::fs::create_dir_all(parent)
-                .context("Failed to create config directory")?;
+            std::fs::create_dir_all(parent).context("Failed to create config directory")?;
         }
 
-        let content = toml::to_string_pretty(self)
-            .context("Failed to serialize config")?;
-        std::fs::write(&config_path, content)
-            .context("Failed to write config file")?;
+        let content = toml::to_string_pretty(self).context("Failed to serialize config")?;
+        std::fs::write(&config_path, content).context("Failed to write config file")?;
 
         Ok(())
     }
@@ -286,28 +282,24 @@ impl AppConfig {
             "provider.ollama.model" => self.provider.ollama.model = value.to_string(),
             "agent.system_prompt" => self.agent.system_prompt = value.to_string(),
             "agent.temperature" => {
-                self.agent.temperature = value.parse()
-                    .context("Invalid temperature value")?;
+                self.agent.temperature = value.parse().context("Invalid temperature value")?;
             }
             "agent.max_iterations" => {
-                self.agent.max_iterations = value.parse()
-                    .context("Invalid max_iterations value")?;
+                self.agent.max_iterations =
+                    value.parse().context("Invalid max_iterations value")?;
             }
             "agent.streaming" => {
-                self.agent.streaming = value.parse()
-                    .context("Invalid streaming value")?;
+                self.agent.streaming = value.parse().context("Invalid streaming value")?;
             }
             "tools.shell_enabled" => {
-                self.tools.shell_enabled = value.parse()
-                    .context("Invalid shell_enabled value")?;
+                self.tools.shell_enabled = value.parse().context("Invalid shell_enabled value")?;
             }
             "tools.filesystem_enabled" => {
-                self.tools.filesystem_enabled = value.parse()
-                    .context("Invalid filesystem_enabled value")?;
+                self.tools.filesystem_enabled =
+                    value.parse().context("Invalid filesystem_enabled value")?;
             }
             "tools.web_enabled" => {
-                self.tools.web_enabled = value.parse()
-                    .context("Invalid web_enabled value")?;
+                self.tools.web_enabled = value.parse().context("Invalid web_enabled value")?;
             }
             _ => anyhow::bail!("Unknown configuration key: {}", key),
         }
@@ -330,12 +322,15 @@ mod tests {
     #[test]
     fn test_config_get_set() {
         let mut config = AppConfig::default();
-        
+
         config.set("agent.temperature", "0.5").unwrap();
         assert_eq!(config.get("agent.temperature"), Some("0.5".to_string()));
-        
+
         config.set("provider.openai.model", "gpt-4").unwrap();
-        assert_eq!(config.get("provider.openai.model"), Some("gpt-4".to_string()));
+        assert_eq!(
+            config.get("provider.openai.model"),
+            Some("gpt-4".to_string())
+        );
     }
 
     #[test]

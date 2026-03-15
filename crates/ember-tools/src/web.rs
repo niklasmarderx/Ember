@@ -1,6 +1,6 @@
 //! Web/HTTP request tool.
 
-use crate::{Error, Result, ToolDefinition, ToolHandler, registry::ToolOutput};
+use crate::{registry::ToolOutput, Error, Result, ToolDefinition, ToolHandler};
 use async_trait::async_trait;
 use reqwest::{Client, Method};
 use serde::{Deserialize, Serialize};
@@ -14,22 +14,22 @@ use tracing::debug;
 pub struct WebConfig {
     /// Request timeout in seconds
     pub timeout_secs: u64,
-    
+
     /// Maximum response body size in bytes
     pub max_response_bytes: usize,
-    
+
     /// Default headers to include in all requests
     pub default_headers: HashMap<String, String>,
-    
+
     /// Allowed URL patterns (empty = all allowed)
     pub allowed_urls: Vec<String>,
-    
+
     /// Blocked URL patterns
     pub blocked_urls: Vec<String>,
-    
+
     /// User agent string
     pub user_agent: String,
-    
+
     /// Whether to follow redirects
     pub follow_redirects: bool,
 }
@@ -102,9 +102,7 @@ impl WebTool {
     /// Allow internal/localhost requests.
     pub fn allow_localhost(mut self) -> Self {
         self.config.blocked_urls.retain(|u| {
-            !u.contains("localhost")
-                && !u.contains("127.0.0.1")
-                && !u.contains("0.0.0.0")
+            !u.contains("localhost") && !u.contains("127.0.0.1") && !u.contains("0.0.0.0")
         });
         self
     }
@@ -141,13 +139,13 @@ impl WebTool {
 
         // Check allowed patterns if set
         if !self.config.allowed_urls.is_empty() {
-            let allowed = self.config.allowed_urls.iter().any(|pattern| {
-                url.starts_with(pattern) || url.contains(pattern)
-            });
+            let allowed = self
+                .config
+                .allowed_urls
+                .iter()
+                .any(|pattern| url.starts_with(pattern) || url.contains(pattern));
             if !allowed {
-                return Err(Error::HttpRequest(
-                    "URL not in allowed list".to_string(),
-                ));
+                return Err(Error::HttpRequest("URL not in allowed list".to_string()));
             }
         }
 
@@ -185,9 +183,10 @@ impl WebTool {
             request = request.body(body_content);
         }
 
-        let response = request.send().await.map_err(|e| {
-            Error::HttpRequest(format!("Request failed: {}", e))
-        })?;
+        let response = request
+            .send()
+            .await
+            .map_err(|e| Error::HttpRequest(format!("Request failed: {}", e)))?;
 
         let status = response.status();
         let headers: HashMap<String, String> = response
@@ -331,16 +330,16 @@ impl ToolHandler for WebTool {
 pub struct WebResponse {
     /// HTTP status code
     pub status: u16,
-    
+
     /// Status text
     pub status_text: String,
-    
+
     /// Response headers
     pub headers: HashMap<String, String>,
-    
+
     /// Response body
     pub body: String,
-    
+
     /// Whether the request was successful (2xx status)
     pub success: bool,
 }
@@ -352,7 +351,7 @@ mod tests {
     #[test]
     fn test_url_validation_blocked() {
         let tool = WebTool::new();
-        
+
         assert!(tool.validate_url("http://localhost/api").is_err());
         assert!(tool.validate_url("http://127.0.0.1/api").is_err());
         assert!(tool.validate_url("http://192.168.1.1/api").is_err());
@@ -361,7 +360,7 @@ mod tests {
     #[test]
     fn test_url_validation_allowed() {
         let tool = WebTool::new();
-        
+
         // External URLs should be allowed
         assert!(tool.validate_url("https://api.example.com/data").is_ok());
         assert!(tool.validate_url("https://httpbin.org/get").is_ok());
@@ -370,7 +369,7 @@ mod tests {
     #[test]
     fn test_allow_localhost() {
         let tool = WebTool::new().allow_localhost();
-        
+
         assert!(tool.validate_url("http://localhost/api").is_ok());
         assert!(tool.validate_url("http://127.0.0.1/api").is_ok());
     }
@@ -378,7 +377,7 @@ mod tests {
     #[test]
     fn test_default_config() {
         let config = WebConfig::default();
-        
+
         assert_eq!(config.timeout_secs, 30);
         assert!(config.follow_redirects);
         assert!(!config.blocked_urls.is_empty());

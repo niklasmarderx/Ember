@@ -10,11 +10,11 @@
 //! - **Stream Transformers**: Filter, transform, aggregate on the fly
 //! - **Multi-Stream Merge**: Combine outputs from multiple agents
 
+use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
-use tokio::sync::{mpsc, RwLock, watch, broadcast};
-use serde::{Deserialize, Serialize};
+use tokio::sync::{broadcast, mpsc, watch, RwLock};
 
 /// A single streamed token with metadata.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -134,12 +134,12 @@ impl StreamingResponse {
             first_token_received: Arc::new(RwLock::new(false)),
         }
     }
-    
+
     /// Get the current state.
     pub fn state(&self) -> StreamState {
         *self.state_rx.borrow()
     }
-    
+
     /// Check if stream is still active.
     pub fn is_active(&self) -> bool {
         matches!(
@@ -147,50 +147,50 @@ impl StreamingResponse {
             StreamState::Pending | StreamState::Streaming | StreamState::Paused
         )
     }
-    
+
     /// Get current statistics.
     pub async fn stats(&self) -> StreamStats {
         self.stats.read().await.clone()
     }
-    
+
     /// Get collected response so far.
     pub async fn collected_response(&self) -> String {
         self.collected.read().await.clone()
     }
-    
+
     /// Receive the next token.
     pub async fn next_token(&mut self) -> Option<StreamToken> {
         let token = self.token_rx.recv().await?;
-        
+
         // Update stats
         {
             let mut stats = self.stats.write().await;
             let mut first_received = self.first_token_received.write().await;
-            
+
             if !*first_received {
                 stats.time_to_first_token_ms = self.start_time.elapsed().as_millis() as u64;
                 *first_received = true;
             }
-            
+
             stats.tokens_streamed += 1;
             stats.chars_streamed += token.content.len();
             stats.total_duration_ms = self.start_time.elapsed().as_millis() as u64;
-            
+
             if stats.total_duration_ms > 0 {
-                stats.tokens_per_second = (stats.tokens_streamed as f64 * 1000.0) 
-                    / stats.total_duration_ms as f64;
+                stats.tokens_per_second =
+                    (stats.tokens_streamed as f64 * 1000.0) / stats.total_duration_ms as f64;
             }
         }
-        
+
         // Collect response
         if self.config.collect_full_response {
             let mut collected = self.collected.write().await;
             collected.push_str(&token.content);
         }
-        
+
         Some(token)
     }
-    
+
     /// Collect all remaining tokens into a string.
     pub async fn collect_remaining(&mut self) -> String {
         let mut result = String::new();
@@ -216,49 +216,49 @@ impl StreamController {
     pub fn new() -> (Self, watch::Receiver<StreamState>, broadcast::Receiver<()>) {
         let (state_tx, state_rx) = watch::channel(StreamState::Pending);
         let (cancel_tx, cancel_rx) = broadcast::channel(1);
-        
+
         let controller = Self {
             state_tx,
             cancel_tx,
             paused: Arc::new(RwLock::new(false)),
         };
-        
+
         (controller, state_rx, cancel_rx)
     }
-    
+
     /// Pause the stream.
     pub async fn pause(&self) {
         *self.paused.write().await = true;
         let _ = self.state_tx.send(StreamState::Paused);
     }
-    
+
     /// Resume the stream.
     pub async fn resume(&self) {
         *self.paused.write().await = false;
         let _ = self.state_tx.send(StreamState::Streaming);
     }
-    
+
     /// Cancel the stream.
     pub fn cancel(&self) {
         let _ = self.state_tx.send(StreamState::Cancelled);
         let _ = self.cancel_tx.send(());
     }
-    
+
     /// Mark stream as completed.
     pub fn complete(&self) {
         let _ = self.state_tx.send(StreamState::Completed);
     }
-    
+
     /// Mark stream as error.
     pub fn error(&self) {
         let _ = self.state_tx.send(StreamState::Error);
     }
-    
+
     /// Check if paused.
     pub async fn is_paused(&self) -> bool {
         *self.paused.read().await
     }
-    
+
     /// Set streaming state.
     pub fn set_streaming(&self) {
         let _ = self.state_tx.send(StreamState::Streaming);
@@ -275,7 +275,7 @@ impl Default for StreamController {
 pub trait StreamTransformer: Send + Sync {
     /// Transform a token.
     fn transform(&self, token: StreamToken) -> Option<StreamToken>;
-    
+
     /// Name of this transformer.
     fn name(&self) -> &str;
 }
@@ -313,7 +313,7 @@ where
             None
         }
     }
-    
+
     fn name(&self) -> &str {
         &self.name
     }
@@ -349,7 +349,7 @@ where
         token.content = (self.mapper)(token.content);
         Some(token)
     }
-    
+
     fn name(&self) -> &str {
         &self.name
     }
@@ -371,16 +371,14 @@ impl TokenAggregator {
             max_buffer,
         }
     }
-    
+
     /// Add a token to the buffer.
     pub fn add(&mut self, token: StreamToken) -> Option<String> {
         self.buffer.push_back(token);
-        
+
         // Check if we have a complete chunk
-        let combined: String = self.buffer.iter()
-            .map(|t| t.content.as_str())
-            .collect();
-        
+        let combined: String = self.buffer.iter().map(|t| t.content.as_str()).collect();
+
         if combined.contains(&self.delimiter) || self.buffer.len() >= self.max_buffer {
             self.buffer.clear();
             Some(combined)
@@ -388,15 +386,13 @@ impl TokenAggregator {
             None
         }
     }
-    
+
     /// Flush remaining tokens.
     pub fn flush(&mut self) -> Option<String> {
         if self.buffer.is_empty() {
             None
         } else {
-            let combined: String = self.buffer.drain(..)
-                .map(|t| t.content)
-                .collect();
+            let combined: String = self.buffer.drain(..).map(|t| t.content).collect();
             Some(combined)
         }
     }
@@ -427,18 +423,18 @@ impl MultiStreamMerger {
             strategy,
         }
     }
-    
+
     /// Add a stream to the merger.
     pub fn add_stream(&mut self, stream: mpsc::Receiver<StreamToken>) {
         self.streams.push(stream);
     }
-    
+
     /// Get the next token from any stream.
     pub async fn next(&mut self) -> Option<StreamToken> {
         if self.streams.is_empty() {
             return None;
         }
-        
+
         match self.strategy {
             MergeStrategy::RoundRobin => {
                 // Rotate streams and try to get from first
@@ -468,7 +464,7 @@ impl MultiStreamMerger {
             MergeStrategy::ByTimestamp => {
                 // Collect one token from each, return earliest
                 let mut earliest: Option<StreamToken> = None;
-                
+
                 for stream in &mut self.streams {
                     if let Ok(token) = stream.try_recv() {
                         if let Some(ref e) = earliest {
@@ -480,7 +476,7 @@ impl MultiStreamMerger {
                         }
                     }
                 }
-                
+
                 earliest
             }
         }
@@ -501,44 +497,50 @@ impl StreamBuilder {
             transformers: Vec::new(),
         }
     }
-    
+
     /// Set buffer size.
     pub fn buffer_size(mut self, size: usize) -> Self {
         self.config.buffer_size = size;
         self
     }
-    
+
     /// Set maximum tokens.
     pub fn max_tokens(mut self, max: usize) -> Self {
         self.config.max_tokens = Some(max);
         self
     }
-    
+
     /// Set idle timeout.
     pub fn idle_timeout(mut self, timeout: Duration) -> Self {
         self.config.idle_timeout = timeout;
         self
     }
-    
+
     /// Enable/disable response collection.
     pub fn collect_response(mut self, collect: bool) -> Self {
         self.config.collect_full_response = collect;
         self
     }
-    
+
     /// Add a transformer.
     pub fn transform(mut self, transformer: Box<dyn StreamTransformer>) -> Self {
         self.transformers.push(transformer);
         self
     }
-    
+
     /// Build the streaming infrastructure.
-    pub fn build(self) -> (mpsc::Sender<StreamToken>, StreamingResponse, StreamController) {
+    pub fn build(
+        self,
+    ) -> (
+        mpsc::Sender<StreamToken>,
+        StreamingResponse,
+        StreamController,
+    ) {
         let (token_tx, token_rx) = mpsc::channel(self.config.buffer_size);
         let (controller, state_rx, _cancel_rx) = StreamController::new();
-        
+
         let response = StreamingResponse::new(token_rx, state_rx, self.config);
-        
+
         (token_tx, response, controller)
     }
 }
@@ -552,7 +554,7 @@ impl Default for StreamBuilder {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[tokio::test]
     async fn test_stream_token() {
         let token = StreamToken {
@@ -563,20 +565,20 @@ mod tests {
             probability: Some(0.95),
             alternatives: vec!["Hi".to_string()],
         };
-        
+
         assert_eq!(token.content, "Hello");
         assert!(!token.is_final);
     }
-    
+
     #[tokio::test]
     async fn test_stream_builder() {
         let (tx, mut response, controller) = StreamBuilder::new()
             .buffer_size(100)
             .max_tokens(1000)
             .build();
-        
+
         controller.set_streaming();
-        
+
         // Send a token
         tx.send(StreamToken {
             content: "Test".to_string(),
@@ -585,40 +587,42 @@ mod tests {
             timestamp_ms: 0,
             probability: None,
             alternatives: vec![],
-        }).await.unwrap();
-        
+        })
+        .await
+        .unwrap();
+
         // Receive it
         let token = response.next_token().await;
         assert!(token.is_some());
         assert_eq!(token.unwrap().content, "Test");
-        
+
         let stats = response.stats().await;
         assert_eq!(stats.tokens_streamed, 1);
     }
-    
+
     #[tokio::test]
     async fn test_stream_controller() {
         let (controller, state_rx, _) = StreamController::new();
-        
+
         assert_eq!(*state_rx.borrow(), StreamState::Pending);
-        
+
         controller.set_streaming();
         assert_eq!(*state_rx.borrow(), StreamState::Streaming);
-        
+
         controller.pause().await;
         assert_eq!(*state_rx.borrow(), StreamState::Paused);
-        
+
         controller.resume().await;
         assert_eq!(*state_rx.borrow(), StreamState::Streaming);
-        
+
         controller.cancel();
         assert_eq!(*state_rx.borrow(), StreamState::Cancelled);
     }
-    
+
     #[test]
     fn test_token_aggregator() {
         let mut agg = TokenAggregator::new("\n", 10);
-        
+
         // Add tokens
         let result = agg.add(StreamToken {
             content: "Hello".to_string(),
@@ -629,7 +633,7 @@ mod tests {
             alternatives: vec![],
         });
         assert!(result.is_none());
-        
+
         let result = agg.add(StreamToken {
             content: "\n".to_string(),
             index: 1,
@@ -641,15 +645,13 @@ mod tests {
         assert!(result.is_some());
         assert_eq!(result.unwrap(), "Hello\n");
     }
-    
+
     #[tokio::test]
     async fn test_collected_response() {
-        let (tx, mut response, controller) = StreamBuilder::new()
-            .collect_response(true)
-            .build();
-        
+        let (tx, mut response, controller) = StreamBuilder::new().collect_response(true).build();
+
         controller.set_streaming();
-        
+
         tx.send(StreamToken {
             content: "Hello ".to_string(),
             index: 0,
@@ -657,8 +659,10 @@ mod tests {
             timestamp_ms: 0,
             probability: None,
             alternatives: vec![],
-        }).await.unwrap();
-        
+        })
+        .await
+        .unwrap();
+
         tx.send(StreamToken {
             content: "World".to_string(),
             index: 1,
@@ -666,11 +670,13 @@ mod tests {
             timestamp_ms: 0,
             probability: None,
             alternatives: vec![],
-        }).await.unwrap();
-        
+        })
+        .await
+        .unwrap();
+
         response.next_token().await;
         response.next_token().await;
-        
+
         let collected = response.collected_response().await;
         assert_eq!(collected, "Hello World");
     }

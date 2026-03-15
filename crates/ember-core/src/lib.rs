@@ -32,117 +32,152 @@
 #![warn(clippy::all, clippy::pedantic)]
 #![allow(clippy::module_name_repetitions)]
 
-mod error;
+mod agent;
+mod cache;
+mod checkpoint;
+mod collaboration;
 mod config;
 mod context;
-mod memory;
-mod agent;
 mod conversation;
-mod planning;
-mod checkpoint;
+mod error;
+mod knowledge_graph;
+mod memory;
 mod orchestrator;
-mod collaboration;
-mod self_healing;
+mod planning;
 mod privacy;
-mod cache;
 mod sandbox;
+mod self_healing;
 mod streaming;
 mod task_planner;
-mod knowledge_graph;
 pub mod thinking;
 
 pub use error::{Error, Result};
 /// Alias for CoreError used by internal modules
 pub type CoreError = Error;
+pub use agent::{Agent, AgentBuilder, AgentState};
+pub use cache::{
+    CacheConfig, CacheStats, CachedResponse, EmbeddingCache, ResponseCache, ToolCache,
+};
+pub use checkpoint::{Checkpoint, CheckpointConfig, CheckpointId, CheckpointManager};
+pub use collaboration::{
+    ACPMessage, ACPMessageType, AccessControl, CollaborativeTask, ConsensusEvent, ConsensusManager,
+    Proposal, ProposalStatus, SessionId, SharedMemory, SharedMemoryEvent, SharedValue,
+    TaskDelegator, TaskEvent, TaskStatus as CollaborativeTaskStatus, ACP_VERSION,
+};
 pub use config::{AgentConfig, AgentConfigBuilder};
 pub use context::{Context, ContextManager};
-pub use memory::{Memory, MemoryEntry, MemoryStore};
-pub use agent::{Agent, AgentBuilder, AgentState};
 pub use conversation::{Conversation, ConversationId, Turn};
-pub use planning::{AgentMode, Plan, PlanBuilder, PlanStep, PlannerConfig};
-pub use checkpoint::{Checkpoint, CheckpointConfig, CheckpointId, CheckpointManager};
+pub use knowledge_graph::{
+    Entity, EntityId, FilterOperation, GraphConfig, GraphExport, GraphQuery, GraphStats,
+    KnowledgeGraph, PropertyFilter, PropertyValue, QueryResult, RelationDirection, Relationship,
+    RelationshipId, TraversalOptions, TraversalResult,
+};
+pub use memory::{Memory, MemoryEntry, MemoryStore};
 pub use orchestrator::{
-    AgentId, AgentRole, AgentStatus, AgentConfig as OrchestratorAgentConfig,
-    AgentConfigBuilder as OrchestratorAgentConfigBuilder, AgentMessage, AgentMessageType,
-    Orchestrator, OrchestratorTask, TaskResult, WorkflowBuilder,
+    AgentConfig as OrchestratorAgentConfig, AgentConfigBuilder as OrchestratorAgentConfigBuilder,
+    AgentId, AgentMessage, AgentMessageType, AgentRole, AgentStatus, Orchestrator,
+    OrchestratorTask, TaskResult, WorkflowBuilder,
 };
-pub use self_healing::{
-    CircuitBreaker, CircuitState, ErrorCategory, RecoveryRecord, RecoveryStats,
-    RecoveryStrategy, SelfHealingSystem,
-};
+pub use planning::{AgentMode, Plan, PlanBuilder, PlanStep, PlannerConfig};
 pub use privacy::{
-    PrivacyShield, PrivacyConfig, PrivacyLevel, PrivacyStats,
-    PiiType, PiiMatch, DataMinimizer, AuditEntry, AccessType,
-};
-pub use cache::{
-    ResponseCache, CacheConfig, CacheStats, CachedResponse,
-    ToolCache, EmbeddingCache,
+    AccessType, AuditEntry, DataMinimizer, PiiMatch, PiiType, PrivacyConfig, PrivacyLevel,
+    PrivacyShield, PrivacyStats,
 };
 pub use sandbox::{
-    SecuritySandbox, SecurityConfig, SecurityLevel, SecurityCheckResult,
-    Capability, ResourceLimits, PathRules, NetworkRules, CommandRules,
-    SecurityEvent, SecurityEventType,
+    Capability, CommandRules, NetworkRules, PathRules, ResourceLimits, SecurityCheckResult,
+    SecurityConfig, SecurityEvent, SecurityEventType, SecurityLevel, SecuritySandbox,
+};
+pub use self_healing::{
+    CircuitBreaker, CircuitState, ErrorCategory, RecoveryRecord, RecoveryStats, RecoveryStrategy,
+    SelfHealingSystem,
 };
 pub use streaming::{
-    StreamingResponse, StreamController, StreamToken, StreamState, StreamStats,
-    StreamConfig, StreamTransformer, FilterTransformer, MapTransformer,
-    TokenAggregator, MultiStreamMerger, MergeStrategy, StreamBuilder,
+    FilterTransformer, MapTransformer, MergeStrategy, MultiStreamMerger, StreamBuilder,
+    StreamConfig, StreamController, StreamState, StreamStats, StreamToken, StreamTransformer,
+    StreamingResponse, TokenAggregator,
 };
 pub use task_planner::{
-    TaskPlanner, PlannerConfig as TaskPlannerConfig, PlannerConfigBuilder as TaskPlannerConfigBuilder, PlannerStats,
-    ExecutionPlan, ExecutionProgress, ProgressCallback,
-    Task, TaskId, TaskType, TaskStatus, TaskPriority, TaskComplexity,
-    Goal, TaskExecutor, DefaultTaskExecutor, TaskPlanBuilder,
-};
-pub use collaboration::{
-    ACPMessage, ACPMessageType, SessionId, ACP_VERSION,
-    SharedMemory, SharedValue, SharedMemoryEvent, AccessControl,
-    CollaborativeTask, TaskStatus as CollaborativeTaskStatus, TaskDelegator, TaskEvent,
-    Proposal, ProposalStatus, ConsensusManager, ConsensusEvent,
-};
-pub use knowledge_graph::{
-    KnowledgeGraph, GraphConfig, GraphStats, GraphExport,
-    Entity, EntityId, Relationship, RelationshipId, RelationDirection,
-    PropertyValue, PropertyFilter, FilterOperation,
-    GraphQuery, QueryResult, TraversalOptions, TraversalResult,
+    DefaultTaskExecutor, ExecutionPlan, ExecutionProgress, Goal,
+    PlannerConfig as TaskPlannerConfig, PlannerConfigBuilder as TaskPlannerConfigBuilder,
+    PlannerStats, ProgressCallback, Task, TaskComplexity, TaskExecutor, TaskId, TaskPlanBuilder,
+    TaskPlanner, TaskPriority, TaskStatus, TaskType,
 };
 
 /// Re-export commonly used types from ember-llm
 pub mod llm {
     pub use ember_llm::{
-        LLMProvider, Message, Role, CompletionRequest, CompletionResponse,
-        ToolDefinition, ToolCall, ToolResult, StreamChunk,
+        CompletionRequest, CompletionResponse, LLMProvider, Message, Role, StreamChunk, ToolCall,
+        ToolDefinition, ToolResult,
     };
-    
+
     /// Alias for backward compatibility
     pub type Tool = ToolDefinition;
 }
 
 /// Prelude module for convenient imports
 pub mod prelude {
-    pub use crate::{
-        Agent, AgentBuilder, AgentConfig, AgentConfigBuilder, AgentState,
-        Context, ContextManager, Memory, MemoryEntry,
-        Conversation, ConversationId, Turn,
-        AgentMode, Plan, PlanBuilder, PlanStep,
-        Checkpoint, CheckpointConfig, CheckpointId, CheckpointManager,
-        // Multi-Agent Orchestration
-        AgentId, AgentRole, AgentStatus, Orchestrator, OrchestratorTask, WorkflowBuilder,
-        // Self-Healing System
-        SelfHealingSystem, ErrorCategory, CircuitState,
-        // Privacy Shield
-        PrivacyShield, PrivacyLevel, PiiType,
-        // Smart Caching
-        ResponseCache, CacheStats,
-        // Security Sandbox
-        SecuritySandbox, SecurityLevel, Capability,
-        // Real-time Streaming
-        StreamingResponse, StreamController, StreamToken, StreamState,
-        // Intelligent Task Planner
-        TaskPlanner, ExecutionPlan, Task, TaskId, Goal,
-        // Knowledge Graph
-        KnowledgeGraph, Entity, EntityId, Relationship, GraphQuery,
-        Error, Result,
-    };
     pub use crate::llm::*;
+    pub use crate::{
+        Agent,
+        AgentBuilder,
+        AgentConfig,
+        AgentConfigBuilder,
+        // Multi-Agent Orchestration
+        AgentId,
+        AgentMode,
+        AgentRole,
+        AgentState,
+        AgentStatus,
+        CacheStats,
+        Capability,
+        Checkpoint,
+        CheckpointConfig,
+        CheckpointId,
+        CheckpointManager,
+        CircuitState,
+        Context,
+        ContextManager,
+        Conversation,
+        ConversationId,
+        Entity,
+        EntityId,
+        Error,
+        ErrorCategory,
+        ExecutionPlan,
+        Goal,
+        GraphQuery,
+        // Knowledge Graph
+        KnowledgeGraph,
+        Memory,
+        MemoryEntry,
+        Orchestrator,
+        OrchestratorTask,
+        PiiType,
+        Plan,
+        PlanBuilder,
+        PlanStep,
+        PrivacyLevel,
+        // Privacy Shield
+        PrivacyShield,
+        Relationship,
+        // Smart Caching
+        ResponseCache,
+        Result,
+        SecurityLevel,
+        // Security Sandbox
+        SecuritySandbox,
+        // Self-Healing System
+        SelfHealingSystem,
+        StreamController,
+        StreamState,
+        StreamToken,
+        // Real-time Streaming
+        StreamingResponse,
+        Task,
+        TaskId,
+        // Intelligent Task Planner
+        TaskPlanner,
+        Turn,
+        WorkflowBuilder,
+    };
 }

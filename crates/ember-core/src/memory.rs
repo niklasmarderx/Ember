@@ -10,25 +10,25 @@ use uuid::Uuid;
 pub struct MemoryEntry {
     /// Unique identifier
     pub id: Uuid,
-    
+
     /// Entry content
     pub content: String,
-    
+
     /// Entry type/category
     pub entry_type: MemoryType,
-    
+
     /// When this memory was created
     pub created_at: DateTime<Utc>,
-    
+
     /// When this memory was last accessed
     pub last_accessed: DateTime<Utc>,
-    
+
     /// Importance score (0.0 - 1.0)
     pub importance: f32,
-    
+
     /// Associated metadata
     pub metadata: HashMap<String, String>,
-    
+
     /// Embedding vector for semantic search (optional)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub embedding: Option<Vec<f32>>,
@@ -112,10 +112,10 @@ pub enum MemoryType {
 pub struct Memory {
     /// All memory entries
     entries: HashMap<Uuid, MemoryEntry>,
-    
+
     /// Index by type
     by_type: HashMap<MemoryType, Vec<Uuid>>,
-    
+
     /// Maximum entries to keep
     max_entries: Option<usize>,
 }
@@ -139,17 +139,17 @@ impl Memory {
     pub fn add(&mut self, entry: MemoryEntry) -> Uuid {
         let id = entry.id;
         let entry_type = entry.entry_type;
-        
+
         self.entries.insert(id, entry);
         self.by_type.entry(entry_type).or_default().push(id);
-        
+
         // Enforce max entries if set
         if let Some(max) = self.max_entries {
             while self.entries.len() > max {
                 self.remove_least_important();
             }
         }
-        
+
         id
     }
 
@@ -179,11 +179,7 @@ impl Memory {
     pub fn get_by_type(&self, entry_type: MemoryType) -> Vec<&MemoryEntry> {
         self.by_type
             .get(&entry_type)
-            .map(|ids| {
-                ids.iter()
-                    .filter_map(|id| self.entries.get(id))
-                    .collect()
-            })
+            .map(|ids| ids.iter().filter_map(|id| self.entries.get(id)).collect())
             .unwrap_or_default()
     }
 
@@ -248,19 +244,19 @@ impl Memory {
 pub trait MemoryStore: Send + Sync {
     /// Save a memory entry.
     fn save(&self, entry: &MemoryEntry) -> crate::Result<()>;
-    
+
     /// Load a memory entry by ID.
     fn load(&self, id: &Uuid) -> crate::Result<Option<MemoryEntry>>;
-    
+
     /// Delete a memory entry.
     fn delete(&self, id: &Uuid) -> crate::Result<()>;
-    
+
     /// List all memory IDs.
     fn list_ids(&self) -> crate::Result<Vec<Uuid>>;
-    
+
     /// Search memories by content.
     fn search(&self, query: &str, limit: usize) -> crate::Result<Vec<MemoryEntry>>;
-    
+
     /// Search memories by embedding (semantic search).
     fn search_by_embedding(
         &self,
@@ -287,13 +283,13 @@ mod tests {
     #[test]
     fn test_memory_storage() {
         let mut memory = Memory::new();
-        
+
         let entry1 = MemoryEntry::fact("Fact 1").with_importance(0.5);
         let entry2 = MemoryEntry::preference("Preference 1").with_importance(0.9);
-        
+
         let id1 = memory.add(entry1);
         let id2 = memory.add(entry2);
-        
+
         assert_eq!(memory.len(), 2);
         assert!(memory.get(&id1).is_some());
         assert!(memory.get(&id2).is_some());
@@ -302,14 +298,14 @@ mod tests {
     #[test]
     fn test_memory_search() {
         let mut memory = Memory::new();
-        
+
         memory.add(MemoryEntry::fact("The user likes coffee"));
         memory.add(MemoryEntry::fact("The user dislikes tea"));
         memory.add(MemoryEntry::preference("Dark mode enabled"));
-        
+
         let results = memory.search("user");
         assert_eq!(results.len(), 2);
-        
+
         let results = memory.search("dark");
         assert_eq!(results.len(), 1);
     }
@@ -317,14 +313,14 @@ mod tests {
     #[test]
     fn test_memory_by_type() {
         let mut memory = Memory::new();
-        
+
         memory.add(MemoryEntry::fact("Fact 1"));
         memory.add(MemoryEntry::fact("Fact 2"));
         memory.add(MemoryEntry::preference("Pref 1"));
-        
+
         let facts = memory.get_by_type(MemoryType::Fact);
         assert_eq!(facts.len(), 2);
-        
+
         let prefs = memory.get_by_type(MemoryType::Preference);
         assert_eq!(prefs.len(), 1);
     }
@@ -332,14 +328,14 @@ mod tests {
     #[test]
     fn test_memory_max_entries() {
         let mut memory = Memory::with_max_entries(2);
-        
+
         memory.add(MemoryEntry::fact("Low importance").with_importance(0.1));
         memory.add(MemoryEntry::fact("High importance").with_importance(0.9));
         memory.add(MemoryEntry::fact("Medium importance").with_importance(0.5));
-        
+
         // Should have removed the least important
         assert_eq!(memory.len(), 2);
-        
+
         // Low importance should be gone
         let results = memory.search("Low importance");
         assert!(results.is_empty());
@@ -348,11 +344,11 @@ mod tests {
     #[test]
     fn test_most_important() {
         let mut memory = Memory::new();
-        
+
         memory.add(MemoryEntry::fact("Low").with_importance(0.1));
         memory.add(MemoryEntry::fact("High").with_importance(0.9));
         memory.add(MemoryEntry::fact("Medium").with_importance(0.5));
-        
+
         let top = memory.most_important(2);
         assert_eq!(top.len(), 2);
         assert!(top[0].content.contains("High"));

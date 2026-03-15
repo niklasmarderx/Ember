@@ -214,30 +214,32 @@ impl Plan {
     /// Format as a checklist (Markdown)
     pub fn to_checklist(&self) -> String {
         let mut output = format!("# Plan: {}\n\n", self.goal);
-        
+
         for step in &self.steps {
             let checkbox = if step.completed { "[x]" } else { "[ ]" };
-            let tool_info = step.tool.as_ref()
+            let tool_info = step
+                .tool
+                .as_ref()
                 .map(|t| format!(" (tool: {})", t))
                 .unwrap_or_default();
-            
+
             output.push_str(&format!(
                 "- {} Step {}: {}{}\n",
                 checkbox, step.number, step.description, tool_info
             ));
-            
+
             if let Some(notes) = &step.notes {
                 output.push_str(&format!("  - Notes: {}\n", notes));
             }
         }
-        
+
         output.push_str(&format!(
             "\nProgress: {:.0}% ({}/{})\n",
             self.completion_percentage(),
             self.steps.iter().filter(|s| s.completed).count(),
             self.steps.len()
         ));
-        
+
         output
     }
 }
@@ -273,9 +275,8 @@ impl PlanBuilder {
         tool: impl Into<String>,
     ) -> Self {
         let number = self.steps.len() + 1;
-        self.steps.push(
-            PlanStep::new(number, description).with_tool(tool)
-        );
+        self.steps
+            .push(PlanStep::new(number, description).with_tool(tool));
         self
     }
 
@@ -351,15 +352,13 @@ mod tests {
 
     #[test]
     fn test_plan_completion() {
-        let mut plan = Plan::new("Test")
-            .step("Step 1")
-            .step("Step 2");
+        let mut plan = Plan::new("Test").step("Step 1").step("Step 2");
 
         assert_eq!(plan.completion_percentage(), 0.0);
-        
+
         plan.complete_step(0).unwrap();
         assert_eq!(plan.completion_percentage(), 50.0);
-        
+
         plan.complete_step(1).unwrap();
         assert_eq!(plan.completion_percentage(), 100.0);
         assert!(plan.is_complete());

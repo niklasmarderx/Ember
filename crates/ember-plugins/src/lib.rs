@@ -82,46 +82,36 @@ pub mod hot_reload;
 
 // Re-exports
 pub use error::{PluginError, Result};
-pub use manifest::{
-    PluginCapabilities, PluginExport, PluginManifest, PluginParameter,
-};
-pub use runtime::{
-    LoadedPlugin, PluginInput, PluginOutput, PluginRuntime, RuntimeConfig,
-};
+pub use manifest::{PluginCapabilities, PluginExport, PluginManifest, PluginParameter};
+pub use runtime::{LoadedPlugin, PluginInput, PluginOutput, PluginRuntime, RuntimeConfig};
 
 #[cfg(feature = "marketplace")]
 pub use marketplace::{
-    MarketplaceClient, PluginCache, PluginRegistryEntry, PluginSearchQuery,
-    PluginSearchResults, CachedPluginInfo, CacheStats, FeaturedPlugins,
-    PluginAuthor, PluginSortField, SortOrder, TagInfo,
+    CacheStats, CachedPluginInfo, FeaturedPlugins, MarketplaceClient, PluginAuthor, PluginCache,
+    PluginRegistryEntry, PluginSearchQuery, PluginSearchResults, PluginSortField, SortOrder,
+    TagInfo,
 };
 
 #[cfg(feature = "hot-reload")]
 pub use hot_reload::{
-    HotReloadManager, HotReloadConfig, HotReloadEvent, HotReloadManagerBuilder,
-    WatchedPluginInfo,
+    HotReloadConfig, HotReloadEvent, HotReloadManager, HotReloadManagerBuilder, WatchedPluginInfo,
 };
 
 /// Prelude module for convenient imports.
 pub mod prelude {
     pub use crate::error::{PluginError, Result};
-    pub use crate::manifest::{
-        PluginCapabilities, PluginExport, PluginManifest, PluginParameter,
-    };
+    pub use crate::manifest::{PluginCapabilities, PluginExport, PluginManifest, PluginParameter};
     pub use crate::runtime::{
         LoadedPlugin, PluginInput, PluginOutput, PluginRuntime, RuntimeConfig,
     };
-    
+
     #[cfg(feature = "marketplace")]
     pub use crate::marketplace::{
-        MarketplaceClient, PluginCache, PluginRegistryEntry, PluginSearchQuery,
-        CachedPluginInfo,
+        CachedPluginInfo, MarketplaceClient, PluginCache, PluginRegistryEntry, PluginSearchQuery,
     };
-    
+
     #[cfg(feature = "hot-reload")]
-    pub use crate::hot_reload::{
-        HotReloadManager, HotReloadConfig, HotReloadEvent,
-    };
+    pub use crate::hot_reload::{HotReloadConfig, HotReloadEvent, HotReloadManager};
 }
 
 #[cfg(test)]

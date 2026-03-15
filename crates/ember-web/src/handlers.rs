@@ -375,7 +375,10 @@ pub async fn chat_stream(
         yield Ok(Event::default().data(serde_json::to_string(&end_event).unwrap_or_default()));
     };
 
-    Ok(Sse::new(Box::pin(stream) as Pin<Box<dyn Stream<Item = std::result::Result<Event, Infallible>> + Send>>))
+    Ok(Sse::new(Box::pin(stream)
+        as Pin<
+            Box<dyn Stream<Item = std::result::Result<Event, Infallible>> + Send>,
+        >))
 }
 
 // =============================================================================

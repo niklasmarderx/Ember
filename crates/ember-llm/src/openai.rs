@@ -8,8 +8,8 @@ use tracing::{debug, instrument};
 
 use crate::{
     provider::StreamResponse, CompletionRequest, CompletionResponse, ContentPart, Error,
-    FinishReason, ImageSource, LLMProvider, ModelInfo, Result, StreamChunk, TokenUsage,
-    ToolCall, ToolCallDelta,
+    FinishReason, ImageSource, LLMProvider, ModelInfo, Result, StreamChunk, TokenUsage, ToolCall,
+    ToolCallDelta,
 };
 
 use tokio_stream::wrappers::ReceiverStream;
@@ -103,11 +103,7 @@ impl LLMProvider for OpenAIProvider {
 
         debug!("Sending request to OpenAI");
 
-        let response = self
-            .build_request()
-            .json(&openai_request)
-            .send()
-            .await?;
+        let response = self.build_request().json(&openai_request).send().await?;
 
         let status = response.status();
 
@@ -139,15 +135,13 @@ impl LLMProvider for OpenAIProvider {
     async fn complete_stream(&self, request: CompletionRequest) -> Result<StreamResponse> {
         let mut openai_request = OpenAIRequest::from(request);
         openai_request.stream = Some(true);
-        openai_request.stream_options = Some(StreamOptions { include_usage: true });
+        openai_request.stream_options = Some(StreamOptions {
+            include_usage: true,
+        });
 
         debug!("Starting streaming request to OpenAI");
 
-        let response = self
-            .build_request()
-            .json(&openai_request)
-            .send()
-            .await?;
+        let response = self.build_request().json(&openai_request).send().await?;
 
         let status = response.status();
 
@@ -193,35 +187,51 @@ impl LLMProvider for OpenAIProvider {
                     for line in event.lines() {
                         if let Some(data) = line.strip_prefix("data: ") {
                             if data == "[DONE]" {
-                                let _ = tx.send(Ok(StreamChunk {
-                                    content: None,
-                                    tool_calls: None,
-                                    done: true,
-                                    finish_reason: Some(FinishReason::Stop),
-                                })).await;
+                                let _ = tx
+                                    .send(Ok(StreamChunk {
+                                        content: None,
+                                        tool_calls: None,
+                                        done: true,
+                                        finish_reason: Some(FinishReason::Stop),
+                                    }))
+                                    .await;
                                 return;
                             }
 
-                            if let Ok(chunk_response) = serde_json::from_str::<OpenAIStreamResponse>(data) {
+                            if let Ok(chunk_response) =
+                                serde_json::from_str::<OpenAIStreamResponse>(data)
+                            {
                                 if let Some(choice) = chunk_response.choices.first() {
                                     let stream_chunk = StreamChunk {
                                         content: choice.delta.content.clone(),
                                         tool_calls: choice.delta.tool_calls.as_ref().map(|tcs| {
-                                            tcs.iter().map(|tc| ToolCallDelta {
-                                                index: tc.index,
-                                                id: tc.id.clone(),
-                                                name: tc.function.as_ref().and_then(|f| f.name.clone()),
-                                                arguments: tc.function.as_ref().and_then(|f| f.arguments.clone()),
-                                            }).collect()
+                                            tcs.iter()
+                                                .map(|tc| ToolCallDelta {
+                                                    index: tc.index,
+                                                    id: tc.id.clone(),
+                                                    name: tc
+                                                        .function
+                                                        .as_ref()
+                                                        .and_then(|f| f.name.clone()),
+                                                    arguments: tc
+                                                        .function
+                                                        .as_ref()
+                                                        .and_then(|f| f.arguments.clone()),
+                                                })
+                                                .collect()
                                         }),
                                         done: choice.finish_reason.is_some(),
-                                        finish_reason: choice.finish_reason.as_ref().and_then(|r| match r.as_str() {
-                                            "stop" => Some(FinishReason::Stop),
-                                            "length" => Some(FinishReason::Length),
-                                            "tool_calls" => Some(FinishReason::ToolCalls),
-                                            "content_filter" => Some(FinishReason::ContentFilter),
-                                            _ => None,
-                                        }),
+                                        finish_reason: choice.finish_reason.as_ref().and_then(
+                                            |r| match r.as_str() {
+                                                "stop" => Some(FinishReason::Stop),
+                                                "length" => Some(FinishReason::Length),
+                                                "tool_calls" => Some(FinishReason::ToolCalls),
+                                                "content_filter" => {
+                                                    Some(FinishReason::ContentFilter)
+                                                }
+                                                _ => None,
+                                            },
+                                        ),
                                     };
 
                                     if tx.send(Ok(stream_chunk)).await.is_err() {
@@ -476,9 +486,7 @@ struct OpenAIModel {
 /// Convert Ember ContentPart to OpenAI ContentPart
 fn convert_content_part(part: &ContentPart) -> OpenAIContentPart {
     match part {
-        ContentPart::Text { text } => OpenAIContentPart::Text {
-            text: text.clone(),
-        },
+        ContentPart::Text { text } => OpenAIContentPart::Text { text: text.clone() },
         ContentPart::Image { source, .. } => {
             let url = match source {
                 ImageSource::Base64 { media_type, data } => {
@@ -510,10 +518,7 @@ impl From<CompletionRequest> for OpenAIRequest {
                         OpenAIContent::Text(m.content)
                     } else {
                         OpenAIContent::Parts(
-                            m.content_parts
-                                .iter()
-                                .map(convert_content_part)
-                                .collect(),
+                            m.content_parts.iter().map(convert_content_part).collect(),
                         )
                     };
 

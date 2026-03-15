@@ -8,7 +8,7 @@
 //! - Streaming throughput
 //! - Concurrent request handling
 
-use criterion::{black_box, criterion_group, criterion_main, Criterion, BenchmarkId};
+use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
 use ember_llm::{CompletionRequest, LLMProvider, Message, OllamaProvider};
 use std::time::Duration;
 use tokio::runtime::Runtime;
@@ -29,8 +29,7 @@ fn bench_provider_creation(c: &mut Criterion) {
 fn bench_request_building(c: &mut Criterion) {
     c.bench_function("request_building_simple", |b| {
         b.iter(|| {
-            let request = CompletionRequest::new("llama3.2")
-                .with_message(Message::user("Hello"));
+            let request = CompletionRequest::new("llama3.2").with_message(Message::user("Hello"));
             black_box(request)
         })
     });
@@ -52,23 +51,17 @@ fn bench_request_building(c: &mut Criterion) {
 /// Benchmark message creation
 fn bench_message_creation(c: &mut Criterion) {
     let mut group = c.benchmark_group("message_creation");
-    
+
     group.bench_function("user_message", |b| {
-        b.iter(|| {
-            black_box(Message::user("Hello, world!"))
-        })
+        b.iter(|| black_box(Message::user("Hello, world!")))
     });
 
     group.bench_function("system_message", |b| {
-        b.iter(|| {
-            black_box(Message::system("You are a helpful assistant."))
-        })
+        b.iter(|| black_box(Message::system("You are a helpful assistant.")))
     });
 
     group.bench_function("assistant_message", |b| {
-        b.iter(|| {
-            black_box(Message::assistant("I can help with that."))
-        })
+        b.iter(|| black_box(Message::assistant("I can help with that.")))
     });
 
     group.finish();
@@ -77,7 +70,7 @@ fn bench_message_creation(c: &mut Criterion) {
 /// Benchmark conversation building with varying sizes
 fn bench_conversation_sizes(c: &mut Criterion) {
     let mut group = c.benchmark_group("conversation_sizes");
-    
+
     for size in [1, 5, 10, 50, 100].iter() {
         group.bench_with_input(BenchmarkId::from_parameter(size), size, |b, &size| {
             b.iter(|| {
@@ -86,14 +79,15 @@ fn bench_conversation_sizes(c: &mut Criterion) {
                     if i % 2 == 0 {
                         request = request.with_message(Message::user(&format!("Message {}", i)));
                     } else {
-                        request = request.with_message(Message::assistant(&format!("Response {}", i)));
+                        request =
+                            request.with_message(Message::assistant(&format!("Response {}", i)));
                     }
                 }
                 black_box(request)
             })
         });
     }
-    
+
     group.finish();
 }
 
@@ -119,7 +113,7 @@ fn bench_serialization(c: &mut Criterion) {
 /// Benchmark actual LLM completion (requires Ollama)
 fn bench_llm_completion(c: &mut Criterion) {
     let rt = Runtime::new().unwrap();
-    
+
     let provider = OllamaProvider::new()
         .with_base_url("http://localhost:11434")
         .with_default_model("llama3.2");

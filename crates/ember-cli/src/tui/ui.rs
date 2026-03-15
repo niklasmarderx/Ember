@@ -16,9 +16,9 @@ pub fn render(frame: &mut Frame, app: &App) {
         .direction(Direction::Vertical)
         .margin(1)
         .constraints([
-            Constraint::Min(5),      // Chat history
-            Constraint::Length(3),   // Input
-            Constraint::Length(1),   // Status bar
+            Constraint::Min(5),    // Chat history
+            Constraint::Length(3), // Input
+            Constraint::Length(1), // Status bar
         ])
         .split(frame.size());
 
@@ -45,19 +45,22 @@ fn render_chat(frame: &mut Frame, app: &App, area: Rect) {
             };
 
             let role_prefix = if msg.role == "user" { "You" } else { "Ember" };
-            
+
             // Wrap long messages
             let content = textwrap::wrap(&msg.content, area.width.saturating_sub(10) as usize);
             let mut lines: Vec<Line> = Vec::new();
-            
+
             // First line with role
             if let Some(first) = content.first() {
                 lines.push(Line::from(vec![
-                    Span::styled(format!("{}: ", role_prefix), style.add_modifier(Modifier::BOLD)),
+                    Span::styled(
+                        format!("{}: ", role_prefix),
+                        style.add_modifier(Modifier::BOLD),
+                    ),
                     Span::raw(first.to_string()),
                 ]));
             }
-            
+
             // Remaining lines indented
             for line in content.iter().skip(1) {
                 lines.push(Line::from(vec![
@@ -68,12 +71,10 @@ fn render_chat(frame: &mut Frame, app: &App, area: Rect) {
 
             // Add token count if available
             if let Some(tokens) = msg.tokens {
-                lines.push(Line::from(vec![
-                    Span::styled(
-                        format!("      [{} tokens]", tokens),
-                        Style::default().fg(Color::DarkGray),
-                    ),
-                ]));
+                lines.push(Line::from(vec![Span::styled(
+                    format!("      [{} tokens]", tokens),
+                    Style::default().fg(Color::DarkGray),
+                )]));
             }
 
             lines.push(Line::from("")); // Spacing
@@ -83,14 +84,10 @@ fn render_chat(frame: &mut Frame, app: &App, area: Rect) {
         .collect();
 
     let chat = List::new(messages)
-        .block(
-            Block::default()
-                .borders(Borders::ALL)
-                .title(Span::styled(
-                    " Chat ",
-                    Style::default().add_modifier(Modifier::BOLD),
-                )),
-        )
+        .block(Block::default().borders(Borders::ALL).title(Span::styled(
+            " Chat ",
+            Style::default().add_modifier(Modifier::BOLD),
+        )))
         .style(Style::default().fg(Color::White));
 
     frame.render_widget(chat, area);
@@ -103,8 +100,12 @@ fn render_input(frame: &mut Frame, app: &App, area: Rect) {
         _ => Style::default().fg(Color::White),
     };
 
-    let cursor_char = if matches!(app.state, AppState::Input) { "_" } else { "" };
-    
+    let cursor_char = if matches!(app.state, AppState::Input) {
+        "_"
+    } else {
+        ""
+    };
+
     let input_text = if app.input.is_empty() && !matches!(app.state, AppState::Waiting) {
         "Type your message... (Enter to send, Esc to quit)".to_string()
     } else {
@@ -113,14 +114,10 @@ fn render_input(frame: &mut Frame, app: &App, area: Rect) {
 
     let input = Paragraph::new(input_text)
         .style(input_style)
-        .block(
-            Block::default()
-                .borders(Borders::ALL)
-                .title(Span::styled(
-                    " Input ",
-                    Style::default().add_modifier(Modifier::BOLD),
-                )),
-        )
+        .block(Block::default().borders(Borders::ALL).title(Span::styled(
+            " Input ",
+            Style::default().add_modifier(Modifier::BOLD),
+        )))
         .wrap(Wrap { trim: false });
 
     frame.render_widget(input, area);
@@ -145,10 +142,7 @@ fn render_status_bar(frame: &mut Frame, app: &App, area: Rect) {
     };
 
     let status_parts = vec![
-        Span::styled(
-            format!(" {} ", app.status),
-            status_style,
-        ),
+        Span::styled(format!(" {} ", app.status), status_style),
         Span::raw(" | "),
         Span::styled(
             format!("Model: {} ", app.model),
@@ -160,14 +154,11 @@ fn render_status_bar(frame: &mut Frame, app: &App, area: Rect) {
             Style::default().fg(Color::Magenta),
         ),
         Span::raw(" | "),
-        Span::styled(
-            "Ctrl+H: Help ",
-            Style::default().fg(Color::DarkGray),
-        ),
+        Span::styled("Ctrl+H: Help ", Style::default().fg(Color::DarkGray)),
     ];
 
-    let status = Paragraph::new(Line::from(status_parts))
-        .style(Style::default().bg(Color::DarkGray));
+    let status =
+        Paragraph::new(Line::from(status_parts)).style(Style::default().bg(Color::DarkGray));
 
     frame.render_widget(status, area);
 }

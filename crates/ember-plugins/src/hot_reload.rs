@@ -7,13 +7,13 @@
 
 use crate::error::{PluginError, Result};
 use crate::manifest::PluginManifest;
-use crate::runtime::{PluginRuntime, LoadedPlugin};
+use crate::runtime::{LoadedPlugin, PluginRuntime};
 use notify::{Config, Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Duration;
-use tokio::sync::{mpsc, RwLock, broadcast};
+use tokio::sync::{broadcast, mpsc, RwLock};
 use tracing::{debug, error, info, warn};
 
 /// Events emitted by the hot-reload system.
@@ -123,7 +123,7 @@ impl HotReloadManager {
     pub fn new(runtime: Arc<PluginRuntime>, config: HotReloadConfig) -> Result<Self> {
         let (event_tx, event_rx) = mpsc::channel(100);
         let (broadcast_tx, _) = broadcast::channel(100);
-        
+
         Ok(Self {
             config,
             runtime,
@@ -135,12 +135,12 @@ impl HotReloadManager {
             shutdown: Arc::new(RwLock::new(false)),
         })
     }
-    
+
     /// Subscribe to hot-reload events.
     pub fn subscribe(&self) -> broadcast::Receiver<HotReloadEvent> {
         self.broadcast_tx.subscribe()
     }
-    
+
     /// Start watching a directory for plugin changes.
     pub async fn watch_directory(&mut self, path: &Path) -> Result<()> {
         if !path.exists() {
@@ -149,17 +149,18 @@ impl HotReloadManager {
                 path.display()
             )));
         }
-        
+
         if !path.is_dir() {
             return Err(PluginError::Internal(format!(
                 "Path is not a directory: {}",
                 path.display()
             )));
         }
-        
-        let canonical = path.canonicalize()
+
+        let canonical = path
+            .canonicalize()
             .map_err(|e| PluginError::Internal(e.to_string()))?;
-        
+
         // Check if already watching
         {
             let dirs = self.watched_dirs.read().await;
@@ -168,21 +169,21 @@ impl HotReloadManager {
                 return Ok(());
             }
         }
-        
+
         // Scan directory for existing plugins
         let watched_dir = self.scan_directory(&canonical).await?;
-        
+
         // Add to watched directories
         {
             let mut dirs = self.watched_dirs.write().await;
             dirs.insert(canonical.clone(), watched_dir);
         }
-        
+
         // Initialize watcher if not already done
         if self.watcher.is_none() {
             self.init_watcher()?;
         }
-        
+
         // Add path to watcher
         if let Some(watcher) = &mut self.watcher {
             let mode = if self.config.recursive {
@@ -190,38 +191,41 @@ impl HotReloadManager {
             } else {
                 RecursiveMode::NonRecursive
             };
-            
-            watcher.watch(&canonical, mode)
+
+            watcher
+                .watch(&canonical, mode)
                 .map_err(|e| PluginError::Internal(format!("Failed to watch directory: {}", e)))?;
         }
-        
+
         info!(path = %canonical.display(), "Started watching directory for plugins");
-        
+
         Ok(())
     }
-    
+
     /// Stop watching a directory.
     pub async fn unwatch_directory(&mut self, path: &Path) -> Result<()> {
-        let canonical = path.canonicalize()
+        let canonical = path
+            .canonicalize()
             .map_err(|e| PluginError::Internal(e.to_string()))?;
-        
+
         // Remove from watcher
         if let Some(watcher) = &mut self.watcher {
-            watcher.unwatch(&canonical)
-                .map_err(|e| PluginError::Internal(format!("Failed to unwatch directory: {}", e)))?;
+            watcher.unwatch(&canonical).map_err(|e| {
+                PluginError::Internal(format!("Failed to unwatch directory: {}", e))
+            })?;
         }
-        
+
         // Remove from watched directories
         {
             let mut dirs = self.watched_dirs.write().await;
             dirs.remove(&canonical);
         }
-        
+
         info!(path = %canonical.display(), "Stopped watching directory");
-        
+
         Ok(())
     }
-    
+
     /// Start the hot-reload event loop.
     pub async fn start(&self) {
         let event_rx = self.event_rx.clone();
@@ -230,20 +234,20 @@ impl HotReloadManager {
         let broadcast_tx = self.broadcast_tx.clone();
         let config = self.config.clone();
         let shutdown = self.shutdown.clone();
-        
+
         tokio::spawn(async move {
             let mut pending_changes: HashMap<PathBuf, std::time::Instant> = HashMap::new();
-            
+
             loop {
                 // Check shutdown
                 if *shutdown.read().await {
                     break;
                 }
-                
+
                 // Process pending changes (debounce)
                 let now = std::time::Instant::now();
                 let mut to_process = Vec::new();
-                
+
                 pending_changes.retain(|path, time| {
                     if now.duration_since(*time) >= config.debounce {
                         to_process.push(path.clone());
@@ -252,19 +256,15 @@ impl HotReloadManager {
                         true
                     }
                 });
-                
+
                 // Process debounced changes
                 for path in to_process {
                     if config.auto_reload {
-                        Self::handle_file_change(
-                            &path,
-                            &watched_dirs,
-                            &runtime,
-                            &broadcast_tx,
-                        ).await;
+                        Self::handle_file_change(&path, &watched_dirs, &runtime, &broadcast_tx)
+                            .await;
                     }
                 }
-                
+
                 // Try to receive new events
                 let mut rx = event_rx.write().await;
                 match tokio::time::timeout(Duration::from_millis(100), rx.recv()).await {
@@ -297,24 +297,24 @@ impl HotReloadManager {
                     }
                 }
             }
-            
+
             info!("Hot-reload event loop stopped");
         });
-        
+
         info!("Hot-reload manager started");
     }
-    
+
     /// Stop the hot-reload manager.
     pub async fn stop(&self) {
         let mut shutdown = self.shutdown.write().await;
         *shutdown = true;
         info!("Hot-reload manager stopping");
     }
-    
+
     /// Manually trigger a reload for a specific plugin.
     pub async fn reload_plugin(&self, name: &str) -> Result<()> {
         let dirs = self.watched_dirs.read().await;
-        
+
         for watched_dir in dirs.values() {
             if let Some(plugin) = watched_dir.plugins.get(name) {
                 // Load manifest
@@ -323,33 +323,35 @@ impl HotReloadManager {
                 } else {
                     PluginManifest::new(name, "0.0.0", "Auto-detected plugin")
                 };
-                
+
                 // Unload existing plugin if loaded
                 if self.runtime.is_loaded(name).await {
                     self.runtime.unload_plugin(name).await?;
                 }
-                
+
                 // Reload plugin
-                self.runtime.load_plugin(&plugin.wasm_path, manifest).await?;
-                
+                self.runtime
+                    .load_plugin(&plugin.wasm_path, manifest)
+                    .await?;
+
                 let _ = self.broadcast_tx.send(HotReloadEvent::PluginReloaded {
                     name: name.to_string(),
                     version: "unknown".to_string(),
                 });
-                
+
                 info!(name = %name, "Plugin manually reloaded");
                 return Ok(());
             }
         }
-        
+
         Err(PluginError::NotFound(name.to_string()))
     }
-    
+
     /// Get list of watched plugins.
     pub async fn list_watched(&self) -> Vec<WatchedPluginInfo> {
         let dirs = self.watched_dirs.read().await;
         let mut result = Vec::new();
-        
+
         for watched_dir in dirs.values() {
             for plugin in watched_dir.plugins.values() {
                 result.push(WatchedPluginInfo {
@@ -360,34 +362,35 @@ impl HotReloadManager {
                 });
             }
         }
-        
+
         result
     }
-    
+
     /// Initialize the file system watcher.
     fn init_watcher(&mut self) -> Result<()> {
         let tx = self.event_tx.clone();
-        
+
         let watcher = RecommendedWatcher::new(
             move |res| {
                 let _ = tx.blocking_send(res);
             },
             Config::default(),
-        ).map_err(|e| PluginError::Internal(format!("Failed to create watcher: {}", e)))?;
-        
+        )
+        .map_err(|e| PluginError::Internal(format!("Failed to create watcher: {}", e)))?;
+
         self.watcher = Some(watcher);
-        
+
         Ok(())
     }
-    
+
     /// Scan a directory for plugins.
     async fn scan_directory(&self, path: &Path) -> Result<WatchedDirectory> {
         let mut plugins = HashMap::new();
         let mut entries = tokio::fs::read_dir(path).await?;
-        
+
         while let Some(entry) = entries.next_entry().await? {
             let entry_path = entry.path();
-            
+
             if entry_path.is_file() {
                 if let Some(ext) = entry_path.extension() {
                     if ext == "wasm" {
@@ -397,22 +400,27 @@ impl HotReloadManager {
                             .and_then(|s| s.to_str())
                             .map(|s| s.to_string())
                             .unwrap_or_else(|| "unknown".to_string());
-                        
+
                         // Look for corresponding manifest
                         let manifest_path = entry_path.with_extension("json");
                         let manifest_exists = manifest_path.exists();
-                        
+
                         let metadata = tokio::fs::metadata(&entry_path).await?;
-                        let last_modified = metadata.modified()
+                        let last_modified = metadata
+                            .modified()
                             .unwrap_or(std::time::SystemTime::UNIX_EPOCH);
-                        
+
                         let watched_plugin = WatchedPlugin {
                             name: name.clone(),
                             wasm_path: entry_path,
-                            manifest_path: if manifest_exists { Some(manifest_path) } else { None },
+                            manifest_path: if manifest_exists {
+                                Some(manifest_path)
+                            } else {
+                                None
+                            },
                             last_modified,
                         };
-                        
+
                         plugins.insert(name, watched_plugin);
                     }
                 }
@@ -425,13 +433,13 @@ impl HotReloadManager {
                 }
             }
         }
-        
+
         Ok(WatchedDirectory {
             path: path.to_path_buf(),
             plugins,
         })
     }
-    
+
     /// Handle a file change event.
     async fn handle_file_change(
         path: &Path,
@@ -444,13 +452,13 @@ impl HotReloadManager {
             .file_stem()
             .and_then(|s| s.to_str())
             .map(|s| s.to_string());
-        
+
         let Some(name) = plugin_name else {
             return;
         };
-        
+
         let extension = path.extension().and_then(|s| s.to_str());
-        
+
         match extension {
             Some("wasm") => {
                 // WASM file changed
@@ -461,15 +469,15 @@ impl HotReloadManager {
                             error!(name = %name, error = %e, "Failed to unload removed plugin");
                         }
                     }
-                    
+
                     let _ = broadcast_tx.send(HotReloadEvent::PluginRemoved { name: name.clone() });
-                    
+
                     // Remove from watched plugins
                     let mut dirs = watched_dirs.write().await;
                     for dir in dirs.values_mut() {
                         dir.plugins.remove(&name);
                     }
-                    
+
                     info!(name = %name, "Plugin removed");
                 } else {
                     // Plugin was modified or added
@@ -477,7 +485,7 @@ impl HotReloadManager {
                         name: name.clone(),
                         path: path.to_path_buf(),
                     });
-                    
+
                     // Try to load manifest
                     let manifest_path = path.with_extension("json");
                     let manifest = if manifest_path.exists() {
@@ -491,7 +499,7 @@ impl HotReloadManager {
                     } else {
                         PluginManifest::new(&name, "0.0.0", "Auto-detected plugin")
                     };
-                    
+
                     // Unload if already loaded
                     if runtime.is_loaded(&name).await {
                         if let Err(e) = runtime.unload_plugin(&name).await {
@@ -503,7 +511,7 @@ impl HotReloadManager {
                             return;
                         }
                     }
-                    
+
                     // Load the plugin
                     match runtime.load_plugin(path, manifest.clone()).await {
                         Ok(()) => {
@@ -533,13 +541,14 @@ impl HotReloadManager {
                         watched_dirs,
                         runtime,
                         broadcast_tx,
-                    )).await;
+                    ))
+                    .await;
                 }
             }
             _ => {}
         }
     }
-    
+
     /// Load a plugin manifest from file.
     async fn load_manifest(path: &Path) -> Result<PluginManifest> {
         let content = tokio::fs::read_to_string(path).await?;
@@ -576,45 +585,45 @@ impl HotReloadManagerBuilder {
             watch_dirs: Vec::new(),
         }
     }
-    
+
     /// Set the debounce duration.
     pub fn debounce(mut self, duration: Duration) -> Self {
         self.config.debounce = duration;
         self
     }
-    
+
     /// Enable or disable auto-reload.
     pub fn auto_reload(mut self, enabled: bool) -> Self {
         self.config.auto_reload = enabled;
         self
     }
-    
+
     /// Enable or disable recursive watching.
     pub fn recursive(mut self, enabled: bool) -> Self {
         self.config.recursive = enabled;
         self
     }
-    
+
     /// Set file extensions to watch.
     pub fn watch_extensions(mut self, extensions: Vec<String>) -> Self {
         self.config.watch_extensions = extensions;
         self
     }
-    
+
     /// Add a directory to watch.
     pub fn watch_dir(mut self, path: PathBuf) -> Self {
         self.watch_dirs.push(path);
         self
     }
-    
+
     /// Build the hot-reload manager.
     pub async fn build(self, runtime: Arc<PluginRuntime>) -> Result<HotReloadManager> {
         let mut manager = HotReloadManager::new(runtime, self.config)?;
-        
+
         for dir in self.watch_dirs {
             manager.watch_directory(&dir).await?;
         }
-        
+
         Ok(manager)
     }
 }
@@ -630,7 +639,7 @@ mod tests {
     use super::*;
     use crate::runtime::RuntimeConfig;
     use tempfile::tempdir;
-    
+
     #[tokio::test]
     async fn test_hot_reload_config_default() {
         let config = HotReloadConfig::default();
@@ -638,45 +647,47 @@ mod tests {
         assert!(config.recursive);
         assert!(config.watch_extensions.contains(&"wasm".to_string()));
     }
-    
+
     #[tokio::test]
     async fn test_hot_reload_manager_creation() {
         let runtime = Arc::new(PluginRuntime::new(RuntimeConfig::default()).unwrap());
         let config = HotReloadConfig::default();
         let manager = HotReloadManager::new(runtime, config);
-        
+
         assert!(manager.is_ok());
     }
-    
+
     #[tokio::test]
     async fn test_watch_nonexistent_directory() {
         let runtime = Arc::new(PluginRuntime::new(RuntimeConfig::default()).unwrap());
         let config = HotReloadConfig::default();
         let mut manager = HotReloadManager::new(runtime, config).unwrap();
-        
-        let result = manager.watch_directory(Path::new("/nonexistent/path")).await;
+
+        let result = manager
+            .watch_directory(Path::new("/nonexistent/path"))
+            .await;
         assert!(result.is_err());
     }
-    
+
     #[tokio::test]
     async fn test_watch_directory() {
         let temp_dir = tempdir().unwrap();
         let runtime = Arc::new(PluginRuntime::new(RuntimeConfig::default()).unwrap());
         let config = HotReloadConfig::default();
         let mut manager = HotReloadManager::new(runtime, config).unwrap();
-        
+
         let result = manager.watch_directory(temp_dir.path()).await;
         assert!(result.is_ok());
-        
+
         let watched = manager.list_watched().await;
         assert!(watched.is_empty()); // No plugins in empty dir
     }
-    
+
     #[tokio::test]
     async fn test_builder_pattern() {
         let temp_dir = tempdir().unwrap();
         let runtime = Arc::new(PluginRuntime::new(RuntimeConfig::default()).unwrap());
-        
+
         let manager = HotReloadManagerBuilder::new()
             .debounce(Duration::from_millis(100))
             .auto_reload(true)
@@ -684,7 +695,7 @@ mod tests {
             .watch_dir(temp_dir.path().to_path_buf())
             .build(runtime)
             .await;
-        
+
         assert!(manager.is_ok());
     }
 }

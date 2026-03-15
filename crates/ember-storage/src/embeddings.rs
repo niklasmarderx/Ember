@@ -57,7 +57,7 @@ impl Default for EmbedderConfig {
 }
 
 /// Simple local embedding using TF-IDF-like approach.
-/// 
+///
 /// This is a lightweight embedding solution that doesn't require
 /// external APIs or heavy ML models. It uses character n-grams
 /// and term frequency to create sparse-dense hybrid embeddings.
@@ -290,7 +290,7 @@ mod tests {
         let embedding = embedder.embed("Hello, world!").await.unwrap();
 
         assert_eq!(embedding.len(), 384);
-        
+
         // Check normalization
         let magnitude: f32 = embedding.iter().map(|x| x * x).sum::<f32>().sqrt();
         assert!((magnitude - 1.0).abs() < 0.01);
@@ -299,10 +299,13 @@ mod tests {
     #[tokio::test]
     async fn test_similar_texts() {
         let embedder = LocalEmbedder::new();
-        
+
         let e1 = embedder.embed("The quick brown fox").await.unwrap();
         let e2 = embedder.embed("The quick brown dog").await.unwrap();
-        let e3 = embedder.embed("Completely different text about programming").await.unwrap();
+        let e3 = embedder
+            .embed("Completely different text about programming")
+            .await
+            .unwrap();
 
         let sim_12 = cosine_similarity(&e1, &e2);
         let sim_13 = cosine_similarity(&e1, &e3);

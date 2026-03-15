@@ -4,9 +4,8 @@
 //! without making real API calls.
 
 use crate::{
-    CompletionRequest, CompletionResponse, LLMProvider, Message, ModelInfo,
-    StreamChunk, ToolCall,
     error::{Error, Result},
+    CompletionRequest, CompletionResponse, LLMProvider, Message, ModelInfo, StreamChunk, ToolCall,
 };
 use async_trait::async_trait;
 use futures::stream::{self, BoxStream, StreamExt};
@@ -134,7 +133,7 @@ impl MockProvider {
     /// Get the next response or a default.
     fn next_response(&self) -> MockResponse {
         let mut responses = self.responses.lock().unwrap();
-        
+
         // Find first unused response
         for response in responses.iter_mut() {
             if !response.used {
@@ -188,7 +187,11 @@ impl LLMProvider for MockProvider {
 
         Ok(CompletionResponse {
             content: response.content,
-            model: if request.model.is_empty() { self.default_model.clone() } else { request.model.clone() },
+            model: if request.model.is_empty() {
+                self.default_model.clone()
+            } else {
+                request.model.clone()
+            },
             tool_calls: response.tool_calls,
             usage: crate::TokenUsage::default(),
             finish_reason: Some(crate::FinishReason::Stop),
@@ -217,23 +220,30 @@ impl LLMProvider for MockProvider {
         }
 
         // Split content into chunks for streaming simulation
-        let words: Vec<String> = response.content
+        let words: Vec<String> = response
+            .content
             .split_whitespace()
             .map(|s| format!("{} ", s))
             .collect();
 
         // Convert tool calls to deltas for the first chunk
-        let tool_call_deltas: Option<Vec<crate::ToolCallDelta>> = if response.tool_calls.is_empty() {
+        let tool_call_deltas: Option<Vec<crate::ToolCallDelta>> = if response.tool_calls.is_empty()
+        {
             None
         } else {
-            Some(response.tool_calls.iter().enumerate().map(|(i, tc)| {
-                crate::ToolCallDelta {
-                    index: i,
-                    id: Some(tc.id.clone()),
-                    name: Some(tc.name.clone()),
-                    arguments: Some(tc.arguments.to_string()),
-                }
-            }).collect())
+            Some(
+                response
+                    .tool_calls
+                    .iter()
+                    .enumerate()
+                    .map(|(i, tc)| crate::ToolCallDelta {
+                        index: i,
+                        id: Some(tc.id.clone()),
+                        name: Some(tc.name.clone()),
+                        arguments: Some(tc.arguments.to_string()),
+                    })
+                    .collect(),
+            )
         };
 
         let chunks: Vec<Result<StreamChunk>> = words
@@ -242,7 +252,11 @@ impl LLMProvider for MockProvider {
             .map(|(i, word)| {
                 Ok(StreamChunk {
                     content: Some(word),
-                    tool_calls: if i == 0 { tool_call_deltas.clone() } else { None },
+                    tool_calls: if i == 0 {
+                        tool_call_deltas.clone()
+                    } else {
+                        None
+                    },
                     done: false,
                     finish_reason: None,
                 })
@@ -285,8 +299,7 @@ mod tests {
         let provider = MockProvider::new();
         provider.queue_response("Hello, world!");
 
-        let request = CompletionRequest::new("test-model")
-            .with_message(Message::user("Hi"));
+        let request = CompletionRequest::new("test-model").with_message(Message::user("Hi"));
 
         let response = provider.complete(request).await.unwrap();
         assert_eq!(response.content, "Hello, world!");
@@ -364,8 +377,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_mock_provider_delay() {
-        let provider = MockProvider::new()
-            .with_delay(Duration::from_millis(100));
+        let provider = MockProvider::new().with_delay(Duration::from_millis(100));
         provider.queue_response("Delayed response");
 
         let start = std::time::Instant::now();
@@ -382,10 +394,10 @@ mod tests {
         provider.queue_response("Response 1");
         provider.queue_response("Response 2");
 
-        let request1 = CompletionRequest::new("model-a")
-            .with_message(Message::user("First question"));
-        let request2 = CompletionRequest::new("model-b")
-            .with_message(Message::user("Second question"));
+        let request1 =
+            CompletionRequest::new("model-a").with_message(Message::user("First question"));
+        let request2 =
+            CompletionRequest::new("model-b").with_message(Message::user("Second question"));
 
         let _ = provider.complete(request1).await;
         let _ = provider.complete(request2).await;

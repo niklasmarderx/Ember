@@ -318,11 +318,7 @@ impl VectorMemory {
         let key = format!("type:{}", doc_type);
         self.metadata_index
             .get(&key)
-            .map(|ids| {
-                ids.iter()
-                    .filter_map(|id| self.documents.get(id))
-                    .collect()
-            })
+            .map(|ids| ids.iter().filter_map(|id| self.documents.get(id)).collect())
             .unwrap_or_default()
     }
 
@@ -397,11 +393,23 @@ mod tests {
     async fn test_search() {
         let mut memory = VectorMemory::new();
 
-        memory.add_text("Rust is a systems programming language", None).await.unwrap();
-        memory.add_text("Python is great for data science", None).await.unwrap();
-        memory.add_text("JavaScript runs in the browser", None).await.unwrap();
+        memory
+            .add_text("Rust is a systems programming language", None)
+            .await
+            .unwrap();
+        memory
+            .add_text("Python is great for data science", None)
+            .await
+            .unwrap();
+        memory
+            .add_text("JavaScript runs in the browser", None)
+            .await
+            .unwrap();
 
-        let results = memory.search("programming languages like Rust", 2).await.unwrap();
+        let results = memory
+            .search("programming languages like Rust", 2)
+            .await
+            .unwrap();
 
         assert!(!results.is_empty());
         // First result should be about Rust
@@ -412,9 +420,18 @@ mod tests {
     async fn test_search_with_filter() {
         let mut memory = VectorMemory::new();
 
-        memory.add(Document::new("Rust systems programming").with_type("tech")).await.unwrap();
-        memory.add(Document::new("Python data science").with_type("tech")).await.unwrap();
-        memory.add(Document::new("Cooking recipes").with_type("food")).await.unwrap();
+        memory
+            .add(Document::new("Rust systems programming").with_type("tech"))
+            .await
+            .unwrap();
+        memory
+            .add(Document::new("Python data science").with_type("tech"))
+            .await
+            .unwrap();
+        memory
+            .add(Document::new("Cooking recipes").with_type("food"))
+            .await
+            .unwrap();
 
         let results = memory
             .search_with_filter("programming", 5, |doc| {
@@ -433,7 +450,7 @@ mod tests {
     async fn test_delete() {
         let mut memory = VectorMemory::new();
         let id = memory.add_text("Test document", None).await.unwrap();
-        
+
         assert_eq!(memory.len(), 1);
         memory.delete(id);
         assert_eq!(memory.len(), 0);
@@ -443,7 +460,7 @@ mod tests {
     async fn test_stats() {
         let mut memory = VectorMemory::new();
         memory.add_text("Hello world", None).await.unwrap();
-        
+
         let stats = memory.stats();
         assert_eq!(stats.document_count, 1);
         assert_eq!(stats.documents_with_embeddings, 1);

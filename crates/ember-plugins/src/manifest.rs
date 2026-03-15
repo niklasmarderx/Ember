@@ -36,7 +36,11 @@ pub struct PluginManifest {
 
 impl PluginManifest {
     /// Create a new plugin manifest with required fields.
-    pub fn new(name: impl Into<String>, version: impl Into<String>, description: impl Into<String>) -> Self {
+    pub fn new(
+        name: impl Into<String>,
+        version: impl Into<String>,
+        description: impl Into<String>,
+    ) -> Self {
         Self {
             name: name.into(),
             version: version.into(),
@@ -197,7 +201,11 @@ fn default_true() -> bool {
 
 impl PluginParameter {
     /// Create a new required parameter.
-    pub fn new(name: impl Into<String>, param_type: impl Into<String>, description: impl Into<String>) -> Self {
+    pub fn new(
+        name: impl Into<String>,
+        param_type: impl Into<String>,
+        description: impl Into<String>,
+    ) -> Self {
         Self {
             name: name.into(),
             param_type: param_type.into(),

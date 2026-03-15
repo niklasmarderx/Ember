@@ -8,19 +8,19 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 // Re-export ember_llm types for interoperability
+pub use ember_llm::ToolCall as LLMToolCall;
 pub use ember_llm::ToolDefinition as LLMToolDefinition;
 pub use ember_llm::ToolResult as LLMToolResult;
-pub use ember_llm::ToolCall as LLMToolCall;
 
 /// Definition of a tool that can be used by an agent.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ToolDefinition {
     /// Tool name (must be unique)
     pub name: String,
-    
+
     /// Human-readable description
     pub description: String,
-    
+
     /// JSON Schema for the tool's parameters
     pub parameters: Value,
 }
@@ -64,12 +64,7 @@ impl ToolDefinition {
     }
 
     /// Add a string parameter.
-    pub fn add_string_param(
-        mut self,
-        name: &str,
-        description: &str,
-        required: bool,
-    ) -> Self {
+    pub fn add_string_param(mut self, name: &str, description: &str, required: bool) -> Self {
         if let Some(props) = self.parameters.get_mut("properties") {
             props[name] = serde_json::json!({
                 "type": "string",
@@ -87,12 +82,7 @@ impl ToolDefinition {
     }
 
     /// Add an integer parameter.
-    pub fn add_integer_param(
-        mut self,
-        name: &str,
-        description: &str,
-        required: bool,
-    ) -> Self {
+    pub fn add_integer_param(mut self, name: &str, description: &str, required: bool) -> Self {
         if let Some(props) = self.parameters.get_mut("properties") {
             props[name] = serde_json::json!({
                 "type": "integer",
@@ -110,12 +100,7 @@ impl ToolDefinition {
     }
 
     /// Add a boolean parameter.
-    pub fn add_boolean_param(
-        mut self,
-        name: &str,
-        description: &str,
-        required: bool,
-    ) -> Self {
+    pub fn add_boolean_param(mut self, name: &str, description: &str, required: bool) -> Self {
         if let Some(props) = self.parameters.get_mut("properties") {
             props[name] = serde_json::json!({
                 "type": "boolean",
@@ -138,10 +123,10 @@ impl ToolDefinition {
 pub struct ToolOutput {
     /// Whether the execution was successful
     pub success: bool,
-    
+
     /// Output content
     pub output: String,
-    
+
     /// Optional structured data
     #[serde(skip_serializing_if = "Option::is_none")]
     pub data: Option<Value>,
@@ -258,7 +243,7 @@ impl ToolRegistry {
     }
 
     /// Execute a tool from an LLM tool call and return an LLM tool result.
-    /// 
+    ///
     /// This is a convenience method for integrating with the agent's tool calling.
     pub async fn execute_tool_call(&self, call: &LLMToolCall) -> Result<LLMToolResult> {
         let output = self.execute(&call.name, call.arguments.clone()).await?;
@@ -306,8 +291,11 @@ mod tests {
     #[async_trait]
     impl ToolHandler for MockTool {
         fn definition(&self) -> ToolDefinition {
-            ToolDefinition::new(&self.name, "A mock tool for testing")
-                .add_string_param("input", "Input string", true)
+            ToolDefinition::new(&self.name, "A mock tool for testing").add_string_param(
+                "input",
+                "Input string",
+                true,
+            )
         }
 
         async fn execute(&self, arguments: Value) -> Result<ToolOutput> {
@@ -364,7 +352,7 @@ mod tests {
         assert!(def.parameters["properties"]["name"].is_object());
         assert!(def.parameters["properties"]["age"].is_object());
         assert!(def.parameters["properties"]["active"].is_object());
-        
+
         let required = def.parameters["required"].as_array().unwrap();
         assert!(required.contains(&Value::String("name".to_string())));
     }

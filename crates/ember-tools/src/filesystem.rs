@@ -1,6 +1,6 @@
 //! Filesystem operations tool.
 
-use crate::{Error, Result, ToolDefinition, ToolHandler, registry::ToolOutput};
+use crate::{registry::ToolOutput, Error, Result, ToolDefinition, ToolHandler};
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -13,16 +13,16 @@ use tracing::debug;
 pub struct FilesystemConfig {
     /// Allowed directories (empty = cwd only)
     pub allowed_paths: Vec<PathBuf>,
-    
+
     /// Maximum file size to read in bytes
     pub max_read_bytes: usize,
-    
+
     /// Maximum file size to write in bytes
     pub max_write_bytes: usize,
-    
+
     /// Whether to allow file deletion
     pub allow_delete: bool,
-    
+
     /// Whether to allow creating directories
     pub allow_mkdir: bool,
 }
@@ -31,7 +31,7 @@ impl Default for FilesystemConfig {
     fn default() -> Self {
         Self {
             allowed_paths: Vec::new(),
-            max_read_bytes: 10 * 1024 * 1024, // 10MB
+            max_read_bytes: 10 * 1024 * 1024,  // 10MB
             max_write_bytes: 10 * 1024 * 1024, // 10MB
             allow_delete: false,
             allow_mkdir: true,
@@ -257,7 +257,7 @@ impl FilesystemTool {
         debug!(path = %base_path.display(), pattern = pattern, "Searching files");
 
         let full_pattern = base_path.join(pattern).to_string_lossy().to_string();
-        
+
         let matches: Vec<String> = glob::glob(&full_pattern)
             .map_err(|e| Error::filesystem(format!("Invalid pattern: {}", e)))?
             .filter_map(|entry| entry.ok())
@@ -310,7 +310,9 @@ impl ToolHandler for FilesystemTool {
         let operation = arguments
             .get("operation")
             .and_then(|v| v.as_str())
-            .ok_or_else(|| Error::invalid_arguments("filesystem", "Missing 'operation' parameter"))?;
+            .ok_or_else(|| {
+                Error::invalid_arguments("filesystem", "Missing 'operation' parameter")
+            })?;
 
         let path = arguments
             .get("path")
@@ -327,10 +329,16 @@ impl ToolHandler for FilesystemTool {
                     .get("content")
                     .and_then(|v| v.as_str())
                     .ok_or_else(|| {
-                        Error::invalid_arguments("filesystem", "Missing 'content' for write operation")
+                        Error::invalid_arguments(
+                            "filesystem",
+                            "Missing 'content' for write operation",
+                        )
                     })?;
                 self.write_file(path, content).await?;
-                Ok(ToolOutput::success(format!("Successfully wrote to {}", path)))
+                Ok(ToolOutput::success(format!(
+                    "Successfully wrote to {}",
+                    path
+                )))
             }
             "list" => {
                 let entries = self.list_directory(path).await?;
@@ -354,7 +362,10 @@ impl ToolHandler for FilesystemTool {
             }
             "delete" => {
                 self.delete(path).await?;
-                Ok(ToolOutput::success(format!("Successfully deleted {}", path)))
+                Ok(ToolOutput::success(format!(
+                    "Successfully deleted {}",
+                    path
+                )))
             }
             "search" => {
                 let pattern = arguments
@@ -376,7 +387,11 @@ impl ToolHandler for FilesystemTool {
                 let validated = self.validate_path(Path::new(path));
                 let exists = validated.map(|p| p.exists()).unwrap_or(false);
                 Ok(ToolOutput::success_with_data(
-                    if exists { "Path exists" } else { "Path does not exist" },
+                    if exists {
+                        "Path exists"
+                    } else {
+                        "Path does not exist"
+                    },
                     serde_json::json!({ "exists": exists }),
                 ))
             }
@@ -397,16 +412,16 @@ impl ToolHandler for FilesystemTool {
 pub struct FileInfo {
     /// File name
     pub name: String,
-    
+
     /// Full path
     pub path: String,
-    
+
     /// Type of file
     pub file_type: FileType,
-    
+
     /// Size in bytes
     pub size: u64,
-    
+
     /// Last modified timestamp (Unix seconds)
     pub modified: Option<u64>,
 }
