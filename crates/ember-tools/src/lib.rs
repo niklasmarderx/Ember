@@ -28,6 +28,9 @@
 mod error;
 mod registry;
 
+/// Custom Tool SDK for creating tools.
+pub mod sdk;
+
 #[cfg(feature = "shell")]
 pub mod shell;
 
@@ -45,6 +48,9 @@ pub mod code_execution;
 
 pub use error::{Error, Result};
 pub use registry::{ToolRegistry, ToolDefinition, ToolHandler, ToolOutput};
+
+// SDK exports
+pub use sdk::{SimpleTool, AsyncTool, SimpleToolBuilder, ParamDef, ParamType, ParamExtractor};
 
 #[cfg(feature = "shell")]
 pub use shell::ShellTool;
@@ -64,6 +70,8 @@ pub use code_execution::{CodeExecutionTool, CodeExecutionConfig, ExecutionResult
 /// Prelude for convenient imports.
 pub mod prelude {
     pub use crate::{ToolRegistry, ToolDefinition, ToolHandler, ToolOutput, Error, Result};
+    pub use crate::sdk::{SimpleTool, AsyncTool, SimpleToolBuilder, ParamDef, ParamType, ParamExtractor};
+    pub use crate::sdk::validation;
     
     #[cfg(feature = "shell")]
     pub use crate::ShellTool;

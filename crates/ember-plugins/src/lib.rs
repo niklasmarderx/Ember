@@ -74,6 +74,12 @@ pub mod error;
 pub mod manifest;
 pub mod runtime;
 
+#[cfg(feature = "marketplace")]
+pub mod marketplace;
+
+#[cfg(feature = "hot-reload")]
+pub mod hot_reload;
+
 // Re-exports
 pub use error::{PluginError, Result};
 pub use manifest::{
@@ -81,6 +87,19 @@ pub use manifest::{
 };
 pub use runtime::{
     LoadedPlugin, PluginInput, PluginOutput, PluginRuntime, RuntimeConfig,
+};
+
+#[cfg(feature = "marketplace")]
+pub use marketplace::{
+    MarketplaceClient, PluginCache, PluginRegistryEntry, PluginSearchQuery,
+    PluginSearchResults, CachedPluginInfo, CacheStats, FeaturedPlugins,
+    PluginAuthor, PluginSortField, SortOrder, TagInfo,
+};
+
+#[cfg(feature = "hot-reload")]
+pub use hot_reload::{
+    HotReloadManager, HotReloadConfig, HotReloadEvent, HotReloadManagerBuilder,
+    WatchedPluginInfo,
 };
 
 /// Prelude module for convenient imports.
@@ -91,6 +110,17 @@ pub mod prelude {
     };
     pub use crate::runtime::{
         LoadedPlugin, PluginInput, PluginOutput, PluginRuntime, RuntimeConfig,
+    };
+    
+    #[cfg(feature = "marketplace")]
+    pub use crate::marketplace::{
+        MarketplaceClient, PluginCache, PluginRegistryEntry, PluginSearchQuery,
+        CachedPluginInfo,
+    };
+    
+    #[cfg(feature = "hot-reload")]
+    pub use crate::hot_reload::{
+        HotReloadManager, HotReloadConfig, HotReloadEvent,
     };
 }
 

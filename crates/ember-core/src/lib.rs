@@ -41,6 +41,7 @@ mod conversation;
 mod planning;
 mod checkpoint;
 mod orchestrator;
+mod collaboration;
 mod self_healing;
 mod privacy;
 mod cache;
@@ -92,6 +93,12 @@ pub use task_planner::{
     ExecutionPlan, ExecutionProgress, ProgressCallback,
     Task, TaskId, TaskType, TaskStatus, TaskPriority, TaskComplexity,
     Goal, TaskExecutor, DefaultTaskExecutor, TaskPlanBuilder,
+};
+pub use collaboration::{
+    ACPMessage, ACPMessageType, SessionId, ACP_VERSION,
+    SharedMemory, SharedValue, SharedMemoryEvent, AccessControl,
+    CollaborativeTask, TaskStatus as CollaborativeTaskStatus, TaskDelegator, TaskEvent,
+    Proposal, ProposalStatus, ConsensusManager, ConsensusEvent,
 };
 pub use knowledge_graph::{
     KnowledgeGraph, GraphConfig, GraphStats, GraphExport,

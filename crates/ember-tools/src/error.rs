@@ -77,6 +77,19 @@ pub enum Error {
     /// Tool is disabled
     #[error("Tool '{0}' is disabled")]
     ToolDisabled(String),
+
+    /// Missing required parameter
+    #[error("Missing required parameter: {0}")]
+    MissingParameter(String),
+
+    /// Invalid parameter value
+    #[error("Invalid parameter '{name}': {reason}")]
+    InvalidParameter {
+        /// Parameter name
+        name: String,
+        /// Reason for invalidity
+        reason: String,
+    },
 }
 
 impl Error {
