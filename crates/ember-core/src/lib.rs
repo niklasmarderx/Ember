@@ -106,6 +106,7 @@ mod self_healing;
 mod streaming;
 mod task_planner;
 pub mod thinking;
+pub mod tool_executor;
 
 pub use error::{Error, Result};
 /// Alias for CoreError used by internal modules
@@ -161,6 +162,10 @@ pub use task_planner::{
 pub use cost_predictor::{
     BudgetAlert, BudgetConfig, CostPredictor, CostRecommendation, PredictionResult, UsageRecord,
     UsageStats,
+};
+pub use tool_executor::{
+    AsyncFunctionTool, AsyncTool, ExecutionMetrics, ExecutorConfig, FunctionTool,
+    MetricsSummary, ToolContext, ToolExecutionResult, ToolExecutor, ToolRegistry,
 };
 
 /// Re-export commonly used types from ember-llm
