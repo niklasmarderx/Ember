@@ -267,25 +267,27 @@ ssh user@server "ember serve"
 ```
                     User
                       |
-          +-----------+-----------+
-          |           |           |
-        CLI      Web UI      Library
-          |           |           |
-          +-----------+-----------+
+          +-----------+-----------+----------+
+          |           |           |          |
+        CLI      Web UI      Desktop     Library
+          |           |           |          |
+          +-----------+-----------+----------+
                       |
                [ember-core]
             Agent Runtime & Memory
                       |
-         +------------+------------+
-         |            |            |
-   [ember-llm]  [ember-tools]  [ember-storage]
-   9+ Providers   Shell, Git,    SQLite, Vector
-   OpenAI, etc    Files, Web     Embeddings
-         |            |            |
-         +------------+------------+
+    +--------+--------+--------+--------+
+    |        |        |        |        |
+ [llm]   [tools]  [storage] [browser] [mcp]
+9+ APIs  Shell,FS  SQLite,   Browser  Model
+         Git,Web   Vector    Control  Context
+    |        |        |        |        |
+    +--------+--------+--------+--------+
                       |
-              [ember-plugins]
-              WASM Extensions
+         +------------+------------+
+         |            |            |
+   [plugins]    [telemetry]    [i18n]
+   WASM Ext.   Privacy-first   6 Languages
 ```
 
 ### Crate Responsibilities
@@ -297,8 +299,14 @@ ssh user@server "ember serve"
 | **ember-tools** | Built-in tools | Shell, filesystem, Git, web, code execution |
 | **ember-storage** | Persistence | SQLite, vector DB, RAG, embeddings |
 | **ember-plugins** | Extensions | WASM runtime, hot reload, marketplace |
+| **ember-browser** | Browser automation | Headless Chromium, screenshots, scraping |
+| **ember-mcp** | Model Context Protocol | External tool integration, MCP servers |
 | **ember-cli** | Command line | Interactive chat, TUI, configuration |
 | **ember-web** | Web interface | REST API, WebSocket, React dashboard |
+| **ember-desktop** | Desktop app | Tauri-based native application |
+| **ember-telemetry** | Analytics | Privacy-first, opt-in, anonymized metrics |
+| **ember-i18n** | Internationalization | 6 languages (EN, DE, FR, ES, ZH, JA) |
+| **ember-benchmarks** | Performance | Criterion benchmarks, CI integration |
 
 ---
 
@@ -617,16 +625,23 @@ cargo run -p ember-cli -- serve
 ```
 ember/
 ├── crates/
-│   ├── ember-core/      # Agent runtime, memory, planning
-│   ├── ember-llm/       # LLM providers (9+ supported)
-│   ├── ember-tools/     # Shell, filesystem, Git, web
-│   ├── ember-storage/   # SQLite, vector DB, RAG
-│   ├── ember-plugins/   # WASM plugin system
-│   ├── ember-cli/       # Command-line interface
-│   └── ember-web/       # Web UI and REST API
-├── examples/            # Code examples
-├── docs/                # Documentation
-└── extensions/          # VS Code extension
+│   ├── ember-core/       # Agent runtime, memory, planning
+│   ├── ember-llm/        # LLM providers (9+ supported)
+│   ├── ember-tools/      # Shell, filesystem, Git, web
+│   ├── ember-storage/    # SQLite, vector DB, RAG
+│   ├── ember-plugins/    # WASM plugin system
+│   ├── ember-browser/    # Browser automation (Chromium)
+│   ├── ember-mcp/        # Model Context Protocol
+│   ├── ember-cli/        # Command-line interface
+│   ├── ember-web/        # Web UI and REST API
+│   ├── ember-desktop/    # Tauri desktop application
+│   ├── ember-telemetry/  # Privacy-first analytics
+│   ├── ember-i18n/       # Internationalization (6 langs)
+│   └── ember-benchmarks/ # Performance benchmarks
+├── examples/             # Code examples
+├── docs/                 # Documentation (mdBook)
+├── extensions/           # VS Code extension
+└── marketing/            # Press kit and resources
 ```
 
 ### How to Contribute
