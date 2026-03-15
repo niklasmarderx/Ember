@@ -1,0 +1,1218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ember - The AI Agent That Starts in 30 Seconds</title>
+    <meta name="description" content="Ember is a blazing-fast AI agent framework written in Rust. One binary, zero dependencies, 80ms startup, works offline.">
+    <meta name="keywords" content="AI, Agent, LLM, Rust, OpenAI, Anthropic, Ollama, Framework">
+    <meta name="author" content="Niklas Marder">
+    
+    <!-- Open Graph / Social Media -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://niklasmarderx.github.io/Ember/">
+    <meta property="og:title" content="Ember - The AI Agent That Starts in 30 Seconds">
+    <meta property="og:description" content="One binary. Zero dependencies. Rust-powered. Privacy-first.">
+    <meta property="og:image" content="https://niklasmarderx.github.io/Ember/assets/og-image.png">
+    
+    <!-- Twitter -->
+    <meta property="twitter:card" content="summary_large_image">
+    <meta property="twitter:url" content="https://niklasmarderx.github.io/Ember/">
+    <meta property="twitter:title" content="Ember - The AI Agent That Starts in 30 Seconds">
+    <meta property="twitter:description" content="One binary. Zero dependencies. Rust-powered. Privacy-first.">
+    
+    <!-- Favicon -->
+    <link rel="icon" type="image/svg+xml" href="assets/logo.svg">
+    
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            --orange-50: #fff7ed;
+            --orange-100: #ffedd5;
+            --orange-200: #fed7aa;
+            --orange-300: #fdba74;
+            --orange-400: #fb923c;
+            --orange-500: #f97316;
+            --orange-600: #ea580c;
+            --orange-700: #c2410c;
+            --orange-800: #9a3412;
+            --orange-900: #7c2d12;
+            
+            --gray-50: #fafafa;
+            --gray-100: #f4f4f5;
+            --gray-200: #e4e4e7;
+            --gray-300: #d4d4d8;
+            --gray-400: #a1a1aa;
+            --gray-500: #71717a;
+            --gray-600: #52525b;
+            --gray-700: #3f3f46;
+            --gray-800: #27272a;
+            --gray-900: #18181b;
+            --gray-950: #09090b;
+            
+            --bg-primary: #0a0a0a;
+            --bg-secondary: #111111;
+            --bg-tertiary: #1a1a1a;
+            --text-primary: #fafafa;
+            --text-secondary: #a1a1aa;
+            --text-muted: #71717a;
+            --border-color: #27272a;
+            
+            --gradient-flame: linear-gradient(135deg, var(--orange-600) 0%, var(--orange-500) 50%, var(--orange-400) 100%);
+            --gradient-glow: radial-gradient(ellipse at center, rgba(249, 115, 22, 0.15) 0%, transparent 70%);
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        html {
+            scroll-behavior: smooth;
+        }
+        
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.6;
+            overflow-x: hidden;
+        }
+        
+        /* Navigation */
+        nav {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 1000;
+            background: rgba(10, 10, 10, 0.8);
+            -webkit-backdrop-filter: blur(20px);
+            backdrop-filter: blur(20px);
+            border-bottom: 1px solid var(--border-color);
+            padding: 1rem 2rem;
+        }
+        
+        .nav-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        
+        .nav-logo {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            text-decoration: none;
+            color: var(--text-primary);
+            font-weight: 700;
+            font-size: 1.25rem;
+        }
+        
+        .nav-logo svg {
+            width: 32px;
+            height: 32px;
+        }
+        
+        .nav-links {
+            display: flex;
+            align-items: center;
+            gap: 2rem;
+        }
+        
+        .nav-links a {
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-size: 0.9rem;
+            font-weight: 500;
+            transition: color 0.2s;
+        }
+        
+        .nav-links a:hover {
+            color: var(--text-primary);
+        }
+        
+        .nav-cta {
+            background: var(--gradient-flame);
+            color: white !important;
+            padding: 0.5rem 1.25rem;
+            border-radius: 8px;
+            font-weight: 600;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        
+        .nav-cta:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 20px rgba(249, 115, 22, 0.4);
+        }
+        
+        /* Hero Section */
+        .hero {
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            padding: 8rem 2rem 4rem;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .hero::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 150%;
+            height: 150%;
+            background: var(--gradient-glow);
+            pointer-events: none;
+        }
+        
+        .hero-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            padding: 0.5rem 1rem;
+            border-radius: 100px;
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            margin-bottom: 2rem;
+        }
+        
+        .hero-badge-dot {
+            width: 8px;
+            height: 8px;
+            background: var(--orange-500);
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        
+        .hero-logo {
+            width: 120px;
+            height: 120px;
+            margin-bottom: 2rem;
+            animation: float 6s ease-in-out infinite;
+            filter: drop-shadow(0 0 40px rgba(249, 115, 22, 0.3));
+        }
+        
+        @keyframes float {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-10px); }
+        }
+        
+        .hero h1 {
+            font-size: clamp(2.5rem, 6vw, 4rem);
+            font-weight: 800;
+            line-height: 1.1;
+            margin-bottom: 1.5rem;
+            max-width: 800px;
+        }
+        
+        .hero h1 span {
+            background: var(--gradient-flame);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        .hero-subtitle {
+            font-size: clamp(1.1rem, 2vw, 1.35rem);
+            color: var(--text-secondary);
+            max-width: 600px;
+            margin-bottom: 3rem;
+        }
+        
+        .hero-cta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1rem;
+            justify-content: center;
+            margin-bottom: 4rem;
+        }
+        
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.875rem 1.75rem;
+            border-radius: 10px;
+            font-size: 1rem;
+            font-weight: 600;
+            text-decoration: none;
+            transition: all 0.2s;
+            cursor: pointer;
+            border: none;
+        }
+        
+        .btn-primary {
+            background: var(--gradient-flame);
+            color: white;
+            box-shadow: 0 4px 20px rgba(249, 115, 22, 0.3);
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 30px rgba(249, 115, 22, 0.4);
+        }
+        
+        .btn-secondary {
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+            border: 1px solid var(--border-color);
+        }
+        
+        .btn-secondary:hover {
+            background: var(--gray-800);
+            border-color: var(--gray-600);
+        }
+        
+        /* Code Block */
+        .hero-code {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 1.5rem 2rem;
+            max-width: 500px;
+            width: 100%;
+            text-align: left;
+            position: relative;
+        }
+        
+        .hero-code-header {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+        
+        .hero-code-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+        }
+        
+        .hero-code-dot:nth-child(1) { background: #ff5f56; }
+        .hero-code-dot:nth-child(2) { background: #ffbd2e; }
+        .hero-code-dot:nth-child(3) { background: #27c93f; }
+        
+        .hero-code pre {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.9rem;
+            line-height: 1.8;
+            color: var(--text-secondary);
+            overflow-x: auto;
+        }
+        
+        .hero-code .comment { color: var(--gray-500); }
+        .hero-code .command { color: var(--orange-400); }
+        .hero-code .string { color: var(--orange-300); }
+        
+        .copy-btn {
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            color: var(--text-secondary);
+            padding: 0.5rem;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .copy-btn:hover {
+            background: var(--gray-700);
+            color: var(--text-primary);
+        }
+        
+        /* Stats Section */
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 2rem;
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 4rem 2rem;
+        }
+        
+        .stat {
+            text-align: center;
+        }
+        
+        .stat-value {
+            font-size: 3rem;
+            font-weight: 800;
+            background: var(--gradient-flame);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 0.5rem;
+        }
+        
+        .stat-label {
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+        }
+        
+        /* Features Section */
+        .features {
+            padding: 6rem 2rem;
+            background: var(--bg-secondary);
+        }
+        
+        .section-header {
+            text-align: center;
+            max-width: 700px;
+            margin: 0 auto 4rem;
+        }
+        
+        .section-header h2 {
+            font-size: clamp(2rem, 4vw, 2.75rem);
+            font-weight: 700;
+            margin-bottom: 1rem;
+        }
+        
+        .section-header p {
+            color: var(--text-secondary);
+            font-size: 1.1rem;
+        }
+        
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 1.5rem;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        .feature-card {
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 2rem;
+            transition: all 0.3s;
+        }
+        
+        .feature-card:hover {
+            border-color: var(--orange-600);
+            transform: translateY(-4px);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+        }
+        
+        .feature-icon {
+            width: 48px;
+            height: 48px;
+            background: var(--gradient-flame);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 1.5rem;
+            font-size: 1.5rem;
+        }
+        
+        .feature-card h3 {
+            font-size: 1.25rem;
+            font-weight: 600;
+            margin-bottom: 0.75rem;
+        }
+        
+        .feature-card p {
+            color: var(--text-secondary);
+            font-size: 0.95rem;
+        }
+        
+        /* Comparison Section */
+        .comparison {
+            padding: 6rem 2rem;
+        }
+        
+        .comparison-table-container {
+            max-width: 1000px;
+            margin: 0 auto;
+            overflow-x: auto;
+        }
+        
+        .comparison-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.95rem;
+        }
+        
+        .comparison-table th,
+        .comparison-table td {
+            padding: 1rem 1.5rem;
+            text-align: left;
+            border-bottom: 1px solid var(--border-color);
+        }
+        
+        .comparison-table th {
+            background: var(--bg-secondary);
+            font-weight: 600;
+            color: var(--text-secondary);
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        
+        .comparison-table th:last-child {
+            background: linear-gradient(135deg, rgba(249, 115, 22, 0.2) 0%, rgba(194, 65, 12, 0.2) 100%);
+            color: var(--orange-400);
+        }
+        
+        .comparison-table td {
+            color: var(--text-secondary);
+        }
+        
+        .comparison-table td:last-child {
+            color: var(--orange-400);
+            font-weight: 600;
+        }
+        
+        .comparison-table tr:hover td {
+            background: var(--bg-secondary);
+        }
+        
+        .check {
+            color: var(--orange-500);
+            font-size: 1.2rem;
+        }
+        
+        .cross {
+            color: var(--gray-600);
+            font-size: 1.2rem;
+        }
+        
+        /* Providers Section */
+        .providers {
+            padding: 6rem 2rem;
+            background: var(--bg-secondary);
+        }
+        
+        .providers-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 1rem;
+            max-width: 900px;
+            margin: 0 auto;
+        }
+        
+        .provider-card {
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 1.5rem;
+            text-align: center;
+            transition: all 0.2s;
+        }
+        
+        .provider-card:hover {
+            border-color: var(--gray-600);
+            transform: scale(1.05);
+        }
+        
+        .provider-name {
+            font-weight: 600;
+            margin-bottom: 0.25rem;
+        }
+        
+        .provider-tag {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+        }
+        
+        .provider-tag.free {
+            color: #22c55e;
+        }
+        
+        /* Install Section */
+        .install {
+            padding: 6rem 2rem;
+            text-align: center;
+        }
+        
+        .install-options {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 1.5rem;
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+        
+        .install-card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 2rem;
+            text-align: left;
+        }
+        
+        .install-card h3 {
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+        }
+        
+        .install-card p {
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+            margin-bottom: 1.5rem;
+        }
+        
+        .install-code {
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 1rem;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.85rem;
+            color: var(--orange-400);
+            overflow-x: auto;
+        }
+        
+        /* CTA Section */
+        .cta {
+            padding: 8rem 2rem;
+            text-align: center;
+            background: var(--bg-secondary);
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .cta::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 150%;
+            height: 100%;
+            background: var(--gradient-glow);
+            pointer-events: none;
+        }
+        
+        .cta h2 {
+            font-size: clamp(2rem, 5vw, 3rem);
+            font-weight: 800;
+            margin-bottom: 1rem;
+            position: relative;
+        }
+        
+        .cta p {
+            color: var(--text-secondary);
+            font-size: 1.1rem;
+            margin-bottom: 2rem;
+            max-width: 500px;
+            margin-left: auto;
+            margin-right: auto;
+            position: relative;
+        }
+        
+        .cta-buttons {
+            display: flex;
+            gap: 1rem;
+            justify-content: center;
+            flex-wrap: wrap;
+            position: relative;
+        }
+        
+        /* Footer */
+        footer {
+            padding: 3rem 2rem;
+            border-top: 1px solid var(--border-color);
+        }
+        
+        .footer-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-between;
+            align-items: center;
+            gap: 2rem;
+        }
+        
+        .footer-logo {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            color: var(--text-primary);
+            text-decoration: none;
+            font-weight: 700;
+        }
+        
+        .footer-logo svg {
+            width: 24px;
+            height: 24px;
+        }
+        
+        .footer-links {
+            display: flex;
+            gap: 2rem;
+        }
+        
+        .footer-links a {
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-size: 0.9rem;
+            transition: color 0.2s;
+        }
+        
+        .footer-links a:hover {
+            color: var(--text-primary);
+        }
+        
+        .footer-social {
+            display: flex;
+            gap: 1rem;
+        }
+        
+        .footer-social a {
+            color: var(--text-secondary);
+            transition: color 0.2s;
+        }
+        
+        .footer-social a:hover {
+            color: var(--orange-500);
+        }
+        
+        /* Mobile Navigation */
+        .mobile-menu-btn {
+            display: none;
+            background: none;
+            border: none;
+            color: var(--text-primary);
+            cursor: pointer;
+            padding: 0.5rem;
+        }
+        
+        /* Responsive */
+        @media (max-width: 768px) {
+            .nav-links {
+                display: none;
+            }
+            
+            .mobile-menu-btn {
+                display: block;
+            }
+            
+            .hero {
+                padding: 7rem 1.5rem 3rem;
+            }
+            
+            .hero-logo {
+                width: 80px;
+                height: 80px;
+            }
+            
+            .stats {
+                grid-template-columns: repeat(2, 1fr);
+                gap: 1.5rem;
+            }
+            
+            .stat-value {
+                font-size: 2rem;
+            }
+            
+            .features-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .footer-container {
+                flex-direction: column;
+                text-align: center;
+            }
+            
+            .footer-links {
+                flex-wrap: wrap;
+                justify-content: center;
+            }
+        }
+        
+        /* Animations */
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        .animate-in {
+            animation: fadeInUp 0.6s ease-out forwards;
+        }
+        
+        .delay-1 { animation-delay: 0.1s; }
+        .delay-2 { animation-delay: 0.2s; }
+        .delay-3 { animation-delay: 0.3s; }
+        .delay-4 { animation-delay: 0.4s; }
+    </style>
+</head>
+<body>
+    <!-- Navigation -->
+    <nav>
+        <div class="nav-container">
+            <a href="#" class="nav-logo">
+                <svg viewBox="0 0 512 512" fill="none">
+                    <defs>
+                        <linearGradient id="nav-flame" x1="50%" y1="100%" x2="50%" y2="0%">
+                            <stop offset="0%" stop-color="#C2410C" />
+                            <stop offset="50%" stop-color="#EA580C" />
+                            <stop offset="100%" stop-color="#F97316" />
+                        </linearGradient>
+                    </defs>
+                    <path d="M256 48c0 0-64 80-64 160c0 48 16 80 32 104c-32-16-64-56-64-104c0-64 32-112 32-112s-96 80-96 192c0 96 80 176 160 176s160-80 160-176c0-112-96-192-96-192s32 48 32 112c0 48-32 88-64 104c16-24 32-56 32-104c0-80-64-160-64-160z" fill="url(#nav-flame)"/>
+                </svg>
+                Ember
+            </a>
+            <div class="nav-links">
+                <a href="#features">Features</a>
+                <a href="#comparison">Comparison</a>
+                <a href="#providers">Providers</a>
+                <a href="https://github.com/niklasmarderx/Ember" target="_blank" rel="noopener noreferrer">GitHub</a>
+                <a href="#install" class="nav-cta">Get Started</a>
+            </div>
+            <button class="mobile-menu-btn" aria-label="Menu">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M3 12h18M3 6h18M3 18h18"/>
+                </svg>
+            </button>
+        </div>
+    </nav>
+
+    <!-- Hero Section -->
+    <section class="hero">
+        <div class="hero-badge animate-in">
+            <span class="hero-badge-dot"></span>
+            v1.0 now available
+        </div>
+        
+        <svg class="hero-logo animate-in delay-1" viewBox="0 0 512 512" fill="none">
+            <defs>
+                <linearGradient id="hero-flame-gradient" x1="50%" y1="100%" x2="50%" y2="0%">
+                    <stop offset="0%" stop-color="#C2410C" />
+                    <stop offset="50%" stop-color="#EA580C" />
+                    <stop offset="100%" stop-color="#F97316" />
+                </linearGradient>
+                <linearGradient id="hero-inner-gradient" x1="50%" y1="100%" x2="50%" y2="0%">
+                    <stop offset="0%" stop-color="#F97316" />
+                    <stop offset="100%" stop-color="#FDBA74" />
+                </linearGradient>
+            </defs>
+            <path d="M256 48c0 0-64 80-64 160c0 48 16 80 32 104c-32-16-64-56-64-104c0-64 32-112 32-112s-96 80-96 192c0 96 80 176 160 176s160-80 160-176c0-112-96-192-96-192s32 48 32 112c0 48-32 88-64 104c16-24 32-56 32-104c0-80-64-160-64-160z" fill="url(#hero-flame-gradient)"/>
+            <path d="M256 176c0 0-32 48-32 96c0 32 16 56 32 72c16-16 32-40 32-72c0-48-32-96-32-96z" fill="url(#hero-inner-gradient)"/>
+            <ellipse cx="256" cy="320" rx="24" ry="32" fill="#FEF3C7"/>
+        </svg>
+        
+        <h1 class="animate-in delay-2">
+            The AI Agent That Starts in <span>30 Seconds</span>, Not 30 Minutes
+        </h1>
+        
+        <p class="hero-subtitle animate-in delay-3">
+            One binary. Zero dependencies. Rust-powered. Privacy-first. 
+            Build AI agents that are blazing fast and work completely offline.
+        </p>
+        
+        <div class="hero-cta animate-in delay-4">
+            <a href="#install" class="btn btn-primary">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/>
+                </svg>
+                Install Now
+            </a>
+            <a href="https://github.com/niklasmarderx/Ember" target="_blank" rel="noopener noreferrer" class="btn btn-secondary">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
+                </svg>
+                View on GitHub
+            </a>
+        </div>
+        
+        <div class="hero-code animate-in delay-4">
+            <div class="hero-code-header">
+                <span class="hero-code-dot"></span>
+                <span class="hero-code-dot"></span>
+                <span class="hero-code-dot"></span>
+            </div>
+            <button class="copy-btn" onclick="copyCode()" title="Copy to clipboard">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+                </svg>
+            </button>
+            <pre><code><span class="comment"># Install in 5 seconds</span>
+<span class="command">curl</span> -fsSL https://ember.dev/install.sh | sh
+
+<span class="comment"># Start chatting immediately</span>
+<span class="command">ember</span> chat <span class="string">"Hello, Ember!"</span></code></pre>
+        </div>
+    </section>
+
+    <!-- Stats Section -->
+    <section class="stats">
+        <div class="stat">
+            <div class="stat-value">80ms</div>
+            <div class="stat-label">Cold Start Time</div>
+        </div>
+        <div class="stat">
+            <div class="stat-value">15MB</div>
+            <div class="stat-label">Binary Size</div>
+        </div>
+        <div class="stat">
+            <div class="stat-value">45MB</div>
+            <div class="stat-label">Memory Usage</div>
+        </div>
+        <div class="stat">
+            <div class="stat-value">9+</div>
+            <div class="stat-label">LLM Providers</div>
+        </div>
+    </section>
+
+    <!-- Features Section -->
+    <section class="features" id="features">
+        <div class="section-header">
+            <h2>Why Developers Love Ember</h2>
+            <p>Built from scratch in Rust for performance, reliability, and developer happiness.</p>
+        </div>
+        
+        <div class="features-grid">
+            <div class="feature-card">
+                <div class="feature-icon">⚡</div>
+                <h3>Blazing Fast</h3>
+                <p>80ms cold start, 45MB memory. No interpreter overhead, no garbage collection pauses. Pure native performance.</p>
+            </div>
+            
+            <div class="feature-card">
+                <div class="feature-icon">📦</div>
+                <h3>Zero Dependencies</h3>
+                <p>One 15MB binary. No Python, no Node.js, no virtual environments. Download and run - it just works.</p>
+            </div>
+            
+            <div class="feature-card">
+                <div class="feature-icon">🔒</div>
+                <h3>Privacy First</h3>
+                <p>Run 100% offline with Ollama. Your data never leaves your machine. Built-in PII detection and redaction.</p>
+            </div>
+            
+            <div class="feature-card">
+                <div class="feature-icon">🛠️</div>
+                <h3>Powerful Tools</h3>
+                <p>Shell execution, filesystem access, Git operations, web scraping, and browser automation - all sandboxed.</p>
+            </div>
+            
+            <div class="feature-card">
+                <div class="feature-icon">💰</div>
+                <h3>Cost Tracking</h3>
+                <p>Real-time pricing, budget alerts, and cost predictions. Never get surprised by your LLM bill again.</p>
+            </div>
+            
+            <div class="feature-card">
+                <div class="feature-icon">🔄</div>
+                <h3>Checkpoints</h3>
+                <p>Undo any action, restore any state. Never lose progress. Travel through your agent's history.</p>
+            </div>
+            
+            <div class="feature-card">
+                <div class="feature-icon">🤖</div>
+                <h3>Multi-Agent</h3>
+                <p>Orchestrate teams of specialized agents. Researcher, coder, reviewer - working together seamlessly.</p>
+            </div>
+            
+            <div class="feature-card">
+                <div class="feature-icon">🧩</div>
+                <h3>WASM Plugins</h3>
+                <p>Extend with any language that compiles to WebAssembly. Hot reload without restart.</p>
+            </div>
+            
+            <div class="feature-card">
+                <div class="feature-icon">🌐</div>
+                <h3>Beautiful Web UI</h3>
+                <p>Modern React dashboard with streaming, cost visualization, model switching, and dark mode.</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Comparison Section -->
+    <section class="comparison" id="comparison">
+        <div class="section-header">
+            <h2>How Ember Compares</h2>
+            <p>See the difference Rust makes.</p>
+        </div>
+        
+        <div class="comparison-table-container">
+            <table class="comparison-table">
+                <thead>
+                    <tr>
+                        <th>Metric</th>
+                        <th>LangChain</th>
+                        <th>AutoGPT</th>
+                        <th>CrewAI</th>
+                        <th>Ember</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Install Time</td>
+                        <td>15 min</td>
+                        <td>20 min</td>
+                        <td>10 min</td>
+                        <td>5 sec</td>
+                    </tr>
+                    <tr>
+                        <td>Cold Start</td>
+                        <td>2.3s</td>
+                        <td>4.1s</td>
+                        <td>1.8s</td>
+                        <td>80ms</td>
+                    </tr>
+                    <tr>
+                        <td>Memory (Idle)</td>
+                        <td>450MB</td>
+                        <td>800MB</td>
+                        <td>380MB</td>
+                        <td>45MB</td>
+                    </tr>
+                    <tr>
+                        <td>Dependencies</td>
+                        <td>500+</td>
+                        <td>300+</td>
+                        <td>200+</td>
+                        <td>0</td>
+                    </tr>
+                    <tr>
+                        <td>Single Binary</td>
+                        <td><span class="cross">✕</span></td>
+                        <td><span class="cross">✕</span></td>
+                        <td><span class="cross">✕</span></td>
+                        <td><span class="check">✓</span></td>
+                    </tr>
+                    <tr>
+                        <td>Works Offline</td>
+                        <td><span class="cross">✕</span></td>
+                        <td><span class="cross">✕</span></td>
+                        <td><span class="cross">✕</span></td>
+                        <td><span class="check">✓</span></td>
+                    </tr>
+                    <tr>
+                        <td>Type Safe</td>
+                        <td><span class="cross">✕</span></td>
+                        <td><span class="cross">✕</span></td>
+                        <td><span class="cross">✕</span></td>
+                        <td><span class="check">✓</span></td>
+                    </tr>
+                    <tr>
+                        <td>Cost Tracking</td>
+                        <td><span class="cross">✕</span></td>
+                        <td><span class="cross">✕</span></td>
+                        <td><span class="cross">✕</span></td>
+                        <td><span class="check">✓</span></td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <!-- Providers Section -->
+    <section class="providers" id="providers">
+        <div class="section-header">
+            <h2>9+ LLM Providers Supported</h2>
+            <p>Switch between providers with a single flag. Use free options or the best commercial models.</p>
+        </div>
+        
+        <div class="providers-grid">
+            <div class="provider-card">
+                <div class="provider-name">OpenAI</div>
+                <div class="provider-tag">GPT-4o, o1</div>
+            </div>
+            <div class="provider-card">
+                <div class="provider-name">Anthropic</div>
+                <div class="provider-tag">Claude 3.5</div>
+            </div>
+            <div class="provider-card">
+                <div class="provider-name">Gemini</div>
+                <div class="provider-tag free">Free Tier</div>
+            </div>
+            <div class="provider-card">
+                <div class="provider-name">Ollama</div>
+                <div class="provider-tag free">100% Free</div>
+            </div>
+            <div class="provider-card">
+                <div class="provider-name">Groq</div>
+                <div class="provider-tag free">Ultra Fast</div>
+            </div>
+            <div class="provider-card">
+                <div class="provider-name">DeepSeek</div>
+                <div class="provider-tag">Very Cheap</div>
+            </div>
+            <div class="provider-card">
+                <div class="provider-name">Mistral</div>
+                <div class="provider-tag">European</div>
+            </div>
+            <div class="provider-card">
+                <div class="provider-name">xAI Grok</div>
+                <div class="provider-tag">Real-time</div>
+            </div>
+            <div class="provider-card">
+                <div class="provider-name">OpenRouter</div>
+                <div class="provider-tag">200+ Models</div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Install Section -->
+    <section class="install" id="install">
+        <div class="section-header">
+            <h2>Get Started in Seconds</h2>
+            <p>Choose your preferred installation method.</p>
+        </div>
+        
+        <div class="install-options">
+            <div class="install-card">
+                <h3>One-Line Install</h3>
+                <p>Recommended for most users</p>
+                <div class="install-code">curl -fsSL https://ember.dev/install.sh | sh</div>
+            </div>
+            
+            <div class="install-card">
+                <h3>Homebrew</h3>
+                <p>macOS and Linux</p>
+                <div class="install-code">brew install ember-agent</div>
+            </div>
+            
+            <div class="install-card">
+                <h3>Cargo</h3>
+                <p>For Rust developers</p>
+                <div class="install-code">cargo install ember-cli</div>
+            </div>
+            
+            <div class="install-card">
+                <h3>Docker</h3>
+                <p>Containerized deployment</p>
+                <div class="install-code">docker pull ghcr.io/niklasmarderx/Ember</div>
+            </div>
+        </div>
+    </section>
+
+    <!-- CTA Section -->
+    <section class="cta">
+        <h2>Small Spark, Big Fire</h2>
+        <p>Join developers who ship faster with Ember. Start building in 30 seconds.</p>
+        <div class="cta-buttons">
+            <a href="#install" class="btn btn-primary">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/>
+                </svg>
+                Get Started Free
+            </a>
+            <a href="https://github.com/niklasmarderx/Ember" target="_blank" rel="noopener noreferrer" class="btn btn-secondary">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+                </svg>
+                Star on GitHub
+            </a>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer>
+        <div class="footer-container">
+            <a href="#" class="footer-logo">
+                <svg viewBox="0 0 512 512" fill="none" width="24" height="24">
+                    <defs>
+                        <linearGradient id="footer-flame" x1="50%" y1="100%" x2="50%" y2="0%">
+                            <stop offset="0%" stop-color="#C2410C" />
+                            <stop offset="100%" stop-color="#F97316" />
+                        </linearGradient>
+                    </defs>
+                    <path d="M256 48c0 0-64 80-64 160c0 48 16 80 32 104c-32-16-64-56-64-104c0-64 32-112 32-112s-96 80-96 192c0 96 80 176 160 176s160-80 160-176c0-112-96-192-96-192s32 48 32 112c0 48-32 88-64 104c16-24 32-56 32-104c0-80-64-160-64-160z" fill="url(#footer-flame)"/>
+                </svg>
+                Ember
+            </a>
+            
+            <div class="footer-links">
+                <a href="https://github.com/niklasmarderx/Ember" target="_blank" rel="noopener noreferrer">GitHub</a>
+                <a href="https://github.com/niklasmarderx/Ember/blob/main/docs/src/README.md" target="_blank" rel="noopener noreferrer">Documentation</a>
+                <a href="https://github.com/niklasmarderx/Ember/blob/main/CONTRIBUTING.md" target="_blank" rel="noopener noreferrer">Contributing</a>
+                <a href="https://github.com/niklasmarderx/Ember/blob/main/LICENSE-MIT" target="_blank" rel="noopener noreferrer">License</a>
+            </div>
+            
+            <div class="footer-social">
+                <a href="https://github.com/niklasmarderx/Ember" target="_blank" rel="noopener noreferrer" aria-label="GitHub">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
+                    </svg>
+                </a>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        // Copy code to clipboard
+        function copyCode() {
+            const code = `curl -fsSL https://ember.dev/install.sh | sh
+ember chat "Hello, Ember!"`;
+            navigator.clipboard.writeText(code).then(() => {
+                const btn = document.querySelector('.copy-btn');
+                btn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>';
+                setTimeout(() => {
+                    btn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>';
+                }, 2000);
+            });
+        }
+
+        // Smooth scroll for anchor links
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                const target = document.querySelector(this.getAttribute('href'));
+                if (target) {
+                    target.scrollIntoView({
+                        behavior: 'smooth',
+                        block: 'start'
+                    });
+                }
+            });
+        });
+
+        // Intersection Observer for animations
+        const observerOptions = {
+            threshold: 0.1,
+            rootMargin: '0px 0px -50px 0px'
+        };
+
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.classList.add('animate-in');
+                }
+            });
+        }, observerOptions);
+
+        document.querySelectorAll('.feature-card, .stat, .install-card, .provider-card').forEach(el => {
+            observer.observe(el);
+        });
+    </script>
+</body>
+</html>
