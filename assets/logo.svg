@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
+    <defs>
+        <linearGradient id="flame-gradient" x1="50%" y1="100%" x2="50%" y2="0%">
+            <stop offset="0%" stop-color="#C2410C" />
+            <stop offset="50%" stop-color="#EA580C" />
+            <stop offset="100%" stop-color="#F97316" />
+        </linearGradient>
+        <linearGradient id="inner-gradient" x1="50%" y1="100%" x2="50%" y2="0%">
+            <stop offset="0%" stop-color="#F97316" />
+            <stop offset="100%" stop-color="#FDBA74" />
+        </linearGradient>
+    </defs>
+
+    <!-- Main flame -->
+    <path
+        d="M256 48c0 0-64 80-64 160c0 48 16 80 32 104c-32-16-64-56-64-104c0-64 32-112 32-112s-96 80-96 192c0 96 80 176 160 176s160-80 160-176c0-112-96-192-96-192s32 48 32 112c0 48-32 88-64 104c16-24 32-56 32-104c0-80-64-160-64-160z"
+        fill="url(#flame-gradient)" />
+
+    <!-- Inner flame -->
+    <path d="M256 176c0 0-32 48-32 96c0 32 16 56 32 72c16-16 32-40 32-72c0-48-32-96-32-96z"
+        fill="url(#inner-gradient)" />
+
+    <!-- Bright center -->
+    <ellipse cx="256" cy="320" rx="24" ry="32" fill="#FEF3C7" />
+</svg>

@@ -1,5 +1,7 @@
 <div align="center">
 
+<img src="assets/logo.svg" alt="Ember Logo" width="128" height="128"/>
+
 # Ember
 
 ### The AI Agent That Starts in 30 Seconds, Not 30 Minutes
