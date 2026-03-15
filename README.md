@@ -25,12 +25,14 @@ Contact: [niklas.marder@gmail.com](mailto:niklas.marder@gmail.com)
 
 ---
 
+<div align="center">
+
 ## What Makes Ember Revolutionary
 
 > **"The first AI agent framework that respects your time, your memory, and your privacy."**
 
 | Traditional Agents | Ember |
-|---|---|
+|:---:|:---:|
 | Minutes to install | **Seconds** |
 | Gigabytes of RAM | **Megabytes** |
 | Hundreds of dependencies | **Zero** |
@@ -38,9 +40,14 @@ Contact: [niklas.marder@gmail.com](mailto:niklas.marder@gmail.com)
 | Python runtime needed | **Single binary** |
 | "It worked on my machine" | **If it compiles, it runs** |
 
-**Ember is not an incremental improvement. It's a complete reimagining of what an AI agent should be.**
+**Ember is not an incremental improvement.**  
+**It's a complete reimagining of what an AI agent should be.**
 
-We took everything developers hate about existing frameworks - the bloat, the slow starts, the dependency hell, the mandatory cloud connection - and eliminated it. What's left is pure, fast, reliable AI tooling.
+</div>
+
+We took everything developers hate about existing frameworks - the bloat, the slow starts, the dependency hell, the mandatory cloud connection - and eliminated it.
+
+What's left is pure, fast, reliable AI tooling.
 
 ---
 
