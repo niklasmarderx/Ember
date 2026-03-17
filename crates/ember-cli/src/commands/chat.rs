@@ -1,8 +1,39 @@
-//! Chat command implementation.
+//! Chat command implementation for Ember CLI.
 //!
-//! This module provides both simple chat and full agent mode with tools.
-//! When tools are enabled via --tools flag, the agent can execute shell commands,
-//! filesystem operations, and web requests.
+//! This module powers the `ember chat` command and supports two modes:
+//!
+//! 1. **Simple Chat Mode**
+//!    - Direct interaction with an AI model
+//!    - Supports streaming responses
+//!
+//! 2. **Agent Mode (with tools)**
+//!    - Enables AI to execute tools automatically
+//!    - Available tools:
+//!        • shell       – run shell commands
+//!        • filesystem  – read/write files
+//!        • web         – fetch web pages
+//!
+//! ## Examples
+//!
+//! Basic chat:
+//! ```bash
+//! ember chat "Explain Rust ownership"
+//! ```
+//!
+//! Interactive chat:
+//! ```bash
+//! ember chat
+//! ```
+//!
+//! Using tools:
+//! ```bash
+//! ember chat --tools shell,filesystem
+//! ```
+//!
+//! Custom model:
+//! ```bash
+//! ember chat --model gpt-4
+//! ```
 
 use crate::config::AppConfig;
 use anyhow::{Context, Result};
@@ -116,7 +147,29 @@ impl ProgressIndicator {
     }
 }
 
-/// Run the chat command.
+
+
+
+/// Execute the `ember chat` command.
+///
+/// This function determines whether to run:
+/// - **Simple chat mode** (no tools)
+/// - **Agent mode** (tools enabled)
+///
+/// Behavior:
+/// - If a message is provided → one-shot response
+/// - If no message is provided → interactive session
+///
+/// # Arguments
+///
+/// - `config` – Loaded application configuration
+/// - `message` – Optional message for one-shot chat
+/// - `provider` – LLM provider override
+/// - `model` – Model override
+/// - `system` – Custom system prompt
+/// - `temperature` – Sampling temperature
+/// - `streaming` – Enable streaming output
+/// - `tools` – Optional list of tools to enable
 pub async fn run(
     config: AppConfig,
     message: Option<String>,
@@ -194,7 +247,18 @@ pub async fn run(
     Ok(())
 }
 
-/// Create a tool registry with the specified tools.
+
+
+/// Build a registry of enabled tools.
+///
+/// The registry is used by the agent to discover and execute tools.
+/// Supported tools:
+///
+/// - `shell` → run shell commands
+/// - `filesystem` → file operations
+/// - `web` → fetch web content
+///
+/// Invalid tools are ignored with a warning.
 fn create_tool_registry(tool_names: &[String]) -> Result<ToolRegistry> {
     let mut registry = ToolRegistry::new();
 
@@ -230,6 +294,8 @@ fn create_tool_registry(tool_names: &[String]) -> Result<ToolRegistry> {
     Ok(registry)
 }
 
+
+
 /// Create an LLM provider based on configuration and provider name.
 fn create_provider(config: &AppConfig, provider_name: &str) -> Result<Arc<dyn LLMProvider>> {
     match provider_name {
@@ -262,7 +328,16 @@ fn create_provider(config: &AppConfig, provider_name: &str) -> Result<Arc<dyn LL
     }
 }
 
-/// Run a task and exit.
+
+
+/// Execute a single AI task and exit.
+///
+/// This command is optimized for scripting and automation.
+///
+/// Example:
+/// ```bash
+/// ember run "Write a bash script that backs up files"
+/// ```
 pub async fn run_task(config: AppConfig, task: String, model: Option<String>) -> Result<()> {
     let provider_name = config.provider.default.clone();
 
@@ -400,7 +475,17 @@ async fn agent_one_shot(
     Ok(())
 }
 
-/// Agent interactive mode: chat with tool support.
+
+
+/// Interactive agent mode with tool execution.
+///
+/// In this mode the AI can automatically:
+///
+/// - run shell commands
+/// - read/write files
+/// - fetch web content
+///
+/// Tool usage is displayed inline in the terminal.
 async fn agent_interactive(
     provider: Arc<dyn LLMProvider>,
     model: &str,
@@ -689,7 +774,18 @@ async fn one_shot_chat(
     Ok(())
 }
 
-/// Interactive chat mode (no tools).
+
+
+/// Start interactive chat mode.
+///
+/// Users can continuously send prompts and receive responses.
+/// Special commands available during chat:
+///
+/// - `/help`    – show commands
+/// - `/clear`   – reset conversation
+/// - `/history` – show conversation history
+/// - `/model`   – show active model
+/// - `/exit`    – exit chat
 async fn interactive_chat(
     provider: Arc<dyn LLMProvider>,
     model: &str,

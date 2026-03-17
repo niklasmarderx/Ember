@@ -28,11 +28,37 @@ mod tui;
 use commands::{chat, config as config_cmd, serve};
 use config::AppConfig;
 
-/// Ember - Blazing fast AI agent in Rust
+/// Ember CLI - AI assistant for your terminal.
+///
+/// Examples:
+///   ember chat "Hello world"
+///   ember chat --model gpt-4
+///   ember run "Explain Rust ownership"
+///   ember config init
+///   ember serve
 #[derive(Parser)]
-#[command(name = "ember")]
-#[command(author, version, about, long_about = None)]
+#[command(
+    name = "ember",
+    author,
+    version,
+    about = "Blazing fast AI agent CLI written in Rust",
+    long_about = "Ember is a command-line AI assistant that lets you interact with
+large language models directly from the terminal.
+
+Features:
+• Interactive AI chat
+• Run AI tasks from the command line
+• Manage configuration easily
+• Start an HTTP server for integrations",
+    after_help = "Examples:
+  ember chat \"Explain Rust ownership\"
+  ember chat --model gpt-4
+  ember run \"Write a Python script\"
+  ember config init
+  ember serve"
+)]
 #[command(propagate_version = true)]
+#[command(arg_required_else_help = true)]
 struct Cli {
     /// Enable verbose logging
     #[arg(short, long, global = true)]
@@ -52,7 +78,24 @@ enum Commands {
     #[cfg(feature = "tui")]
     Tui,
 
-    /// Chat with the AI agent
+    #[command(
+        about = "Chat with the AI assistant.",
+        long_about = "Start a conversation with an AI model using Ember.
+
+You can send a single message for a one-shot response or run the command
+without arguments to enter interactive chat mode.
+
+Supports multiple providers (OpenAI, Ollama), custom models,
+system prompts, temperature control, and optional tool usage.
+
+Use the --tools flag to enable agent mode, allowing the AI to execute
+shell commands, access the filesystem, and fetch web content.",
+        after_help = "Examples:
+  ember chat \"Explain Rust ownership\"
+  ember chat --model gpt-4
+  ember chat --provider ollama
+  ember chat --tools shell,filesystem"
+    )]
     Chat {
         /// Message to send (omit for interactive mode)
         message: Option<String>,
@@ -82,7 +125,11 @@ enum Commands {
         tools: Option<Vec<String>>,
     },
 
-    /// Run a single command and exit
+    /// Execute a task using the AI agent and exit.
+    ///
+    /// Examples:
+    ///   ember run "Write a Python script"
+    ///   ember run "Explain async Rust"
     Run {
         /// The task to execute
         task: String,
@@ -92,7 +139,24 @@ enum Commands {
         model: Option<String>,
     },
 
-    /// Manage configuration
+    #[command(
+        about = "Manage Ember configuration.",
+        long_about = "Manage and customize Ember's configuration settings.
+
+The configuration file stores preferences such as:
+- default LLM provider (OpenAI or Ollama)
+- model settings
+- API keys
+- agent behavior and tools
+
+You can initialize a new config file, view current settings,
+or update individual configuration values.",
+        after_help = "Examples:
+  ember config init
+  ember config show
+  ember config set provider.default ollama
+  ember config get provider.default"
+    )]
     Config {
         #[command(subcommand)]
         action: ConfigAction,
@@ -101,7 +165,7 @@ enum Commands {
     /// Show version and system information
     Info,
 
-    /// Start the web server
+    /// Start Ember's HTTP server for API access.
     Serve(serve::ServeArgs),
 }
 
@@ -139,13 +203,11 @@ enum ConfigAction {
 async fn main() -> Result<()> {
     let cli = Cli::parse();
 
-    // Initialize logging
     init_logging(cli.verbose)?;
 
-    // Load configuration
-    let config = AppConfig::load(cli.config.as_deref()).context("Failed to load configuration")?;
+    let config = AppConfig::load(cli.config.as_deref())
+        .context("Failed to load configuration")?;
 
-    // Execute command
     match cli.command {
         #[cfg(feature = "tui")]
         Commands::Tui => {
@@ -208,7 +270,6 @@ async fn main() -> Result<()> {
     Ok(())
 }
 
-/// Initialize logging based on verbosity level.
 fn init_logging(verbose: bool) -> Result<()> {
     let filter = if verbose {
         EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("debug"))
@@ -224,7 +285,6 @@ fn init_logging(verbose: bool) -> Result<()> {
     Ok(())
 }
 
-/// Print version and system information.
 fn print_info() -> Result<()> {
     println!("{}", "Ember AI Agent".bright_yellow().bold());
     println!();
@@ -252,7 +312,6 @@ fn print_info() -> Result<()> {
     Ok(())
 }
 
-/// Get rustc version (compile-time).
 fn rustc_version() -> &'static str {
     env!("CARGO_PKG_RUST_VERSION")
 }

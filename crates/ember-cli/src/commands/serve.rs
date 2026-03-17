@@ -1,4 +1,29 @@
 //! Web server command implementation.
+//!
+//! This module powers the `ember serve` command which starts
+//! an HTTP API server for the Ember AI agent.
+//!
+//! The server allows Ember to be accessed by:
+//! - web frontends
+//! - external tools
+//! - integrations
+//!
+//! Examples:
+//!
+//! Start the server on default port:
+//! ```bash
+//! ember serve
+//! ```
+//!
+//! Start server on a custom port:
+//! ```bash
+//! ember serve --port 8080
+//! ```
+//!
+//! Serve a frontend directory:
+//! ```bash
+//! ember serve --static-dir ./frontend
+//! ```
 
 use anyhow::Result;
 use clap::Args;
@@ -7,20 +32,49 @@ use tracing::info;
 /// Serve command arguments
 #[derive(Args, Debug)]
 pub struct ServeArgs {
-    /// Port to listen on
-    #[arg(short, long, default_value = "3000")]
+    #[arg(
+        short,
+        long,
+        default_value = "3000",
+        help = "Port for the HTTP server",
+        long_help = "Port for the HTTP server.
+
+Examples:
+  ember serve --port 8080
+  ember serve --port 5000"
+    )]
     pub port: u16,
 
-    /// Host to bind to
-    #[arg(long, default_value = "0.0.0.0")]
+    #[arg(
+        long,
+        default_value = "0.0.0.0",
+        help = "Host address to bind the server",
+        long_help = "Host address to bind the server.
+
+Examples:
+  ember serve --host 127.0.0.1
+  ember serve --host 0.0.0.0"
+    )]
     pub host: String,
 
-    /// Path to static files directory (for frontend)
-    #[arg(long)]
+    #[arg(
+        long,
+        help = "Directory containing static frontend files",
+        long_help = "Directory containing static frontend files.
+
+Examples:
+  ember serve --static-dir ./frontend
+  ember serve --static-dir ./dist"
+    )]
     pub static_dir: Option<String>,
 }
 
-/// Run the web server
+/// Start the Ember web server.
+///
+/// This launches the HTTP API used by Ember.
+/// Optionally serves static frontend files if `--static-dir` is provided.
+///
+/// The server will listen on the specified host and port.
 pub async fn run(args: ServeArgs) -> Result<()> {
     info!(
         host = %args.host,

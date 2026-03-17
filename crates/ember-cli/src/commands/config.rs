@@ -1,10 +1,58 @@
-//! Configuration command implementations.
+//! Configuration command implementations for Ember CLI.
+//!
+//! This module provides commands to manage the Ember configuration file.
+//!
+//! The configuration stores settings such as:
+//! - default LLM provider
+//! - model settings
+//! - API keys
+//! - agent behavior
+//! - enabled tools
+//!
+//! Configuration is stored in a TOML file in the user's config directory.
+//!
+//! Examples:
+//!
+//! Initialize configuration:
+//! ```bash
+//! ember config init
+//! ```
+//!
+//! Show configuration:
+//! ```bash
+//! ember config show
+//! ```
+//!
+//! Set a value:
+//! ```bash
+//! ember config set provider.default openai
+//! ```
+//!
+//! Get a value:
+//! ```bash
+//! ember config get provider.default
+//! ```
 
 use crate::config::AppConfig;
 use anyhow::{Context, Result};
 use colored::Colorize;
 
-/// Initialize a new configuration file.
+
+
+/// Initialize a new Ember configuration file.
+///
+/// This creates a default configuration file if one does not exist.
+///
+/// Example:
+/// ```bash
+/// ember config init
+/// ```
+///
+/// Use `--force` to overwrite an existing configuration:
+///
+/// ```bash
+/// ember config init --force
+/// ```
 pub fn init(force: bool) -> Result<()> {
     let config_path = AppConfig::config_path()?;
 
@@ -49,7 +97,18 @@ pub fn init(force: bool) -> Result<()> {
     Ok(())
 }
 
-/// Show current configuration.
+
+
+
+/// Display the current configuration.
+///
+/// Shows provider settings, agent configuration,
+/// and enabled tools in a readable format.
+///
+/// Example:
+/// ```bash
+/// ember config show
+/// ```
 pub fn show(config: &AppConfig) -> Result<()> {
     println!("{}", "Ember Configuration".bright_yellow().bold());
     println!();
@@ -142,7 +201,15 @@ pub fn show(config: &AppConfig) -> Result<()> {
     Ok(())
 }
 
-/// Set a configuration value.
+
+
+/// Set a configuration key to a new value.
+///
+/// Example:
+/// ```bash
+/// ember config set provider.default ollama
+/// ember config set agent.temperature 0.7
+/// ```
 pub fn set(key: &str, value: &str) -> Result<()> {
     let mut config = AppConfig::load(None)?;
 
@@ -162,7 +229,14 @@ pub fn set(key: &str, value: &str) -> Result<()> {
     Ok(())
 }
 
-/// Get a configuration value.
+
+
+/// Retrieve a configuration value.
+///
+/// Example:
+/// ```bash
+/// ember config get provider.default
+/// ```
 pub fn get(config: &AppConfig, key: &str) -> Result<()> {
     match config.get(key) {
         Some(value) => {
@@ -183,7 +257,15 @@ pub fn get(config: &AppConfig, key: &str) -> Result<()> {
     Ok(())
 }
 
-/// Show configuration file path.
+
+
+
+/// Display the location of the Ember configuration file.
+///
+/// Example:
+/// ```bash
+/// ember config path
+/// ```
 pub fn path() -> Result<()> {
     let config_path = AppConfig::config_path()?;
 
@@ -201,7 +283,12 @@ pub fn path() -> Result<()> {
     Ok(())
 }
 
-/// Print available configuration keys.
+
+
+/// Print all supported configuration keys.
+///
+/// This helps users discover valid keys when using
+/// `ember config set` or `ember config get`.
 fn print_available_keys() {
     let keys = [
         ("provider.default", "Default LLM provider (openai, ollama)"),
