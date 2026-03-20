@@ -23,7 +23,7 @@ pub enum ErrorCode {
     E002,
     /// API key has expired
     E003,
-    
+
     // Network & Connection errors (E100-E199)
     /// Network request failed
     E100,
@@ -35,7 +35,7 @@ pub enum ErrorCode {
     E103,
     /// SSL/TLS error
     E104,
-    
+
     // API Response errors (E200-E299)
     /// API returned an error
     E200,
@@ -45,7 +45,7 @@ pub enum ErrorCode {
     E202,
     /// Streaming error
     E203,
-    
+
     // Model & Provider errors (E300-E399)
     /// Model not found
     E300,
@@ -57,7 +57,7 @@ pub enum ErrorCode {
     E303,
     /// Tool calling not supported
     E304,
-    
+
     // Request & Input errors (E400-E499)
     /// Invalid request
     E400,
@@ -65,7 +65,7 @@ pub enum ErrorCode {
     E401,
     /// Request too large
     E402,
-    
+
     // Configuration errors (E500-E599)
     /// Configuration error
     E500,
@@ -101,10 +101,13 @@ impl ErrorCode {
             Self::E501 => "E501",
         }
     }
-    
+
     /// Get the documentation URL for this error code
     pub fn doc_url(&self) -> String {
-        format!("https://docs.ember.dev/errors/{}", self.as_str().to_lowercase())
+        format!(
+            "https://docs.ember.dev/errors/{}",
+            self.as_str().to_lowercase()
+        )
     }
 }
 
@@ -559,13 +562,11 @@ impl Error {
                     ErrorCode::E100
                 }
             }
-            Self::ApiError { status, .. } => {
-                match *status {
-                    401 => ErrorCode::E002,
-                    429 => ErrorCode::E302,
-                    _ => ErrorCode::E200,
-                }
-            }
+            Self::ApiError { status, .. } => match *status {
+                401 => ErrorCode::E002,
+                429 => ErrorCode::E302,
+                _ => ErrorCode::E200,
+            },
             Self::ParseError(_) => ErrorCode::E201,
             Self::ModelNotFound { .. } => ErrorCode::E300,
             Self::RateLimitExceeded { .. } => ErrorCode::E302,

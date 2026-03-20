@@ -92,13 +92,14 @@ fn display_llm_error(error: &ember_llm::Error) {
     // Add recovery suggestions if available
     let suggestions = error.recovery_suggestions();
     if !suggestions.is_empty() {
-        eprintln!(
-            "{}",
-            " 💡 Quick Actions ".bright_white().on_blue().bold()
-        );
+        eprintln!("{}", " 💡 Quick Actions ".bright_white().on_blue().bold());
         eprintln!();
         for (i, suggestion) in suggestions.iter().enumerate() {
-            eprintln!("  {}. {}", (i + 1).to_string().bright_blue(), suggestion.bright_white());
+            eprintln!(
+                "  {}. {}",
+                (i + 1).to_string().bright_blue(),
+                suggestion.bright_white()
+            );
         }
         eprintln!();
     }
@@ -124,7 +125,7 @@ fn display_core_error(error: &ember_core::Error) {
 
     eprintln!();
     eprintln!("{}", "━".repeat(60).bright_red());
-    
+
     let (code, title) = get_core_error_info(error);
     eprintln!(
         "{} {} {}",
@@ -150,15 +151,15 @@ fn display_core_error(error: &ember_core::Error) {
             eprintln!("  {}", "Suggestions:".bright_yellow());
             eprintln!("    1. Check the tool configuration");
             eprintln!("    2. Ensure required permissions are granted");
-            eprintln!("    3. Try running without the tool: {}", "ember chat --tools \"\"".bright_green());
+            eprintln!(
+                "    3. Try running without the tool: {}",
+                "ember chat --tools \"\"".bright_green()
+            );
         }
         ember_core::Error::ContextOverflow { current, max } => {
             eprintln!("  {} Context window exceeded", "📏".bright_red());
             eprintln!();
-            eprintln!(
-                "  Current: {} tokens",
-                current.to_string().bright_yellow()
-            );
+            eprintln!("  Current: {} tokens", current.to_string().bright_yellow());
             eprintln!("  Maximum: {} tokens", max.to_string().bright_green());
             eprintln!();
             eprintln!("  {}", "Solutions:".bright_yellow());
@@ -175,19 +176,22 @@ fn display_core_error(error: &ember_core::Error) {
             eprintln!();
             eprintln!("  {}", "Suggestions:".bright_yellow());
             eprintln!("    1. Try a simpler request");
-            eprintln!("    2. Use a faster provider (e.g., {})", "Groq".bright_green());
+            eprintln!(
+                "    2. Use a faster provider (e.g., {})",
+                "Groq".bright_green()
+            );
             eprintln!("    3. Check your network connection");
         }
         ember_core::Error::ConversationNotFound(id) => {
-            eprintln!(
-                "  {} Conversation not found",
-                "❌".bright_red()
-            );
+            eprintln!("  {} Conversation not found", "❌".bright_red());
             eprintln!();
             eprintln!("  ID: {}", id.to_string().bright_yellow());
             eprintln!();
             eprintln!("  The conversation may have been deleted or expired.");
-            eprintln!("  Start a new conversation with: {}", "ember chat".bright_green());
+            eprintln!(
+                "  Start a new conversation with: {}",
+                "ember chat".bright_green()
+            );
         }
         ember_core::Error::Config(msg) | ember_core::Error::Configuration(msg) => {
             eprintln!("  {} Configuration error", "⚙️".bright_red());
@@ -210,7 +214,10 @@ fn display_core_error(error: &ember_core::Error) {
             eprintln!();
             eprintln!("  {}", msg.bright_white());
             eprintln!();
-            eprintln!("  Run {} to initialize.", "ember config init".bright_green());
+            eprintln!(
+                "  Run {} to initialize.",
+                "ember config init".bright_green()
+            );
         }
         ember_core::Error::LoopLimitExceeded { iterations } => {
             eprintln!(
@@ -236,7 +243,9 @@ fn display_core_error(error: &ember_core::Error) {
     eprintln!(
         "  {} {}",
         "📚 Documentation:".bright_cyan(),
-        format!("https://docs.ember.dev/errors/{}", code.to_lowercase()).bright_blue().underline()
+        format!("https://docs.ember.dev/errors/{}", code.to_lowercase())
+            .bright_blue()
+            .underline()
     );
     eprintln!();
     eprintln!("{}", "━".repeat(60).bright_red());
@@ -259,9 +268,7 @@ fn get_core_error_info(error: &ember_core::Error) -> (&'static str, &'static str
         ember_core::Error::Serialization(_) => ("E201", "Serialization Error"),
         ember_core::Error::Io(_) => ("E603", "I/O Error"),
         ember_core::Error::InvalidStateTransition { .. } => ("E604", "Invalid State"),
-        ember_core::Error::Timeout { .. } | ember_core::Error::TimeoutMsg(_) => {
-            ("E102", "Timeout")
-        }
+        ember_core::Error::Timeout { .. } | ember_core::Error::TimeoutMsg(_) => ("E102", "Timeout"),
         ember_core::Error::Cancelled => ("E605", "Operation Cancelled"),
         ember_core::Error::Agent(_) => ("E606", "Agent Error"),
         ember_core::Error::NotImplemented(_) => ("E607", "Not Implemented"),
@@ -283,7 +290,7 @@ fn display_generic_error(error: &anyhow::Error) {
     );
     eprintln!("{}", "━".repeat(60).bright_red());
     eprintln!();
-    
+
     eprintln!("  {}", error.to_string().bright_white());
 
     // Print error chain if available
@@ -309,29 +316,25 @@ fn display_generic_error(error: &anyhow::Error) {
 }
 
 /// Display a warning message
+#[allow(dead_code)]
 pub fn display_warning(message: &str) {
-    eprintln!(
-        "{} {}",
-        "⚠️  Warning:".bright_yellow().bold(),
-        message
-    );
+    eprintln!("{} {}", "⚠️  Warning:".bright_yellow().bold(), message);
 }
 
 /// Display a success message
+#[allow(dead_code)]
 pub fn display_success(message: &str) {
-    println!(
-        "{} {}",
-        "✓".bright_green().bold(),
-        message.bright_white()
-    );
+    println!("{} {}", "✓".bright_green().bold(), message.bright_white());
 }
 
 /// Display an info message
+#[allow(dead_code)]
 pub fn display_info(message: &str) {
     println!("{} {}", "ℹ".bright_blue().bold(), message);
 }
 
 /// Display a retry message
+#[allow(dead_code)]
 pub fn display_retry(attempt: u32, max_attempts: u32, delay_secs: u64) {
     eprintln!(
         "{} Retrying ({}/{}) in {} seconds...",
@@ -343,6 +346,7 @@ pub fn display_retry(attempt: u32, max_attempts: u32, delay_secs: u64) {
 }
 
 /// Display a progress spinner message
+#[allow(dead_code)]
 pub fn display_progress(message: &str) {
     print!("\r{} {}", "◐".bright_blue(), message);
     use std::io::Write;
@@ -350,6 +354,7 @@ pub fn display_progress(message: &str) {
 }
 
 /// Clear the current line (for progress updates)
+#[allow(dead_code)]
 pub fn clear_line() {
     print!("\r{}\r", " ".repeat(80));
     use std::io::Write;
@@ -357,15 +362,13 @@ pub fn clear_line() {
 }
 
 /// Display a hint message
+#[allow(dead_code)]
 pub fn display_hint(message: &str) {
-    eprintln!(
-        "  {} {}",
-        "💡".bright_cyan(),
-        message.bright_white()
-    );
+    eprintln!("  {} {}", "💡".bright_cyan(), message.bright_white());
 }
 
 /// Display a command suggestion
+#[allow(dead_code)]
 pub fn display_command(command: &str) {
     eprintln!("    {}", command.bright_green());
 }
