@@ -582,7 +582,7 @@ mod tests {
         let shield = PrivacyShield::new();
         // Test with a key that matches the pattern: starts with sk/pk/api/key/token/secret/password
         // followed by optional - or _ and at least 20 alphanumeric characters
-        let text = "My key is sk-abcdefghijklmnopqrstuvwxyz123456";
+        let text = "My key is sk-test00000000000000000000000000";
         let matches = shield.detect_pii(text).await;
 
         assert!(matches.iter().any(|m| m.pii_type == PiiType::ApiKey));

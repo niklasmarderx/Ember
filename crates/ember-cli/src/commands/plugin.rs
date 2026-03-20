@@ -200,7 +200,10 @@ async fn search_plugins(
                 .iter()
                 .map(|p| PluginRow {
                     name: p.name.clone(),
-                    version: p.latest_version().map(|v| v.version.to_string()).unwrap_or_else(|| "N/A".to_string()),
+                    version: p
+                        .latest_version()
+                        .map(|v| v.version.to_string())
+                        .unwrap_or_else(|| "N/A".to_string()),
                     description: truncate(&p.description, 40),
                     downloads: format_number(p.stats.downloads),
                     rating: format!("{:.1}", p.stats.average_rating),
@@ -259,7 +262,10 @@ async fn install_plugin(name: &str, version: Option<String>) -> anyhow::Result<(
                 match metadata.latest_version() {
                     Some(v) => v.clone(),
                     None => {
-                        println!("\n{} No versions available for this plugin", "[Error]".red());
+                        println!(
+                            "\n{} No versions available for this plugin",
+                            "[Error]".red()
+                        );
                         return Ok(());
                     }
                 }
@@ -295,7 +301,11 @@ async fn install_plugin(name: &str, version: Option<String>) -> anyhow::Result<(
 
 /// Uninstall a plugin.
 async fn uninstall_plugin(name: &str) -> anyhow::Result<()> {
-    println!("{} Uninstalling plugin: {}", "[Uninstall]".cyan(), name.yellow());
+    println!(
+        "{} Uninstalling plugin: {}",
+        "[Uninstall]".cyan(),
+        name.yellow()
+    );
 
     let cache_dir = get_cache_dir();
     let plugin_dir = cache_dir.join(name);
@@ -322,7 +332,11 @@ async fn update_plugins(name: Option<String>, all: bool) -> anyhow::Result<()> {
         println!("{} Batch update not yet implemented.", "[Info]".yellow());
         println!("  Use: ember plugin update <plugin-name>");
     } else if let Some(plugin_name) = name {
-        println!("{} Updating plugin: {}", "[Update]".cyan(), plugin_name.yellow());
+        println!(
+            "{} Updating plugin: {}",
+            "[Update]".cyan(),
+            plugin_name.yellow()
+        );
 
         let client = create_client()?;
 
@@ -412,7 +426,9 @@ async fn show_plugin_info(name: &str) -> anyhow::Result<()> {
 
     match client.get_plugin(name).await {
         Ok(metadata) => {
-            let author_name = metadata.authors.first()
+            let author_name = metadata
+                .authors
+                .first()
                 .map(|a| a.name.clone())
                 .unwrap_or_else(|| "Unknown".to_string());
             println!("{}", "Marketplace Info:".blue().bold());
@@ -421,9 +437,18 @@ async fn show_plugin_info(name: &str) -> anyhow::Result<()> {
             println!("  Description: {}", metadata.description);
             println!("  Author:      {}", author_name);
             println!("  Downloads:   {}", format_number(metadata.stats.downloads));
-            println!("  Rating:      {:.1} ({} ratings)", metadata.stats.average_rating, metadata.stats.review_count);
-            println!("  Featured:    {}", if metadata.featured { "Yes" } else { "No" });
-            println!("  Verified:    {}", if metadata.verified { "Yes" } else { "No" });
+            println!(
+                "  Rating:      {:.1} ({} ratings)",
+                metadata.stats.average_rating, metadata.stats.review_count
+            );
+            println!(
+                "  Featured:    {}",
+                if metadata.featured { "Yes" } else { "No" }
+            );
+            println!(
+                "  Verified:    {}",
+                if metadata.verified { "Yes" } else { "No" }
+            );
 
             if let Some(latest) = metadata.latest_version() {
                 println!("\n{}", "Latest Version:".blue().bold());
@@ -445,7 +470,10 @@ async fn check_updates() -> anyhow::Result<()> {
     println!("{} Checking for updates...\n", "[Check]".cyan());
 
     // TODO: Implement proper installed plugin tracking
-    println!("{} Update checking requires installed plugin tracking.", "[Info]".yellow());
+    println!(
+        "{} Update checking requires installed plugin tracking.",
+        "[Info]".yellow()
+    );
     println!("  This feature will be available in a future version.");
 
     Ok(())
@@ -468,14 +496,24 @@ async fn show_featured() -> anyhow::Result<()> {
                 println!(
                     "  - {} v{} - {}",
                     p.name.green(),
-                    p.latest_version().map(|v| v.version.to_string()).unwrap_or_else(|| "?".to_string()),
+                    p.latest_version()
+                        .map(|v| v.version.to_string())
+                        .unwrap_or_else(|| "?".to_string()),
                     truncate(&p.description, 50)
                 );
-                println!("    {} downloads, {:.1} rating", format_number(p.stats.downloads), p.stats.average_rating);
+                println!(
+                    "    {} downloads, {:.1} rating",
+                    format_number(p.stats.downloads),
+                    p.stats.average_rating
+                );
             }
         }
         Err(e) => {
-            println!("{} Could not fetch featured plugins: {}", "[Error]".yellow(), e);
+            println!(
+                "{} Could not fetch featured plugins: {}",
+                "[Error]".yellow(),
+                e
+            );
             show_example_plugins();
         }
     }
@@ -500,13 +538,19 @@ async fn show_trending() -> anyhow::Result<()> {
                 println!(
                     "  - {} v{} - {}",
                     p.name.green(),
-                    p.latest_version().map(|v| v.version.to_string()).unwrap_or_else(|| "?".to_string()),
+                    p.latest_version()
+                        .map(|v| v.version.to_string())
+                        .unwrap_or_else(|| "?".to_string()),
                     truncate(&p.description, 50)
                 );
             }
         }
         Err(e) => {
-            println!("{} Could not fetch trending plugins: {}", "[Error]".yellow(), e);
+            println!(
+                "{} Could not fetch trending plugins: {}",
+                "[Error]".yellow(),
+                e
+            );
             show_example_plugins();
         }
     }
@@ -538,11 +582,41 @@ fn show_example_plugins() {
     println!("\n{}", "Example Plugins:".blue().bold());
 
     let examples = vec![
-        ("weather", "1.2.0", "Get weather forecasts for any location", "12.5k", "4.8"),
-        ("slack", "2.0.1", "Send messages and notifications to Slack", "8.3k", "4.6"),
-        ("github", "1.5.0", "Interact with GitHub repositories and issues", "15.2k", "4.9"),
-        ("jira", "1.1.0", "Create and manage Jira tickets", "5.7k", "4.3"),
-        ("calendar", "1.0.0", "Manage Google Calendar events", "3.2k", "4.5"),
+        (
+            "weather",
+            "1.2.0",
+            "Get weather forecasts for any location",
+            "12.5k",
+            "4.8",
+        ),
+        (
+            "slack",
+            "2.0.1",
+            "Send messages and notifications to Slack",
+            "8.3k",
+            "4.6",
+        ),
+        (
+            "github",
+            "1.5.0",
+            "Interact with GitHub repositories and issues",
+            "15.2k",
+            "4.9",
+        ),
+        (
+            "jira",
+            "1.1.0",
+            "Create and manage Jira tickets",
+            "5.7k",
+            "4.3",
+        ),
+        (
+            "calendar",
+            "1.0.0",
+            "Manage Google Calendar events",
+            "3.2k",
+            "4.5",
+        ),
     ];
 
     for (name, version, desc, downloads, rating) in examples {

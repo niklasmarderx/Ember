@@ -407,10 +407,7 @@ async fn generate_commit(
         .args(["diff", "--cached", "--name-only"])
         .output()?;
     let files_str = String::from_utf8_lossy(&files_output.stdout);
-    let files: Vec<&str> = files_str
-        .lines()
-        .take(10)
-        .collect();
+    let files: Vec<&str> = files_str.lines().take(10).collect();
 
     // Generate commit message based on style
     let message = match style {
@@ -875,9 +872,7 @@ async fn generate_changelog(
         ])
         .output()?;
     let commits_str = String::from_utf8_lossy(&log_output.stdout);
-    let commits: Vec<&str> = commits_str
-        .lines()
-        .collect();
+    let commits: Vec<&str> = commits_str.lines().collect();
 
     if commits.is_empty() || (commits.len() == 1 && commits[0].is_empty()) {
         println!("{} No commits found in range", "[i]".cyan());
