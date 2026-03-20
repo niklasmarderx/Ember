@@ -416,12 +416,16 @@ impl StreamManager {
 
     /// Get session info for resumption
     pub async fn get_session(&self, session_id: &str) -> Option<ClientSession> {
-        self.client_sessions.read().await.get(session_id).map(|s| ClientSession {
-            created_at: s.created_at,
-            last_activity: s.last_activity,
-            last_sent_seq: s.last_sent_seq,
-            active_streams: s.active_streams.clone(),
-        })
+        self.client_sessions
+            .read()
+            .await
+            .get(session_id)
+            .map(|s| ClientSession {
+                created_at: s.created_at,
+                last_activity: s.last_activity,
+                last_sent_seq: s.last_sent_seq,
+                active_streams: s.active_streams.clone(),
+            })
     }
 
     /// Update session's last sent sequence
@@ -468,7 +472,7 @@ async fn handle_socket(socket: WebSocket, state: AppState) {
     let stream_manager = state.stream_manager.clone();
     let client_id = stream_manager.add_client();
     let session_id = uuid::Uuid::new_v4().to_string();
-    
+
     info!(client_id = client_id, session_id = %session_id, "WebSocket client connected");
 
     // Register session for reconnection support
@@ -484,11 +488,11 @@ async fn handle_socket(socket: WebSocket, state: AppState) {
 
     // Track last pong received for heartbeat monitoring
     let last_pong = Arc::new(RwLock::new(Instant::now()));
-    
+
     // Session ID for this connection
     let session_id_clone = session_id.clone();
     let stream_manager_clone = stream_manager.clone();
-    
+
     // Task to forward messages to WebSocket
     let msg_sender = tokio::spawn(async move {
         while let Some(msg) = msg_rx.recv().await {
@@ -764,7 +768,7 @@ async fn handle_socket(socket: WebSocket, state: AppState) {
             ClientMessage::Ping { timestamp_ms } => {
                 // Update last pong time (client is responsive)
                 *last_pong.write().await = Instant::now();
-                
+
                 let _ = msg_tx
                     .send(ServerMessage::Pong {
                         timestamp_ms: std::time::SystemTime::now()
