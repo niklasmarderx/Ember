@@ -404,9 +404,7 @@ impl AppConfig {
         // Validate OpenAI settings if OpenAI is the default provider
         if provider_lower == "openai" {
             // Check if API key is set (or available in environment)
-            if self.provider.openai.api_key.is_none()
-                && std::env::var("OPENAI_API_KEY").is_err()
-            {
+            if self.provider.openai.api_key.is_none() && std::env::var("OPENAI_API_KEY").is_err() {
                 result.add_warning(ConfigValidationWarning {
                     message: "OpenAI API key not configured".to_string(),
                     suggestion: "Set 'provider.openai.api_key' in config or OPENAI_API_KEY environment variable".to_string(),
@@ -420,13 +418,15 @@ impl AppConfig {
                         field: "provider.openai.api_key".to_string(),
                         message: "API key cannot be empty".to_string(),
                         current_value: Some("(empty string)".to_string()),
-                        suggestion: "Provide a valid OpenAI API key starting with 'sk-'".to_string(),
+                        suggestion: "Provide a valid OpenAI API key starting with 'sk-'"
+                            .to_string(),
                         line: None,
                     });
                 } else if !key.starts_with("sk-") && !key.starts_with("sess-") {
                     result.add_warning(ConfigValidationWarning {
                         message: "OpenAI API key has unusual format".to_string(),
-                        suggestion: "OpenAI API keys typically start with 'sk-' or 'sess-'".to_string(),
+                        suggestion: "OpenAI API keys typically start with 'sk-' or 'sess-'"
+                            .to_string(),
                     });
                 }
             }
@@ -437,7 +437,8 @@ impl AppConfig {
                     field: "provider.openai.model".to_string(),
                     message: "Model name cannot be empty".to_string(),
                     current_value: None,
-                    suggestion: "Set a model like 'gpt-4o', 'gpt-4-turbo', or 'gpt-3.5-turbo'".to_string(),
+                    suggestion: "Set a model like 'gpt-4o', 'gpt-4-turbo', or 'gpt-3.5-turbo'"
+                        .to_string(),
                     line: None,
                 });
             }
@@ -477,7 +478,8 @@ impl AppConfig {
                     field: "provider.ollama.model".to_string(),
                     message: "Model name cannot be empty".to_string(),
                     current_value: None,
-                    suggestion: "Set a model like 'llama3.2', 'codellama', or 'mistral'".to_string(),
+                    suggestion: "Set a model like 'llama3.2', 'codellama', or 'mistral'"
+                        .to_string(),
                     line: None,
                 });
             }
@@ -499,8 +501,8 @@ impl AppConfig {
             {
                 result.add_warning(ConfigValidationWarning {
                     message: "Google/Gemini API key not configured".to_string(),
-                    suggestion:
-                        "Set GOOGLE_API_KEY or GEMINI_API_KEY environment variable".to_string(),
+                    suggestion: "Set GOOGLE_API_KEY or GEMINI_API_KEY environment variable"
+                        .to_string(),
                 });
             }
         }
@@ -531,7 +533,9 @@ impl AppConfig {
                     "High temperature ({}) may produce unpredictable responses",
                     self.agent.temperature
                 ),
-                suggestion: "Consider using a lower temperature (0.5-1.0) for more consistent output".to_string(),
+                suggestion:
+                    "Consider using a lower temperature (0.5-1.0) for more consistent output"
+                        .to_string(),
             });
         }
 
@@ -558,7 +562,8 @@ impl AppConfig {
         if self.agent.system_prompt.trim().is_empty() {
             result.add_warning(ConfigValidationWarning {
                 message: "Empty system prompt".to_string(),
-                suggestion: "Consider adding a system prompt to guide the AI's behavior".to_string(),
+                suggestion: "Consider adding a system prompt to guide the AI's behavior"
+                    .to_string(),
             });
         } else if self.agent.system_prompt.len() > 10000 {
             result.add_warning(ConfigValidationWarning {
@@ -596,21 +601,20 @@ impl AppConfig {
             if !path_buf.exists() {
                 result.add_warning(ConfigValidationWarning {
                     message: format!("Allowed path does not exist: {}", path),
-                    suggestion: "Ensure the path exists or remove it from allowed_paths".to_string(),
+                    suggestion: "Ensure the path exists or remove it from allowed_paths"
+                        .to_string(),
                 });
             } else if !path_buf.is_dir() {
                 result.add_warning(ConfigValidationWarning {
                     message: format!("Allowed path is not a directory: {}", path),
-                    suggestion: "allowed_paths should contain directory paths, not files".to_string(),
+                    suggestion: "allowed_paths should contain directory paths, not files"
+                        .to_string(),
                 });
             }
         }
 
         // Warn if all tools are disabled
-        if !self.tools.shell_enabled
-            && !self.tools.filesystem_enabled
-            && !self.tools.web_enabled
-        {
+        if !self.tools.shell_enabled && !self.tools.filesystem_enabled && !self.tools.web_enabled {
             result.add_warning(ConfigValidationWarning {
                 message: "All tools are disabled".to_string(),
                 suggestion:
@@ -661,8 +665,8 @@ impl AppConfig {
                     if !known_provider_keys.contains(key.as_str()) {
                         result.add_warning(ConfigValidationWarning {
                             message: format!("Unknown provider configuration: 'provider.{}'", key),
-                            suggestion:
-                                "Valid provider keys are: default, openai, ollama".to_string(),
+                            suggestion: "Valid provider keys are: default, openai, ollama"
+                                .to_string(),
                         });
                     }
                 }
@@ -685,7 +689,11 @@ impl AppConfig {
                             message: format!("Unknown agent configuration: 'agent.{}'", key),
                             suggestion: format!(
                                 "Valid agent keys are: {}. Did you mean one of these?",
-                                known_agent_keys.iter().copied().collect::<Vec<_>>().join(", ")
+                                known_agent_keys
+                                    .iter()
+                                    .copied()
+                                    .collect::<Vec<_>>()
+                                    .join(", ")
                             ),
                         });
                     }
@@ -710,7 +718,11 @@ impl AppConfig {
                             message: format!("Unknown tools configuration: 'tools.{}'", key),
                             suggestion: format!(
                                 "Valid tools keys are: {}",
-                                known_tools_keys.iter().copied().collect::<Vec<_>>().join(", ")
+                                known_tools_keys
+                                    .iter()
+                                    .copied()
+                                    .collect::<Vec<_>>()
+                                    .join(", ")
                             ),
                         });
                     }
@@ -835,7 +847,11 @@ mod tests {
         let config = AppConfig::default();
         let result = config.validate();
         // Default config should be valid (no errors)
-        assert!(result.is_valid(), "Default config should be valid: {:?}", result.errors);
+        assert!(
+            result.is_valid(),
+            "Default config should be valid: {:?}",
+            result.errors
+        );
         std::env::remove_var("OPENAI_API_KEY");
     }
 
@@ -843,13 +859,17 @@ mod tests {
     fn test_invalid_provider() {
         let mut config = AppConfig::default();
         config.provider.default = "invalid_provider".to_string();
-        
+
         let result = config.validate();
         assert!(!result.is_valid());
         assert!(result.errors.iter().any(|e| e.field == "provider.default"));
-        
+
         // Check that suggestion lists valid providers
-        let error = result.errors.iter().find(|e| e.field == "provider.default").unwrap();
+        let error = result
+            .errors
+            .iter()
+            .find(|e| e.field == "provider.default")
+            .unwrap();
         assert!(error.suggestion.contains("openai"));
         assert!(error.suggestion.contains("ollama"));
     }
@@ -858,12 +878,16 @@ mod tests {
     fn test_negative_temperature() {
         let mut config = AppConfig::default();
         config.agent.temperature = -0.5;
-        
+
         let result = config.validate();
         assert!(!result.is_valid());
         assert!(result.errors.iter().any(|e| e.field == "agent.temperature"));
-        
-        let error = result.errors.iter().find(|e| e.field == "agent.temperature").unwrap();
+
+        let error = result
+            .errors
+            .iter()
+            .find(|e| e.field == "agent.temperature")
+            .unwrap();
         assert!(error.message.contains("negative"));
     }
 
@@ -871,7 +895,7 @@ mod tests {
     fn test_temperature_too_high() {
         let mut config = AppConfig::default();
         config.agent.temperature = 3.0;
-        
+
         let result = config.validate();
         assert!(!result.is_valid());
         assert!(result.errors.iter().any(|e| e.field == "agent.temperature"));
@@ -882,12 +906,15 @@ mod tests {
         let mut config = AppConfig::default();
         config.agent.temperature = 1.8; // High but valid
         std::env::set_var("OPENAI_API_KEY", "sk-test-key-12345");
-        
+
         let result = config.validate();
         assert!(result.is_valid()); // Should still be valid
         assert!(result.has_warnings()); // But should have a warning
-        assert!(result.warnings.iter().any(|w| w.message.contains("High temperature")));
-        
+        assert!(result
+            .warnings
+            .iter()
+            .any(|w| w.message.contains("High temperature")));
+
         std::env::remove_var("OPENAI_API_KEY");
     }
 
@@ -895,10 +922,13 @@ mod tests {
     fn test_zero_max_iterations() {
         let mut config = AppConfig::default();
         config.agent.max_iterations = 0;
-        
+
         let result = config.validate();
         assert!(!result.is_valid());
-        assert!(result.errors.iter().any(|e| e.field == "agent.max_iterations"));
+        assert!(result
+            .errors
+            .iter()
+            .any(|e| e.field == "agent.max_iterations"));
     }
 
     #[test]
@@ -906,12 +936,15 @@ mod tests {
         let mut config = AppConfig::default();
         config.agent.max_iterations = 150;
         std::env::set_var("OPENAI_API_KEY", "sk-test-key-12345");
-        
+
         let result = config.validate();
         assert!(result.is_valid());
         assert!(result.has_warnings());
-        assert!(result.warnings.iter().any(|w| w.message.contains("max_iterations")));
-        
+        assert!(result
+            .warnings
+            .iter()
+            .any(|w| w.message.contains("max_iterations")));
+
         std::env::remove_var("OPENAI_API_KEY");
     }
 
@@ -919,10 +952,13 @@ mod tests {
     fn test_zero_shell_timeout() {
         let mut config = AppConfig::default();
         config.tools.shell_timeout = 0;
-        
+
         let result = config.validate();
         assert!(!result.is_valid());
-        assert!(result.errors.iter().any(|e| e.field == "tools.shell_timeout"));
+        assert!(result
+            .errors
+            .iter()
+            .any(|e| e.field == "tools.shell_timeout"));
     }
 
     #[test]
@@ -930,10 +966,13 @@ mod tests {
         let mut config = AppConfig::default();
         config.provider.openai.api_key = Some("".to_string());
         std::env::remove_var("OPENAI_API_KEY");
-        
+
         let result = config.validate();
         assert!(!result.is_valid());
-        assert!(result.errors.iter().any(|e| e.field == "provider.openai.api_key"));
+        assert!(result
+            .errors
+            .iter()
+            .any(|e| e.field == "provider.openai.api_key"));
     }
 
     #[test]
@@ -941,11 +980,14 @@ mod tests {
         let mut config = AppConfig::default();
         config.provider.openai.model = "".to_string();
         std::env::set_var("OPENAI_API_KEY", "sk-test-key-12345");
-        
+
         let result = config.validate();
         assert!(!result.is_valid());
-        assert!(result.errors.iter().any(|e| e.field == "provider.openai.model"));
-        
+        assert!(result
+            .errors
+            .iter()
+            .any(|e| e.field == "provider.openai.model"));
+
         std::env::remove_var("OPENAI_API_KEY");
     }
 
@@ -954,11 +996,14 @@ mod tests {
         let mut config = AppConfig::default();
         config.provider.openai.base_url = Some("not-a-url".to_string());
         std::env::set_var("OPENAI_API_KEY", "sk-test-key-12345");
-        
+
         let result = config.validate();
         assert!(!result.is_valid());
-        assert!(result.errors.iter().any(|e| e.field == "provider.openai.base_url"));
-        
+        assert!(result
+            .errors
+            .iter()
+            .any(|e| e.field == "provider.openai.base_url"));
+
         std::env::remove_var("OPENAI_API_KEY");
     }
 
@@ -967,11 +1012,14 @@ mod tests {
         let mut config = AppConfig::default();
         config.provider.openai.base_url = Some("https://api.example.com".to_string());
         std::env::set_var("OPENAI_API_KEY", "sk-test-key-12345");
-        
+
         let result = config.validate();
         // Should not have an error for base_url
-        assert!(!result.errors.iter().any(|e| e.field == "provider.openai.base_url"));
-        
+        assert!(!result
+            .errors
+            .iter()
+            .any(|e| e.field == "provider.openai.base_url"));
+
         std::env::remove_var("OPENAI_API_KEY");
     }
 
@@ -980,10 +1028,13 @@ mod tests {
         let mut config = AppConfig::default();
         config.provider.default = "ollama".to_string();
         config.provider.ollama.url = "not-a-url".to_string();
-        
+
         let result = config.validate();
         assert!(!result.is_valid());
-        assert!(result.errors.iter().any(|e| e.field == "provider.ollama.url"));
+        assert!(result
+            .errors
+            .iter()
+            .any(|e| e.field == "provider.ollama.url"));
     }
 
     #[test]
@@ -991,10 +1042,13 @@ mod tests {
         let mut config = AppConfig::default();
         config.provider.default = "ollama".to_string();
         config.provider.ollama.model = "".to_string();
-        
+
         let result = config.validate();
         assert!(!result.is_valid());
-        assert!(result.errors.iter().any(|e| e.field == "provider.ollama.model"));
+        assert!(result
+            .errors
+            .iter()
+            .any(|e| e.field == "provider.ollama.model"));
     }
 
     #[test]
@@ -1004,11 +1058,14 @@ mod tests {
         config.tools.filesystem_enabled = false;
         config.tools.web_enabled = false;
         std::env::set_var("OPENAI_API_KEY", "sk-test-key-12345");
-        
+
         let result = config.validate();
         assert!(result.has_warnings());
-        assert!(result.warnings.iter().any(|w| w.message.contains("All tools are disabled")));
-        
+        assert!(result
+            .warnings
+            .iter()
+            .any(|w| w.message.contains("All tools are disabled")));
+
         std::env::remove_var("OPENAI_API_KEY");
     }
 
@@ -1016,21 +1073,27 @@ mod tests {
     fn test_unusual_api_key_format_warning() {
         let mut config = AppConfig::default();
         config.provider.openai.api_key = Some("unusual-key-format".to_string());
-        
+
         let result = config.validate();
         // Should be valid but with a warning
         assert!(result.is_valid());
-        assert!(result.warnings.iter().any(|w| w.message.contains("unusual format")));
+        assert!(result
+            .warnings
+            .iter()
+            .any(|w| w.message.contains("unusual format")));
     }
 
     #[test]
     fn test_valid_api_key_format() {
         let mut config = AppConfig::default();
         config.provider.openai.api_key = Some("sk-abc123xyz".to_string());
-        
+
         let result = config.validate();
         // Should not have warning about unusual format
-        assert!(!result.warnings.iter().any(|w| w.message.contains("unusual format")));
+        assert!(!result
+            .warnings
+            .iter()
+            .any(|w| w.message.contains("unusual format")));
     }
 
     #[test]
@@ -1045,10 +1108,16 @@ some_key = "value"
 [agent]
 temperature = 0.7
 "#;
-        
+
         let (_, result) = AppConfig::validate_toml(toml_content).unwrap();
-        assert!(result.warnings.iter().any(|w| w.message.contains("Unknown configuration section")));
-        assert!(result.warnings.iter().any(|w| w.message.contains("unknown_section")));
+        assert!(result
+            .warnings
+            .iter()
+            .any(|w| w.message.contains("Unknown configuration section")));
+        assert!(result
+            .warnings
+            .iter()
+            .any(|w| w.message.contains("unknown_section")));
     }
 
     #[test]
@@ -1061,9 +1130,12 @@ default = "ollama"
 temperature = 0.7
 unknown_key = "value"
 "#;
-        
+
         let (_, result) = AppConfig::validate_toml(toml_content).unwrap();
-        assert!(result.warnings.iter().any(|w| w.message.contains("Unknown agent configuration")));
+        assert!(result
+            .warnings
+            .iter()
+            .any(|w| w.message.contains("Unknown agent configuration")));
     }
 
     #[test]
@@ -1076,9 +1148,12 @@ default = "ollama"
 shell_enabled = true
 typo_key = false
 "#;
-        
+
         let (_, result) = AppConfig::validate_toml(toml_content).unwrap();
-        assert!(result.warnings.iter().any(|w| w.message.contains("Unknown tools configuration")));
+        assert!(result
+            .warnings
+            .iter()
+            .any(|w| w.message.contains("Unknown tools configuration")));
     }
 
     #[test]
@@ -1095,9 +1170,9 @@ typo_key = false
             message: "Test warning".to_string(),
             suggestion: "Consider fixing this".to_string(),
         });
-        
+
         let report = result.format_report(Some("/path/to/config.toml"));
-        
+
         assert!(report.contains("Configuration Errors in /path/to/config.toml"));
         assert!(report.contains("test.field"));
         assert!(report.contains("Test error message"));
@@ -1112,13 +1187,13 @@ typo_key = false
     fn test_validation_result_is_valid() {
         let mut result = ValidationResult::new();
         assert!(result.is_valid());
-        
+
         result.add_warning(ConfigValidationWarning {
             message: "Warning".to_string(),
             suggestion: "Fix it".to_string(),
         });
         assert!(result.is_valid()); // Warnings don't affect validity
-        
+
         result.add_error(ConfigValidationError {
             field: "field".to_string(),
             message: "Error".to_string(),
@@ -1134,11 +1209,14 @@ typo_key = false
         let mut config = AppConfig::default();
         config.agent.system_prompt = "   ".to_string(); // Just whitespace
         std::env::set_var("OPENAI_API_KEY", "sk-test-key-12345");
-        
+
         let result = config.validate();
         assert!(result.has_warnings());
-        assert!(result.warnings.iter().any(|w| w.message.contains("Empty system prompt")));
-        
+        assert!(result
+            .warnings
+            .iter()
+            .any(|w| w.message.contains("Empty system prompt")));
+
         std::env::remove_var("OPENAI_API_KEY");
     }
 
@@ -1147,11 +1225,14 @@ typo_key = false
         let mut config = AppConfig::default();
         config.agent.system_prompt = "x".repeat(15000); // Very long
         std::env::set_var("OPENAI_API_KEY", "sk-test-key-12345");
-        
+
         let result = config.validate();
         assert!(result.has_warnings());
-        assert!(result.warnings.iter().any(|w| w.message.contains("Very long system prompt")));
-        
+        assert!(result
+            .warnings
+            .iter()
+            .any(|w| w.message.contains("Very long system prompt")));
+
         std::env::remove_var("OPENAI_API_KEY");
     }
 
@@ -1160,11 +1241,14 @@ typo_key = false
         let mut config = AppConfig::default();
         config.tools.shell_timeout = 5000; // More than 1 hour
         std::env::set_var("OPENAI_API_KEY", "sk-test-key-12345");
-        
+
         let result = config.validate();
         assert!(result.has_warnings());
-        assert!(result.warnings.iter().any(|w| w.message.contains("shell timeout")));
-        
+        assert!(result
+            .warnings
+            .iter()
+            .any(|w| w.message.contains("shell timeout")));
+
         std::env::remove_var("OPENAI_API_KEY");
     }
 
@@ -1175,7 +1259,7 @@ typo_key = false
         config.agent.temperature = -1.0;
         config.agent.max_iterations = 0;
         config.tools.shell_timeout = 0;
-        
+
         let result = config.validate();
         assert!(!result.is_valid());
         assert!(result.errors.len() >= 4); // Should have multiple errors

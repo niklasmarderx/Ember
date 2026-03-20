@@ -596,7 +596,8 @@ mod tests {
 
     #[test]
     fn test_tool_definition_add_integer_param() {
-        let def = ToolDefinition::new("test", "Test tool").add_integer_param("count", "Count", true);
+        let def =
+            ToolDefinition::new("test", "Test tool").add_integer_param("count", "Count", true);
 
         assert_eq!(def.parameters["properties"]["count"]["type"], "integer");
     }

@@ -38,11 +38,12 @@ pub struct ExportArgs {
 /// Execute the export command.
 pub fn run(args: ExportArgs) -> Result<()> {
     // Parse format
-    let format = ExportFormat::from_str(&args.format)
-        .ok_or_else(|| anyhow::anyhow!(
+    let format = ExportFormat::from_str(&args.format).ok_or_else(|| {
+        anyhow::anyhow!(
             "Unknown format '{}'. Supported formats: json, markdown (md), html",
             args.format
-        ))?;
+        )
+    })?;
 
     // Load conversation
     let conversation = load_conversation(args.conversation.as_deref())?;
@@ -56,18 +57,15 @@ pub fn run(args: ExportArgs) -> Result<()> {
 
     // Export based on format
     let content = match format {
-        ExportFormat::Json => conversation.export_json(
-            args.provider.as_deref(),
-            args.model.as_deref(),
-        ),
-        ExportFormat::Markdown => conversation.export_markdown(
-            args.provider.as_deref(),
-            args.model.as_deref(),
-        ),
-        ExportFormat::Html => conversation.export_html(
-            args.provider.as_deref(),
-            args.model.as_deref(),
-        ),
+        ExportFormat::Json => {
+            conversation.export_json(args.provider.as_deref(), args.model.as_deref())
+        }
+        ExportFormat::Markdown => {
+            conversation.export_markdown(args.provider.as_deref(), args.model.as_deref())
+        }
+        ExportFormat::Html => {
+            conversation.export_html(args.provider.as_deref(), args.model.as_deref())
+        }
     };
 
     // Write to file
@@ -106,11 +104,12 @@ pub fn export_conversation(
     provider: Option<&str>,
     model: Option<&str>,
 ) -> Result<PathBuf> {
-    let format = ExportFormat::from_str(format_str)
-        .ok_or_else(|| anyhow::anyhow!(
+    let format = ExportFormat::from_str(format_str).ok_or_else(|| {
+        anyhow::anyhow!(
             "Unknown format '{}'. Supported: json, markdown, html",
             format_str
-        ))?;
+        )
+    })?;
 
     let output_path = output.unwrap_or_else(|| {
         let timestamp = Utc::now().format("%Y-%m-%d_%H%M%S");
@@ -186,7 +185,8 @@ fn load_conversation(id: Option<&str>) -> Result<Conversation> {
     conv.title = Some("Demo Conversation".to_string());
 
     let turn = conv.start_turn("Hello! Can you help me with something?");
-    turn.assistant_response = "Of course! I'd be happy to help. What do you need assistance with?".to_string();
+    turn.assistant_response =
+        "Of course! I'd be happy to help. What do you need assistance with?".to_string();
     turn.complete();
 
     let turn2 = conv.start_turn("What's the weather like today?");
@@ -287,13 +287,7 @@ mod tests {
         turn.assistant_response = "Hi".to_string();
         turn.complete();
 
-        let result = export_conversation(
-            &conv,
-            "json",
-            Some(output_path.clone()),
-            None,
-            None,
-        );
+        let result = export_conversation(&conv, "json", Some(output_path.clone()), None, None);
 
         assert!(result.is_ok());
         assert!(output_path.exists());
@@ -307,7 +301,10 @@ mod tests {
     fn test_export_format_parsing() {
         assert_eq!(ExportFormat::from_str("json"), Some(ExportFormat::Json));
         assert_eq!(ExportFormat::from_str("JSON"), Some(ExportFormat::Json));
-        assert_eq!(ExportFormat::from_str("markdown"), Some(ExportFormat::Markdown));
+        assert_eq!(
+            ExportFormat::from_str("markdown"),
+            Some(ExportFormat::Markdown)
+        );
         assert_eq!(ExportFormat::from_str("md"), Some(ExportFormat::Markdown));
         assert_eq!(ExportFormat::from_str("html"), Some(ExportFormat::Html));
         assert_eq!(ExportFormat::from_str("HTML"), Some(ExportFormat::Html));

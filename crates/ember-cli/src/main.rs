@@ -75,7 +75,13 @@ struct Cli {
     config: Option<String>,
 
     /// Log output format
-    #[arg(long, global = true, value_enum, default_value = "pretty", env = "EMBER_LOG_FORMAT")]
+    #[arg(
+        long,
+        global = true,
+        value_enum,
+        default_value = "pretty",
+        env = "EMBER_LOG_FORMAT"
+    )]
     log_format: LogFormat,
 
     /// Log level (trace, debug, info, warn, error)

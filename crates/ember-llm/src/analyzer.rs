@@ -123,35 +123,130 @@ impl TaskAnalyzer {
     pub fn new() -> Self {
         Self {
             code_keywords: vec![
-                "code", "function", "implement", "programming", "debug", "fix", "error",
-                "compile", "syntax", "class", "method", "variable", "algorithm", "refactor",
-                "typescript", "javascript", "python", "rust", "java", "c++", "golang",
-                "api", "endpoint", "database", "sql", "query", "script", "terminal",
-                "command", "cli", "git", "docker", "kubernetes", "deploy",
+                "code",
+                "function",
+                "implement",
+                "programming",
+                "debug",
+                "fix",
+                "error",
+                "compile",
+                "syntax",
+                "class",
+                "method",
+                "variable",
+                "algorithm",
+                "refactor",
+                "typescript",
+                "javascript",
+                "python",
+                "rust",
+                "java",
+                "c++",
+                "golang",
+                "api",
+                "endpoint",
+                "database",
+                "sql",
+                "query",
+                "script",
+                "terminal",
+                "command",
+                "cli",
+                "git",
+                "docker",
+                "kubernetes",
+                "deploy",
             ],
             math_keywords: vec![
-                "calculate", "math", "equation", "formula", "solve", "compute", "derivative",
-                "integral", "algebra", "geometry", "statistics", "probability", "matrix",
-                "vector", "proof", "theorem", "number", "sum", "product", "average",
+                "calculate",
+                "math",
+                "equation",
+                "formula",
+                "solve",
+                "compute",
+                "derivative",
+                "integral",
+                "algebra",
+                "geometry",
+                "statistics",
+                "probability",
+                "matrix",
+                "vector",
+                "proof",
+                "theorem",
+                "number",
+                "sum",
+                "product",
+                "average",
             ],
             creative_keywords: vec![
-                "story", "creative", "write", "poem", "novel", "fiction", "narrative",
-                "character", "plot", "imagination", "fantasy", "describe", "compose",
-                "lyrics", "song", "screenplay", "dialogue",
+                "story",
+                "creative",
+                "write",
+                "poem",
+                "novel",
+                "fiction",
+                "narrative",
+                "character",
+                "plot",
+                "imagination",
+                "fantasy",
+                "describe",
+                "compose",
+                "lyrics",
+                "song",
+                "screenplay",
+                "dialogue",
             ],
             analysis_keywords: vec![
-                "analyze", "analysis", "compare", "contrast", "evaluate", "assess",
-                "examine", "investigate", "research", "study", "review", "critique",
-                "interpret", "explain", "why", "how", "reason", "cause", "effect",
+                "analyze",
+                "analysis",
+                "compare",
+                "contrast",
+                "evaluate",
+                "assess",
+                "examine",
+                "investigate",
+                "research",
+                "study",
+                "review",
+                "critique",
+                "interpret",
+                "explain",
+                "why",
+                "how",
+                "reason",
+                "cause",
+                "effect",
             ],
             translation_keywords: vec![
-                "translate", "translation", "spanish", "french", "german", "chinese",
-                "japanese", "korean", "portuguese", "italian", "russian", "arabic",
-                "language", "multilingual",
+                "translate",
+                "translation",
+                "spanish",
+                "french",
+                "german",
+                "chinese",
+                "japanese",
+                "korean",
+                "portuguese",
+                "italian",
+                "russian",
+                "arabic",
+                "language",
+                "multilingual",
             ],
             summary_keywords: vec![
-                "summarize", "summary", "tldr", "brief", "overview", "key points",
-                "main ideas", "condense", "shorten", "recap",
+                "summarize",
+                "summary",
+                "tldr",
+                "brief",
+                "overview",
+                "key points",
+                "main ideas",
+                "condense",
+                "shorten",
+                "recap",
             ],
         }
     }
@@ -174,7 +269,8 @@ impl TaskAnalyzer {
         let (task_type, detected_keywords) = self.detect_task_type(content);
         let requires_tools = self.detect_tool_need(content);
         let estimated_input_tokens = self.estimate_tokens(content);
-        let estimated_output_tokens = self.estimate_output_tokens(&task_type, estimated_input_tokens);
+        let estimated_output_tokens =
+            self.estimate_output_tokens(&task_type, estimated_input_tokens);
 
         TaskAnalysis {
             complexity,
@@ -207,8 +303,16 @@ impl TaskAnalyzer {
 
         // Check for complex reasoning
         let reasoning_indicators = [
-            "explain", "analyze", "compare", "contrast", "evaluate",
-            "step by step", "reasoning", "logic", "argument", "evidence",
+            "explain",
+            "analyze",
+            "compare",
+            "contrast",
+            "evaluate",
+            "step by step",
+            "reasoning",
+            "logic",
+            "argument",
+            "evidence",
         ];
         let has_reasoning = reasoning_indicators.iter().any(|k| lower.contains(k));
 
@@ -232,10 +336,14 @@ impl TaskAnalyzer {
         // Check each category
         let code_score = self.count_keyword_matches(&lower, &self.code_keywords, &mut detected);
         let math_score = self.count_keyword_matches(&lower, &self.math_keywords, &mut detected);
-        let creative_score = self.count_keyword_matches(&lower, &self.creative_keywords, &mut detected);
-        let analysis_score = self.count_keyword_matches(&lower, &self.analysis_keywords, &mut detected);
-        let translation_score = self.count_keyword_matches(&lower, &self.translation_keywords, &mut detected);
-        let summary_score = self.count_keyword_matches(&lower, &self.summary_keywords, &mut detected);
+        let creative_score =
+            self.count_keyword_matches(&lower, &self.creative_keywords, &mut detected);
+        let analysis_score =
+            self.count_keyword_matches(&lower, &self.analysis_keywords, &mut detected);
+        let translation_score =
+            self.count_keyword_matches(&lower, &self.translation_keywords, &mut detected);
+        let summary_score =
+            self.count_keyword_matches(&lower, &self.summary_keywords, &mut detected);
 
         // Find the highest scoring category
         let scores = [
@@ -290,10 +398,26 @@ impl TaskAnalyzer {
     fn detect_tool_need(&self, content: &str) -> bool {
         let lower = content.to_lowercase();
         let tool_indicators = [
-            "run", "execute", "file", "directory", "folder", "create",
-            "delete", "search", "find", "download", "upload", "browse",
-            "website", "url", "http", "api call", "shell", "terminal",
-            "command", "script",
+            "run",
+            "execute",
+            "file",
+            "directory",
+            "folder",
+            "create",
+            "delete",
+            "search",
+            "find",
+            "download",
+            "upload",
+            "browse",
+            "website",
+            "url",
+            "http",
+            "api call",
+            "shell",
+            "terminal",
+            "command",
+            "script",
         ];
 
         tool_indicators.iter().any(|k| lower.contains(k))
@@ -395,7 +519,10 @@ mod tests {
         );
         let analysis = analyzer.analyze(&request);
 
-        assert!(analysis.complexity == TaskComplexity::Complex || analysis.complexity == TaskComplexity::Moderate);
+        assert!(
+            analysis.complexity == TaskComplexity::Complex
+                || analysis.complexity == TaskComplexity::Moderate
+        );
         assert_eq!(analysis.task_type, TaskType::Analysis);
     }
 

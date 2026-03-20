@@ -205,7 +205,10 @@ impl ModelScorer {
     pub fn new(models: Vec<ModelCapabilities>, preferences: UserPreferences) -> Self {
         let mut preferences = preferences;
         preferences.normalize();
-        Self { models, preferences }
+        Self {
+            models,
+            preferences,
+        }
     }
 
     /// Create a scorer with default models.

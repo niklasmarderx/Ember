@@ -130,7 +130,10 @@ pub async fn execute(args: HistoryArgs) -> Result<()> {
     };
 
     let storage = SqliteStorage::new(&config).context("Failed to open database")?;
-    storage.migrate().await.context("Failed to run migrations")?;
+    storage
+        .migrate()
+        .await
+        .context("Failed to run migrations")?;
 
     match args.command {
         HistoryCommand::Search(search_args) => execute_search(&storage, search_args).await,
@@ -217,11 +220,7 @@ async fn execute_list(storage: &SqliteStorage, args: ListArgs) -> Result<()> {
         println!();
 
         for conv in &conversations {
-            let title = conv
-                .title
-                .as_deref()
-                .unwrap_or("(untitled)")
-                .to_string();
+            let title = conv.title.as_deref().unwrap_or("(untitled)").to_string();
             let date = format_date(&conv.updated_at);
 
             println!("  {} {}", conv.id[..8].cyan(), title.bold());
@@ -305,10 +304,7 @@ async fn execute_prune(storage: &SqliteStorage, args: PruneArgs) -> Result<()> {
         .await
         .context("Failed to prune conversations")?;
 
-    println!(
-        "{}",
-        format!("Deleted {} conversation(s)", deleted).green()
-    );
+    println!("{}", format!("Deleted {} conversation(s)", deleted).green());
 
     Ok(())
 }
@@ -316,10 +312,7 @@ async fn execute_prune(storage: &SqliteStorage, args: PruneArgs) -> Result<()> {
 /// Print conversation search results as text.
 fn print_conversation_results_text(results: &[SqliteSearchResult], query: &str) {
     if results.is_empty() {
-        println!(
-            "{}",
-            format!("No results found for '{}'", query).dimmed()
-        );
+        println!("{}", format!("No results found for '{}'", query).dimmed());
         return;
     }
 
@@ -332,11 +325,7 @@ fn print_conversation_results_text(results: &[SqliteSearchResult], query: &str) 
     println!();
 
     for result in results {
-        let title = result
-            .title
-            .as_deref()
-            .unwrap_or("(untitled)")
-            .to_string();
+        let title = result.title.as_deref().unwrap_or("(untitled)").to_string();
         let date = format_date(&result.updated_at);
 
         println!(
@@ -358,10 +347,7 @@ fn print_conversation_results_text(results: &[SqliteSearchResult], query: &str) 
 /// Print message search results as text.
 fn print_message_results_text(results: &[MessageSearchResult], query: &str) {
     if results.is_empty() {
-        println!(
-            "{}",
-            format!("No messages found for '{}'", query).dimmed()
-        );
+        println!("{}", format!("No messages found for '{}'", query).dimmed());
         return;
     }
 
@@ -374,10 +360,7 @@ fn print_message_results_text(results: &[MessageSearchResult], query: &str) {
     println!();
 
     for result in results {
-        let conv_title = result
-            .conversation_title
-            .as_deref()
-            .unwrap_or("(untitled)");
+        let conv_title = result.conversation_title.as_deref().unwrap_or("(untitled)");
         let date = format_date(&result.created_at);
         let role_colored = match result.role.as_str() {
             "user" => result.role.blue(),

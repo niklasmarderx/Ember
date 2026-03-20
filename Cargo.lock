@@ -1368,6 +1368,7 @@ version = "1.0.0"
 dependencies = [
  "async-trait",
  "chrono",
+ "parking_lot",
  "reqwest",
  "rusqlite",
  "serde",

@@ -186,9 +186,8 @@ impl BedrockProvider {
         messages: &[Message],
         model_id: &str,
     ) -> Result<serde_json::Value> {
-        let family = BedrockModelFamily::from_model_id(model_id).ok_or_else(|| {
-            Error::model_not_found(model_id, "bedrock")
-        })?;
+        let family = BedrockModelFamily::from_model_id(model_id)
+            .ok_or_else(|| Error::model_not_found(model_id, "bedrock"))?;
 
         match family {
             BedrockModelFamily::Claude => self.format_claude_messages(messages),
@@ -357,7 +356,9 @@ impl BedrockProvider {
                     .to_string();
                 let usage = TokenUsage::new(
                     response_body["usage"]["input_tokens"].as_u64().unwrap_or(0) as u32,
-                    response_body["usage"]["output_tokens"].as_u64().unwrap_or(0) as u32,
+                    response_body["usage"]["output_tokens"]
+                        .as_u64()
+                        .unwrap_or(0) as u32,
                 );
                 (content, usage)
             }

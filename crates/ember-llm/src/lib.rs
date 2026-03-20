@@ -113,16 +113,14 @@ pub use xai::XAIProvider;
 #[cfg(feature = "bedrock")]
 pub use bedrock::{BedrockConfig, BedrockModelFamily, BedrockProvider};
 
-pub use analyzer::{
-    TaskAnalysis, TaskAnalyzer, TaskComplexity, TaskConstraints, TaskRequirements, TaskType,
-};
+pub use analyzer::{TaskAnalysis, TaskAnalyzer, TaskComplexity, TaskType};
 pub use model_registry::{
     CostEstimate, ModelCapabilities, ModelMetadata, ModelRegistry, MODEL_REGISTRY,
 };
 pub use retry::{complete_with_retry, RetryConfig};
 pub use router::LLMRouter;
 pub use scorer::{
-    ModelCapabilities as ScorerModelCapabilities, ModelRecommendation, ModelScorer, UserPreferences,
+    ModelCapabilities as ScorerModelCapabilities, ModelScore, ModelScorer, UserPreferences,
 };
 
 #[cfg(any(test, feature = "mock"))]

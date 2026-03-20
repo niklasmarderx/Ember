@@ -17,7 +17,6 @@ use chrono::{DateTime, Utc};
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
 use std::collections::hash_map::DefaultHasher;
-use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
@@ -189,11 +188,17 @@ impl CacheStats {
 /// Summary of cache statistics.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CacheStatsSummary {
+    /// Total number of cache hits.
     pub hits: u64,
+    /// Total number of cache misses.
     pub misses: u64,
+    /// Cache hit rate as a ratio (0.0 - 1.0).
     pub hit_rate: f64,
+    /// Average similarity score of cache hits.
     pub average_similarity: f32,
+    /// Total number of tokens saved by cache hits.
     pub tokens_saved: u64,
+    /// Estimated cost savings in USD.
     pub estimated_savings_usd: f64,
 }
 
@@ -367,11 +372,7 @@ impl SemanticCache {
             // Record stats
             self.stats.record_hit(similarity, tokens);
 
-            debug!(
-                similarity = similarity,
-                query = query,
-                "Semantic cache hit"
-            );
+            debug!(similarity = similarity, query = query, "Semantic cache hit");
 
             return Some(CacheHit {
                 response,
@@ -419,7 +420,7 @@ impl SemanticCache {
         let mut entries = self.entries.write();
 
         // Evict expired entries first
-        entries.retain(|e| !e.is_expired());
+        entries.retain(|e: &CacheEntry| !e.is_expired());
 
         // If still over capacity, evict LRU entries
         if entries.len() >= self.config.max_entries {
@@ -677,9 +678,7 @@ mod tests {
             ..Default::default()
         };
 
-        cache
-            .put("Hello", "Hi there!", &context1, "gpt-4")
-            .unwrap();
+        cache.put("Hello", "Hi there!", &context1, "gpt-4").unwrap();
 
         // Same context should hit
         let hit = cache.get("Hello", &context1);
@@ -698,9 +697,7 @@ mod tests {
 
         let context = CacheContext::default();
 
-        cache
-            .put("test", "response", &context, "gpt-4")
-            .unwrap();
+        cache.put("test", "response", &context, "gpt-4").unwrap();
 
         // Should miss because TTL is 0
         std::thread::sleep(std::time::Duration::from_millis(10));
@@ -719,7 +716,12 @@ mod tests {
 
         for i in 0..5 {
             cache
-                .put(&format!("query{}", i), &format!("response{}", i), &context, "gpt-4")
+                .put(
+                    &format!("query{}", i),
+                    &format!("response{}", i),
+                    &context,
+                    "gpt-4",
+                )
                 .unwrap();
         }
 

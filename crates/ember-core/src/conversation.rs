@@ -376,7 +376,8 @@ impl Conversation {
         let mut output = String::new();
 
         // HTML header
-        output.push_str(r#"<!DOCTYPE html>
+        output.push_str(
+            r#"<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -455,7 +456,8 @@ impl Conversation {
     </style>
 </head>
 <body>
-"#);
+"#,
+        );
 
         // Header section
         output.push_str("    <div class=\"header\">\n");
@@ -467,12 +469,19 @@ impl Conversation {
 
         if let Some(p) = provider {
             if let Some(m) = model {
-                output.push_str(&format!("            <div>Model: {} ({})</div>\n", escape_html(m), escape_html(p)));
+                output.push_str(&format!(
+                    "            <div>Model: {} ({})</div>\n",
+                    escape_html(m),
+                    escape_html(p)
+                ));
             }
         }
 
         if let Some(title) = &self.title {
-            output.push_str(&format!("            <div>Topic: {}</div>\n", escape_html(title)));
+            output.push_str(&format!(
+                "            <div>Topic: {}</div>\n",
+                escape_html(title)
+            ));
         }
 
         let total = self.total_tokens();
@@ -490,7 +499,10 @@ impl Conversation {
             // User message
             output.push_str("        <div class=\"message user-message\">\n");
             output.push_str("            <div class=\"role\">User</div>\n");
-            output.push_str(&format!("            <div class=\"content\">{}</div>\n", escape_html(&turn.user_message)));
+            output.push_str(&format!(
+                "            <div class=\"content\">{}</div>\n",
+                escape_html(&turn.user_message)
+            ));
             output.push_str("        </div>\n");
 
             // Tool calls
@@ -510,7 +522,10 @@ impl Conversation {
             if !turn.assistant_response.is_empty() {
                 output.push_str("        <div class=\"message assistant-message\">\n");
                 output.push_str("            <div class=\"role\">Assistant</div>\n");
-                output.push_str(&format!("            <div class=\"content\">{}</div>\n", escape_html(&turn.assistant_response)));
+                output.push_str(&format!(
+                    "            <div class=\"content\">{}</div>\n",
+                    escape_html(&turn.assistant_response)
+                ));
                 output.push_str("        </div>\n");
             }
 

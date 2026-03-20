@@ -301,7 +301,10 @@ impl SqliteStorage {
         sql.push_str(&format!(" ORDER BY {}", order));
 
         // Add pagination
-        sql.push_str(&format!(" LIMIT {} OFFSET {}", options.limit, options.offset));
+        sql.push_str(&format!(
+            " LIMIT {} OFFSET {}",
+            options.limit, options.offset
+        ));
 
         let mut stmt = conn.prepare(&sql)?;
         let rows = stmt.query_map(params![search_pattern], |row| {
@@ -344,9 +347,11 @@ impl SqliteStorage {
         let search_pattern = format!("%{}%", query.to_lowercase());
 
         // Build query based on whether we're filtering by conversation
-        let (sql, raw_results): (&str, Vec<(String, String, Option<String>, String, String, String)>) = 
-            if let Some(conv_id) = conversation_id {
-                let sql = r#"
+        let (sql, raw_results): (
+            &str,
+            Vec<(String, String, Option<String>, String, String, String)>,
+        ) = if let Some(conv_id) = conversation_id {
+            let sql = r#"
                     SELECT 
                         m.id,
                         m.conversation_id,
@@ -360,21 +365,21 @@ impl SqliteStorage {
                     ORDER BY m.created_at DESC
                     LIMIT ?3
                 "#;
-                let mut stmt = conn.prepare(sql)?;
-                let rows = stmt.query_map(params![search_pattern, conv_id, limit as i64], |row| {
-                    Ok((
-                        row.get::<_, String>(0)?,
-                        row.get::<_, String>(1)?,
-                        row.get::<_, Option<String>>(2)?,
-                        row.get::<_, String>(3)?,
-                        row.get::<_, String>(4)?,
-                        row.get::<_, String>(5)?,
-                    ))
-                })?;
-                let results: Vec<_> = rows.filter_map(|r| r.ok()).collect();
-                (sql, results)
-            } else {
-                let sql = r#"
+            let mut stmt = conn.prepare(sql)?;
+            let rows = stmt.query_map(params![search_pattern, conv_id, limit as i64], |row| {
+                Ok((
+                    row.get::<_, String>(0)?,
+                    row.get::<_, String>(1)?,
+                    row.get::<_, Option<String>>(2)?,
+                    row.get::<_, String>(3)?,
+                    row.get::<_, String>(4)?,
+                    row.get::<_, String>(5)?,
+                ))
+            })?;
+            let results: Vec<_> = rows.filter_map(|r| r.ok()).collect();
+            (sql, results)
+        } else {
+            let sql = r#"
                     SELECT 
                         m.id,
                         m.conversation_id,
@@ -388,20 +393,20 @@ impl SqliteStorage {
                     ORDER BY m.created_at DESC
                     LIMIT ?2
                 "#;
-                let mut stmt = conn.prepare(sql)?;
-                let rows = stmt.query_map(params![search_pattern, limit as i64], |row| {
-                    Ok((
-                        row.get::<_, String>(0)?,
-                        row.get::<_, String>(1)?,
-                        row.get::<_, Option<String>>(2)?,
-                        row.get::<_, String>(3)?,
-                        row.get::<_, String>(4)?,
-                        row.get::<_, String>(5)?,
-                    ))
-                })?;
-                let results: Vec<_> = rows.filter_map(|r| r.ok()).collect();
-                (sql, results)
-            };
+            let mut stmt = conn.prepare(sql)?;
+            let rows = stmt.query_map(params![search_pattern, limit as i64], |row| {
+                Ok((
+                    row.get::<_, String>(0)?,
+                    row.get::<_, String>(1)?,
+                    row.get::<_, Option<String>>(2)?,
+                    row.get::<_, String>(3)?,
+                    row.get::<_, String>(4)?,
+                    row.get::<_, String>(5)?,
+                ))
+            })?;
+            let results: Vec<_> = rows.filter_map(|r| r.ok()).collect();
+            (sql, results)
+        };
 
         // Suppress unused variable warning
         let _ = sql;
@@ -409,20 +414,22 @@ impl SqliteStorage {
         // Convert raw results to MessageSearchResult with snippets and highlights
         let results = raw_results
             .into_iter()
-            .map(|(message_id, conv_id, conv_title, role, content, created_at)| {
-                let snippet = Some(Self::extract_snippet(&content, query));
-                let highlights = Self::find_highlights(&content, query);
-                MessageSearchResult {
-                    message_id,
-                    conversation_id: conv_id,
-                    conversation_title: conv_title,
-                    role,
-                    content,
-                    created_at,
-                    snippet,
-                    highlights,
-                }
-            })
+            .map(
+                |(message_id, conv_id, conv_title, role, content, created_at)| {
+                    let snippet = Some(Self::extract_snippet(&content, query));
+                    let highlights = Self::find_highlights(&content, query);
+                    MessageSearchResult {
+                        message_id,
+                        conversation_id: conv_id,
+                        conversation_title: conv_title,
+                        role,
+                        content,
+                        created_at,
+                        snippet,
+                        highlights,
+                    }
+                },
+            )
             .collect();
 
         Ok(results)
@@ -445,9 +452,7 @@ impl SqliteStorage {
         }
 
         let count: i64 = match (from_date, to_date) {
-            (Some(from), Some(to)) => {
-                conn.query_row(&sql, params![from, to], |row| row.get(0))?
-            }
+            (Some(from), Some(to)) => conn.query_row(&sql, params![from, to], |row| row.get(0))?,
             (Some(from), None) => conn.query_row(&sql, params![from], |row| row.get(0))?,
             (None, Some(to)) => {
                 sql = "SELECT COUNT(*) FROM conversations WHERE created_at <= ?1".to_string();
@@ -456,9 +461,8 @@ impl SqliteStorage {
             (None, None) => conn.query_row(&sql, [], |row| row.get(0))?,
         };
 
-        let message_count: i64 = conn.query_row("SELECT COUNT(*) FROM messages", [], |row| {
-            row.get(0)
-        })?;
+        let message_count: i64 =
+            conn.query_row("SELECT COUNT(*) FROM messages", [], |row| row.get(0))?;
 
         let oldest: Option<String> = conn
             .query_row(

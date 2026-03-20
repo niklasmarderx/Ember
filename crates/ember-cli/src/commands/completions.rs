@@ -30,9 +30,7 @@ pub fn print_installation_instructions(shell: Shell) {
             eprintln!("# Bash installation instructions:");
             eprintln!("# Add the following to your ~/.bashrc or ~/.bash_profile:");
             eprintln!();
-            eprintln!(
-                "# Option 1: Install system-wide (requires sudo):"
-            );
+            eprintln!("# Option 1: Install system-wide (requires sudo):");
             eprintln!("# sudo ember completions bash > /etc/bash_completion.d/ember");
             eprintln!();
             eprintln!("# Option 2: Install for current user:");
@@ -60,9 +58,7 @@ pub fn print_installation_instructions(shell: Shell) {
         Shell::Fish => {
             eprintln!("# Fish installation instructions:");
             eprintln!();
-            eprintln!(
-                "# ember completions fish > ~/.config/fish/completions/ember.fish"
-            );
+            eprintln!("# ember completions fish > ~/.config/fish/completions/ember.fish");
             eprintln!();
             eprintln!("# Completions will be loaded automatically on next shell start.");
         }
@@ -74,7 +70,9 @@ pub fn print_installation_instructions(shell: Shell) {
             eprintln!();
             eprintln!("# Or save to a file and dot-source it:");
             eprintln!("# ember completions powershell > ~\\Documents\\WindowsPowerShell\\ember_completions.ps1");
-            eprintln!("# Then add to profile: . ~\\Documents\\WindowsPowerShell\\ember_completions.ps1");
+            eprintln!(
+                "# Then add to profile: . ~\\Documents\\WindowsPowerShell\\ember_completions.ps1"
+            );
         }
         Shell::Elvish => {
             eprintln!("# Elvish installation instructions:");
