@@ -28,6 +28,7 @@
 - [Mistral AI](./providers/mistral.md)
 - [OpenRouter](./providers/openrouter.md)
 - [xAI (Grok)](./providers/xai.md)
+- [AWS Bedrock](./providers/bedrock.md)
 
 # Tools
 
@@ -36,6 +37,10 @@
 - [Filesystem Tool](./tools/filesystem.md)
 - [Web Tool](./tools/web.md)
 - [Browser Tool](./tools/browser.md)
+
+# Examples
+
+- [Code Examples](./examples/index.md)
 
 # Advanced
 

@@ -17,6 +17,7 @@ path = "src/main.rs"
 ember-core = { path = "../ember-core" }
 ember-llm = { path = "../ember-llm", features = ["openai", "ollama"] }
 ember-tools = { path = "../ember-tools", features = ["shell", "filesystem", "web"] }
+ember-storage = { path = "../ember-storage", features = ["sqlite"] }
 ember-web = { path = "../ember-web" }
 ember-plugins = { path = "../ember-plugins", features = ["marketplace"] }
 
@@ -25,6 +26,7 @@ tokio = { workspace = true, features = ["full", "signal"] }
 
 # CLI parsing
 clap = { version = "4.5", features = ["derive", "env", "color"] }
+clap_complete = "4.5"
 
 # Serialization
 serde = { workspace = true }
@@ -47,6 +49,9 @@ colored = "2.1"
 # Configuration
 toml = "0.8"
 dirs = "5.0"
+
+# Date/Time
+chrono = "0.4"
 
 # Streaming output
 futures = "0.3"

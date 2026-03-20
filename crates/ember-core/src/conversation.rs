@@ -287,6 +287,419 @@ impl Conversation {
             });
         }
     }
+
+    // =========================================================================
+    // Export Methods
+    // =========================================================================
+
+    /// Export the conversation to JSON format.
+    pub fn export_json(&self, provider: Option<&str>, model: Option<&str>) -> String {
+        let export = ConversationExport::from_conversation(self, provider, model);
+        serde_json::to_string_pretty(&export).unwrap_or_else(|_| "{}".to_string())
+    }
+
+    /// Export the conversation to Markdown format.
+    pub fn export_markdown(&self, provider: Option<&str>, model: Option<&str>) -> String {
+        let mut output = String::new();
+
+        // Header
+        output.push_str("# Chat Conversation\n\n");
+
+        // Metadata
+        let date = self.created_at.format("%B %d, %Y at %H:%M UTC");
+        output.push_str(&format!("**Date:** {}  \n", date));
+
+        if let Some(p) = provider {
+            if let Some(m) = model {
+                output.push_str(&format!("**Model:** {} ({})  \n", m, p));
+            } else {
+                output.push_str(&format!("**Provider:** {}  \n", p));
+            }
+        }
+
+        if let Some(title) = &self.title {
+            output.push_str(&format!("**Topic:** {}  \n", title));
+        }
+
+        let total = self.total_tokens();
+        if total.total > 0 {
+            output.push_str(&format!("**Tokens used:** {}  \n", total.total));
+        }
+
+        output.push_str("\n---\n\n");
+
+        // Turns
+        for (i, turn) in self.turns.iter().enumerate() {
+            output.push_str(&format!("## Turn {}\n\n", i + 1));
+
+            // User message
+            output.push_str("**User:**\n");
+            for line in turn.user_message.lines() {
+                output.push_str(&format!("> {}\n", line));
+            }
+            output.push('\n');
+
+            // Tool calls if any
+            if !turn.tool_calls.is_empty() {
+                output.push_str("**Tool Calls:**\n");
+                for call in &turn.tool_calls {
+                    output.push_str(&format!("- `{}`", call.name));
+                    let args_str = call.arguments.to_string();
+                    if args_str != "null" && args_str != "{}" {
+                        output.push_str(&format!(": `{}`", args_str));
+                    }
+                    output.push('\n');
+                }
+                output.push('\n');
+            }
+
+            // Assistant response
+            if !turn.assistant_response.is_empty() {
+                output.push_str("**Assistant:**\n");
+                for line in turn.assistant_response.lines() {
+                    output.push_str(&format!("> {}\n", line));
+                }
+                output.push('\n');
+            }
+
+            // Error if any
+            if let Some(error) = &turn.error {
+                output.push_str(&format!("**Error:** {}\n\n", error));
+            }
+        }
+
+        output
+    }
+
+    /// Export the conversation to HTML format.
+    pub fn export_html(&self, provider: Option<&str>, model: Option<&str>) -> String {
+        let mut output = String::new();
+
+        // HTML header
+        output.push_str(r#"<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chat Conversation</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            line-height: 1.6;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+        .header h1 { margin-bottom: 10px; }
+        .metadata { font-size: 0.9em; opacity: 0.9; }
+        .turn {
+            background: white;
+            border-radius: 10px;
+            margin-bottom: 15px;
+            overflow: hidden;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .message {
+            padding: 15px 20px;
+        }
+        .user-message {
+            background: #e3f2fd;
+            border-left: 4px solid #2196f3;
+        }
+        .assistant-message {
+            background: white;
+            border-left: 4px solid #4caf50;
+        }
+        .role {
+            font-weight: 600;
+            margin-bottom: 5px;
+            color: #333;
+        }
+        .content {
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+        .tool-calls {
+            background: #fff3e0;
+            padding: 10px 20px;
+            font-size: 0.9em;
+            border-left: 4px solid #ff9800;
+        }
+        .tool-call {
+            font-family: 'Monaco', 'Consolas', monospace;
+            background: rgba(0,0,0,0.05);
+            padding: 2px 6px;
+            border-radius: 3px;
+        }
+        .error {
+            background: #ffebee;
+            color: #c62828;
+            padding: 10px 20px;
+            border-left: 4px solid #f44336;
+        }
+        .footer {
+            text-align: center;
+            padding: 20px;
+            color: #666;
+            font-size: 0.85em;
+        }
+    </style>
+</head>
+<body>
+"#);
+
+        // Header section
+        output.push_str("    <div class=\"header\">\n");
+        output.push_str("        <h1>Chat Conversation</h1>\n");
+        output.push_str("        <div class=\"metadata\">\n");
+
+        let date = self.created_at.format("%B %d, %Y at %H:%M UTC");
+        output.push_str(&format!("            <div>Date: {}</div>\n", date));
+
+        if let Some(p) = provider {
+            if let Some(m) = model {
+                output.push_str(&format!("            <div>Model: {} ({})</div>\n", escape_html(m), escape_html(p)));
+            }
+        }
+
+        if let Some(title) = &self.title {
+            output.push_str(&format!("            <div>Topic: {}</div>\n", escape_html(title)));
+        }
+
+        let total = self.total_tokens();
+        if total.total > 0 {
+            output.push_str(&format!("            <div>Tokens: {}</div>\n", total.total));
+        }
+
+        output.push_str("        </div>\n");
+        output.push_str("    </div>\n\n");
+
+        // Turns
+        for turn in &self.turns {
+            output.push_str("    <div class=\"turn\">\n");
+
+            // User message
+            output.push_str("        <div class=\"message user-message\">\n");
+            output.push_str("            <div class=\"role\">User</div>\n");
+            output.push_str(&format!("            <div class=\"content\">{}</div>\n", escape_html(&turn.user_message)));
+            output.push_str("        </div>\n");
+
+            // Tool calls
+            if !turn.tool_calls.is_empty() {
+                output.push_str("        <div class=\"tool-calls\">\n");
+                output.push_str("            <strong>Tool Calls:</strong>\n");
+                for call in &turn.tool_calls {
+                    output.push_str(&format!(
+                        "            <div><span class=\"tool-call\">{}</span></div>\n",
+                        escape_html(&call.name)
+                    ));
+                }
+                output.push_str("        </div>\n");
+            }
+
+            // Assistant response
+            if !turn.assistant_response.is_empty() {
+                output.push_str("        <div class=\"message assistant-message\">\n");
+                output.push_str("            <div class=\"role\">Assistant</div>\n");
+                output.push_str(&format!("            <div class=\"content\">{}</div>\n", escape_html(&turn.assistant_response)));
+                output.push_str("        </div>\n");
+            }
+
+            // Error
+            if let Some(error) = &turn.error {
+                output.push_str(&format!(
+                    "        <div class=\"error\">Error: {}</div>\n",
+                    escape_html(error)
+                ));
+            }
+
+            output.push_str("    </div>\n\n");
+        }
+
+        // Footer
+        output.push_str("    <div class=\"footer\">\n");
+        output.push_str("        Exported with Ember AI Agent Framework\n");
+        output.push_str("    </div>\n");
+        output.push_str("</body>\n</html>\n");
+
+        output
+    }
+}
+
+/// Exported conversation format for JSON serialization.
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ConversationExport {
+    /// Export metadata
+    pub metadata: ExportMetadata,
+    /// All messages in the conversation
+    pub messages: Vec<ExportMessage>,
+    /// Tool calls made during the conversation
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub tool_calls: Vec<ExportToolCall>,
+}
+
+/// Metadata for exported conversations.
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ExportMetadata {
+    /// When the conversation was exported
+    pub exported_at: DateTime<Utc>,
+    /// When the conversation was created
+    pub created_at: DateTime<Utc>,
+    /// Conversation ID
+    pub conversation_id: String,
+    /// Provider used (if available)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub provider: Option<String>,
+    /// Model used (if available)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub model: Option<String>,
+    /// Conversation title
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub title: Option<String>,
+    /// Total tokens used
+    pub total_tokens: u32,
+    /// Number of turns
+    pub turn_count: usize,
+}
+
+/// A message in the exported format.
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ExportMessage {
+    /// Role: user, assistant, or system
+    pub role: String,
+    /// Message content
+    pub content: String,
+    /// Timestamp
+    pub timestamp: DateTime<Utc>,
+}
+
+/// A tool call in the exported format.
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ExportToolCall {
+    /// Tool name
+    pub name: String,
+    /// Tool arguments (JSON string)
+    pub arguments: String,
+    /// Tool result
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub result: Option<String>,
+    /// Timestamp
+    pub timestamp: DateTime<Utc>,
+}
+
+impl ConversationExport {
+    /// Create an export from a conversation.
+    pub fn from_conversation(
+        conv: &Conversation,
+        provider: Option<&str>,
+        model: Option<&str>,
+    ) -> Self {
+        let mut messages = Vec::new();
+        let mut tool_calls = Vec::new();
+
+        // Add system message
+        messages.push(ExportMessage {
+            role: "system".to_string(),
+            content: conv.system_prompt.clone(),
+            timestamp: conv.created_at,
+        });
+
+        // Add all turns
+        for turn in &conv.turns {
+            // User message
+            messages.push(ExportMessage {
+                role: "user".to_string(),
+                content: turn.user_message.clone(),
+                timestamp: turn.started_at,
+            });
+
+            // Tool calls
+            for (call, result) in turn.tool_calls.iter().zip(turn.tool_results.iter()) {
+                tool_calls.push(ExportToolCall {
+                    name: call.name.clone(),
+                    arguments: call.arguments.to_string(),
+                    result: Some(result.output.clone()),
+                    timestamp: turn.started_at,
+                });
+            }
+
+            // Assistant response
+            if !turn.assistant_response.is_empty() {
+                messages.push(ExportMessage {
+                    role: "assistant".to_string(),
+                    content: turn.assistant_response.clone(),
+                    timestamp: turn.completed_at.unwrap_or(turn.started_at),
+                });
+            }
+        }
+
+        let total = conv.total_tokens();
+
+        Self {
+            metadata: ExportMetadata {
+                exported_at: Utc::now(),
+                created_at: conv.created_at,
+                conversation_id: conv.id.to_string(),
+                provider: provider.map(String::from),
+                model: model.map(String::from),
+                title: conv.title.clone(),
+                total_tokens: total.total,
+                turn_count: conv.turns.len(),
+            },
+            messages,
+            tool_calls,
+        }
+    }
+}
+
+/// Escape HTML special characters.
+fn escape_html(s: &str) -> String {
+    s.replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+        .replace('"', "&quot;")
+        .replace('\'', "&#39;")
+}
+
+/// Supported export formats.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ExportFormat {
+    /// JSON format
+    Json,
+    /// Markdown format
+    Markdown,
+    /// HTML format
+    Html,
+}
+
+impl ExportFormat {
+    /// Get the file extension for this format.
+    pub fn extension(&self) -> &'static str {
+        match self {
+            ExportFormat::Json => "json",
+            ExportFormat::Markdown => "md",
+            ExportFormat::Html => "html",
+        }
+    }
+
+    /// Parse from string.
+    pub fn from_str(s: &str) -> Option<Self> {
+        match s.to_lowercase().as_str() {
+            "json" => Some(ExportFormat::Json),
+            "markdown" | "md" => Some(ExportFormat::Markdown),
+            "html" => Some(ExportFormat::Html),
+            _ => None,
+        }
+    }
 }
 
 #[cfg(test)]

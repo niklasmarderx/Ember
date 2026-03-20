@@ -36,6 +36,7 @@ pub mod embeddings;
 pub mod error;
 pub mod memory;
 pub mod rag;
+pub mod semantic_cache;
 
 #[cfg(feature = "sqlite")]
 pub mod sqlite;
@@ -60,9 +61,17 @@ pub use rag::{
     Chunker, ChunkingStrategy, OpenAIEmbedder, RagConfig, RagPipeline, RagStats, RetrievedChunk,
     RetrievedContext, TextChunk, VoyageEmbedder,
 };
+pub use semantic_cache::{
+    CacheContext, CacheEntry, CacheHit, CacheStats, CacheStatsSummary, EmbeddingProvider,
+    SemanticCache, SemanticCacheBuilder, SemanticCacheConfig, SimpleEmbedder,
+};
 
 #[cfg(feature = "sqlite")]
-pub use sqlite::{ConversationRecord, MemoryRecord, MessageRecord, SqliteConfig, SqliteStorage};
+pub use sqlite::{
+    ConversationRecord, ConversationStats, HighlightSpan, MemoryRecord, MessageRecord,
+    MessageSearchResult, SearchOptions, SearchResult as SqliteSearchResult, SearchSortBy,
+    SqliteConfig, SqliteStorage,
+};
 
 #[cfg(feature = "vector")]
 pub use vector::{
@@ -77,10 +86,14 @@ pub mod prelude {
     pub use crate::rag::{
         Chunker, ChunkingStrategy, RagConfig, RagPipeline, RetrievedChunk, RetrievedContext,
     };
+    pub use crate::semantic_cache::{
+        CacheContext, CacheHit, SemanticCache, SemanticCacheBuilder, SemanticCacheConfig,
+    };
 
     #[cfg(feature = "sqlite")]
     pub use crate::sqlite::{
-        ConversationRecord, MemoryRecord, MessageRecord, SqliteConfig, SqliteStorage,
+        ConversationRecord, ConversationStats, HighlightSpan, MemoryRecord, MessageRecord,
+        MessageSearchResult, SearchOptions, SearchSortBy, SqliteConfig, SqliteStorage,
     };
 
     #[cfg(feature = "vector")]

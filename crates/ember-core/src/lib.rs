@@ -123,7 +123,10 @@ pub use collaboration::{
 };
 pub use config::{AgentConfig, AgentConfigBuilder};
 pub use context::{Context, ContextManager};
-pub use conversation::{Conversation, ConversationId, Turn};
+pub use conversation::{
+    Conversation, ConversationExport, ConversationId, ExportFormat, ExportMessage, ExportMetadata,
+    ExportToolCall, Turn,
+};
 pub use cost_predictor::{
     BudgetAlert, BudgetConfig, CostPredictor, CostRecommendation, PredictionResult, UsageRecord,
     UsageStats,

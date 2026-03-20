@@ -67,8 +67,13 @@ pub mod openrouter;
 #[cfg(feature = "xai")]
 pub mod xai;
 
+#[cfg(feature = "bedrock")]
+pub mod bedrock;
+
+pub mod analyzer;
 pub mod model_registry;
 pub mod router;
+pub mod scorer;
 
 #[cfg(any(test, feature = "mock"))]
 pub mod mock;
@@ -105,11 +110,20 @@ pub use openrouter::OpenRouterProvider;
 #[cfg(feature = "xai")]
 pub use xai::XAIProvider;
 
+#[cfg(feature = "bedrock")]
+pub use bedrock::{BedrockConfig, BedrockModelFamily, BedrockProvider};
+
+pub use analyzer::{
+    TaskAnalysis, TaskAnalyzer, TaskComplexity, TaskConstraints, TaskRequirements, TaskType,
+};
 pub use model_registry::{
     CostEstimate, ModelCapabilities, ModelMetadata, ModelRegistry, MODEL_REGISTRY,
 };
 pub use retry::{complete_with_retry, RetryConfig};
 pub use router::LLMRouter;
+pub use scorer::{
+    ModelCapabilities as ScorerModelCapabilities, ModelRecommendation, ModelScorer, UserPreferences,
+};
 
 #[cfg(any(test, feature = "mock"))]
 pub use mock::MockProvider;

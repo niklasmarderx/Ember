@@ -14,9 +14,15 @@
 #![allow(clippy::module_name_repetitions)]
 
 use anyhow::{Context, Result};
-use clap::{Parser, Subcommand};
+use clap::{Parser, Subcommand, ValueEnum};
+use clap_complete::Shell;
 use colored::Colorize;
-use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
+use tracing_subscriber::{
+    fmt::{self, format::FmtSpan},
+    layer::SubscriberExt,
+    util::SubscriberInitExt,
+    EnvFilter,
+};
 
 mod commands;
 mod config;
@@ -25,7 +31,7 @@ mod error_display;
 #[cfg(feature = "tui")]
 mod tui;
 
-use commands::{chat, config as config_cmd, serve};
+use commands::{chat, completions, config as config_cmd, export, history, serve};
 use config::AppConfig;
 
 /// Ember CLI - AI assistant for your terminal.
@@ -68,8 +74,34 @@ struct Cli {
     #[arg(short, long, global = true, env = "EMBER_CONFIG")]
     config: Option<String>,
 
+    /// Log output format
+    #[arg(long, global = true, value_enum, default_value = "pretty", env = "EMBER_LOG_FORMAT")]
+    log_format: LogFormat,
+
+    /// Log level (trace, debug, info, warn, error)
+    #[arg(long, global = true, env = "EMBER_LOG_LEVEL")]
+    log_level: Option<String>,
+
+    /// Log output file (optional, logs to stderr by default)
+    #[arg(long, global = true, env = "EMBER_LOG_FILE")]
+    log_file: Option<String>,
+
     #[command(subcommand)]
     command: Commands,
+}
+
+/// Log output format.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, ValueEnum)]
+pub enum LogFormat {
+    /// JSON format for log aggregation tools (ELK, Datadog, Loki)
+    Json,
+    /// Human-readable colored output (default)
+    #[default]
+    Pretty,
+    /// Compact single-line format
+    Compact,
+    /// Full format with all details
+    Full,
 }
 
 #[derive(Subcommand)]
@@ -167,6 +199,104 @@ or update individual configuration values.",
 
     /// Start Ember's HTTP server for API access.
     Serve(serve::ServeArgs),
+
+    /// Export a conversation to JSON, Markdown, or HTML.
+    ///
+    /// Export chat conversations in various formats for sharing, documentation, or backup.
+    ///
+    /// Examples:
+    ///   ember export --format json --output conversation.json
+    ///   ember export --format markdown --output chat.md
+    ///   ember export --format html --output chat.html
+    #[command(
+        about = "Export a conversation to JSON, Markdown, or HTML.",
+        long_about = "Export chat conversations in various formats for sharing, documentation, or backup.
+
+Supported formats:
+  - json      - Structured data format for programmatic use
+  - markdown  - Human-readable format for documentation
+  - html      - Styled format for web sharing
+
+If no output file is specified, a timestamped filename will be generated automatically.",
+        after_help = "Examples:
+  ember export --format json
+  ember export --format markdown --output my_chat.md
+  ember export --format html --conversation abc123"
+    )]
+    Export(export::ExportArgs),
+
+    /// Search and manage conversation history.
+    ///
+    /// Search through past conversations, list recent chats, view statistics,
+    /// or prune old conversations.
+    ///
+    /// Examples:
+    ///   ember history search "rust"
+    ///   ember history list
+    ///   ember history stats
+    ///   ember history prune --older-than 2024-01-01
+    #[command(
+        about = "Search and manage conversation history.",
+        long_about = "Search and manage your conversation history.
+
+Features:
+  - Search through conversations and messages
+  - List recent conversations
+  - View statistics about your chat history
+  - Delete old conversations
+
+Search supports filtering by date range and various sorting options.",
+        after_help = "Examples:
+  ember history search \"rust ownership\"
+  ember history search \"error\" --messages-only
+  ember history list --limit 20
+  ember history stats
+  ember history prune --older-than 2024-01-01 --yes"
+    )]
+    History(history::HistoryArgs),
+
+    /// Generate shell completion scripts.
+    ///
+    /// Generates shell completions that enable tab-completion for Ember commands.
+    ///
+    /// Examples:
+    ///   ember completions bash > ~/.local/share/bash-completion/completions/ember
+    ///   ember completions zsh > ~/.zfunc/_ember
+    ///   ember completions fish > ~/.config/fish/completions/ember.fish
+    #[command(
+        about = "Generate shell completion scripts.",
+        long_about = "Generate shell completion scripts for bash, zsh, fish, PowerShell, or elvish.
+
+Shell completions enable tab-completion for Ember commands, options, and arguments,
+making the CLI much easier and faster to use.
+
+Supported shells:
+  - bash
+  - zsh
+  - fish
+  - powershell
+  - elvish",
+        after_help = "Installation:
+
+  Bash:
+    ember completions bash > ~/.local/share/bash-completion/completions/ember
+
+  Zsh:
+    mkdir -p ~/.zfunc
+    ember completions zsh > ~/.zfunc/_ember
+    # Add 'fpath+=~/.zfunc' to ~/.zshrc before compinit
+
+  Fish:
+    ember completions fish > ~/.config/fish/completions/ember.fish
+
+  PowerShell:
+    ember completions powershell >> $PROFILE"
+    )]
+    Completions {
+        /// Shell to generate completions for
+        #[arg(value_enum)]
+        shell: Shell,
+    },
 }
 
 #[derive(Subcommand)]
@@ -212,7 +342,12 @@ async fn main() {
 async fn run() -> Result<()> {
     let cli = Cli::parse();
 
-    init_logging(cli.verbose)?;
+    init_logging(
+        cli.log_format,
+        cli.verbose,
+        cli.log_level.as_deref(),
+        cli.log_file.as_deref(),
+    )?;
 
     let config = AppConfig::load(cli.config.as_deref()).context("Failed to load configuration")?;
 
@@ -273,22 +408,171 @@ async fn run() -> Result<()> {
         Commands::Serve(args) => {
             serve::run(args).await?;
         }
+
+        Commands::Completions { shell } => {
+            completions::generate_completions::<Cli>(shell)?;
+            completions::print_installation_instructions(shell);
+        }
+
+        Commands::Export(args) => {
+            export::run(args)?;
+        }
+
+        Commands::History(args) => {
+            history::execute(args).await?;
+        }
     }
 
     Ok(())
 }
 
-fn init_logging(verbose: bool) -> Result<()> {
-    let filter = if verbose {
-        EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("debug"))
-    } else {
-        EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("warn"))
-    };
+/// Initialize logging with the specified format and level.
+///
+/// # Arguments
+///
+/// * `format` - Output format (json, pretty, compact, full)
+/// * `verbose` - Enable verbose (debug) logging
+/// * `level` - Override log level (trace, debug, info, warn, error)
+/// * `log_file` - Optional file path for log output
+fn init_logging(
+    format: LogFormat,
+    verbose: bool,
+    level: Option<&str>,
+    log_file: Option<&str>,
+) -> Result<()> {
+    // Determine log level
+    let default_level = if verbose { "debug" } else { "warn" };
+    let level_str = level.unwrap_or(default_level);
 
-    tracing_subscriber::registry()
-        .with(filter)
-        .with(tracing_subscriber::fmt::layer().with_target(false))
-        .init();
+    let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new(level_str));
+
+    // Build subscriber based on format and output target
+    match (format, log_file) {
+        (LogFormat::Json, Some(file_path)) => {
+            let file = std::fs::OpenOptions::new()
+                .create(true)
+                .append(true)
+                .open(file_path)
+                .context("Failed to open log file")?;
+
+            tracing_subscriber::registry()
+                .with(filter)
+                .with(
+                    fmt::layer()
+                        .json()
+                        .with_writer(std::sync::Mutex::new(file))
+                        .with_target(true)
+                        .with_thread_ids(true)
+                        .with_file(true)
+                        .with_line_number(true)
+                        .with_span_events(FmtSpan::CLOSE),
+                )
+                .init();
+        }
+        (LogFormat::Json, None) => {
+            tracing_subscriber::registry()
+                .with(filter)
+                .with(
+                    fmt::layer()
+                        .json()
+                        .with_target(true)
+                        .with_thread_ids(true)
+                        .with_file(true)
+                        .with_line_number(true)
+                        .with_span_events(FmtSpan::CLOSE),
+                )
+                .init();
+        }
+        (LogFormat::Pretty, Some(file_path)) => {
+            let file = std::fs::OpenOptions::new()
+                .create(true)
+                .append(true)
+                .open(file_path)
+                .context("Failed to open log file")?;
+
+            tracing_subscriber::registry()
+                .with(filter)
+                .with(
+                    fmt::layer()
+                        .pretty()
+                        .with_writer(std::sync::Mutex::new(file))
+                        .with_target(true)
+                        .with_file(true)
+                        .with_line_number(true),
+                )
+                .init();
+        }
+        (LogFormat::Pretty, None) => {
+            tracing_subscriber::registry()
+                .with(filter)
+                .with(
+                    fmt::layer()
+                        .pretty()
+                        .with_target(false)
+                        .with_file(false)
+                        .with_line_number(false),
+                )
+                .init();
+        }
+        (LogFormat::Compact, Some(file_path)) => {
+            let file = std::fs::OpenOptions::new()
+                .create(true)
+                .append(true)
+                .open(file_path)
+                .context("Failed to open log file")?;
+
+            tracing_subscriber::registry()
+                .with(filter)
+                .with(
+                    fmt::layer()
+                        .compact()
+                        .with_writer(std::sync::Mutex::new(file))
+                        .with_target(true),
+                )
+                .init();
+        }
+        (LogFormat::Compact, None) => {
+            tracing_subscriber::registry()
+                .with(filter)
+                .with(fmt::layer().compact().with_target(true))
+                .init();
+        }
+        (LogFormat::Full, Some(file_path)) => {
+            let file = std::fs::OpenOptions::new()
+                .create(true)
+                .append(true)
+                .open(file_path)
+                .context("Failed to open log file")?;
+
+            tracing_subscriber::registry()
+                .with(filter)
+                .with(
+                    fmt::layer()
+                        .with_writer(std::sync::Mutex::new(file))
+                        .with_target(true)
+                        .with_thread_ids(true)
+                        .with_thread_names(true)
+                        .with_file(true)
+                        .with_line_number(true)
+                        .with_span_events(FmtSpan::FULL),
+                )
+                .init();
+        }
+        (LogFormat::Full, None) => {
+            tracing_subscriber::registry()
+                .with(filter)
+                .with(
+                    fmt::layer()
+                        .with_target(true)
+                        .with_thread_ids(true)
+                        .with_thread_names(true)
+                        .with_file(true)
+                        .with_line_number(true)
+                        .with_span_events(FmtSpan::FULL),
+                )
+                .init();
+        }
+    }
 
     Ok(())
 }

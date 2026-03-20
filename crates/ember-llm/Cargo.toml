@@ -17,6 +17,7 @@ mistral = []
 deepseek = []
 openrouter = []
 xai = []
+bedrock = ["dep:chrono"]
 local = ["dep:llama-cpp-2"]
 retry-provider = []
 mock = []
@@ -50,6 +51,9 @@ tokio-util = { version = "0.7", features = ["io"] }
 
 # Local LLM (optional)
 llama-cpp-2 = { version = "0.1", optional = true }
+
+# AWS Bedrock support (optional)
+chrono = { version = "0.4", optional = true }
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["test-util"] }

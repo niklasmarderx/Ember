@@ -237,6 +237,322 @@ impl SqliteStorage {
         Ok(affected > 0)
     }
 
+    /// Update a conversation's title.
+    pub async fn update_conversation_title(&self, id: &str, title: &str) -> Result<bool> {
+        let now = Utc::now().to_rfc3339();
+        let conn = self.conn.lock().await;
+        let affected = conn.execute(
+            "UPDATE conversations SET title = ?1, updated_at = ?2 WHERE id = ?3",
+            params![title, now, id],
+        )?;
+        Ok(affected > 0)
+    }
+
+    // =========================================================================
+    // Search Operations
+    // =========================================================================
+
+    /// Search conversations and messages by keyword.
+    ///
+    /// Returns conversations that match the search query in either the title
+    /// or the message content.
+    pub async fn search_conversations(
+        &self,
+        query: &str,
+        options: SearchOptions,
+    ) -> Result<Vec<SearchResult>> {
+        let conn = self.conn.lock().await;
+
+        // Build the search query
+        let search_pattern = format!("%{}%", query.to_lowercase());
+
+        let mut sql = String::from(
+            r#"
+            SELECT DISTINCT 
+                c.id,
+                c.title,
+                c.created_at,
+                c.updated_at,
+                (SELECT COUNT(*) FROM messages WHERE conversation_id = c.id) as message_count,
+                (SELECT content FROM messages WHERE conversation_id = c.id AND LOWER(content) LIKE ?1 ORDER BY created_at LIMIT 1) as matching_snippet
+            FROM conversations c
+            LEFT JOIN messages m ON m.conversation_id = c.id
+            WHERE (LOWER(c.title) LIKE ?1 OR LOWER(m.content) LIKE ?1)
+            "#,
+        );
+
+        // Add date filters if specified
+        if options.from_date.is_some() || options.to_date.is_some() {
+            if let Some(ref from) = options.from_date {
+                sql.push_str(&format!(" AND c.created_at >= '{}'", from));
+            }
+            if let Some(ref to) = options.to_date {
+                sql.push_str(&format!(" AND c.created_at <= '{}'", to));
+            }
+        }
+
+        // Add sorting
+        let order = match options.sort_by {
+            SearchSortBy::Relevance => "matching_snippet IS NOT NULL DESC, c.updated_at DESC",
+            SearchSortBy::DateNewest => "c.updated_at DESC",
+            SearchSortBy::DateOldest => "c.updated_at ASC",
+            SearchSortBy::MessageCount => "message_count DESC",
+        };
+        sql.push_str(&format!(" ORDER BY {}", order));
+
+        // Add pagination
+        sql.push_str(&format!(" LIMIT {} OFFSET {}", options.limit, options.offset));
+
+        let mut stmt = conn.prepare(&sql)?;
+        let rows = stmt.query_map(params![search_pattern], |row| {
+            let matching_snippet: Option<String> = row.get(5)?;
+            let snippet = matching_snippet.map(|content| Self::extract_snippet(&content, query));
+
+            Ok(SearchResult {
+                conversation_id: row.get(0)?,
+                title: row.get(1)?,
+                created_at: row.get(2)?,
+                updated_at: row.get(3)?,
+                message_count: row.get(4)?,
+                snippet,
+                highlights: Vec::new(), // Will be populated below
+            })
+        })?;
+
+        let mut results = Vec::new();
+        for row in rows {
+            let mut result = row?;
+            // Add highlight positions
+            if let Some(ref snippet) = result.snippet {
+                result.highlights = Self::find_highlights(snippet, query);
+            }
+            results.push(result);
+        }
+
+        debug!(query = %query, results = results.len(), "Search completed");
+        Ok(results)
+    }
+
+    /// Search only within message content.
+    pub async fn search_messages(
+        &self,
+        query: &str,
+        conversation_id: Option<&str>,
+        limit: usize,
+    ) -> Result<Vec<MessageSearchResult>> {
+        let conn = self.conn.lock().await;
+        let search_pattern = format!("%{}%", query.to_lowercase());
+
+        // Build query based on whether we're filtering by conversation
+        let (sql, raw_results): (&str, Vec<(String, String, Option<String>, String, String, String)>) = 
+            if let Some(conv_id) = conversation_id {
+                let sql = r#"
+                    SELECT 
+                        m.id,
+                        m.conversation_id,
+                        c.title as conversation_title,
+                        m.role,
+                        m.content,
+                        m.created_at
+                    FROM messages m
+                    JOIN conversations c ON c.id = m.conversation_id
+                    WHERE LOWER(m.content) LIKE ?1 AND m.conversation_id = ?2
+                    ORDER BY m.created_at DESC
+                    LIMIT ?3
+                "#;
+                let mut stmt = conn.prepare(sql)?;
+                let rows = stmt.query_map(params![search_pattern, conv_id, limit as i64], |row| {
+                    Ok((
+                        row.get::<_, String>(0)?,
+                        row.get::<_, String>(1)?,
+                        row.get::<_, Option<String>>(2)?,
+                        row.get::<_, String>(3)?,
+                        row.get::<_, String>(4)?,
+                        row.get::<_, String>(5)?,
+                    ))
+                })?;
+                let results: Vec<_> = rows.filter_map(|r| r.ok()).collect();
+                (sql, results)
+            } else {
+                let sql = r#"
+                    SELECT 
+                        m.id,
+                        m.conversation_id,
+                        c.title as conversation_title,
+                        m.role,
+                        m.content,
+                        m.created_at
+                    FROM messages m
+                    JOIN conversations c ON c.id = m.conversation_id
+                    WHERE LOWER(m.content) LIKE ?1
+                    ORDER BY m.created_at DESC
+                    LIMIT ?2
+                "#;
+                let mut stmt = conn.prepare(sql)?;
+                let rows = stmt.query_map(params![search_pattern, limit as i64], |row| {
+                    Ok((
+                        row.get::<_, String>(0)?,
+                        row.get::<_, String>(1)?,
+                        row.get::<_, Option<String>>(2)?,
+                        row.get::<_, String>(3)?,
+                        row.get::<_, String>(4)?,
+                        row.get::<_, String>(5)?,
+                    ))
+                })?;
+                let results: Vec<_> = rows.filter_map(|r| r.ok()).collect();
+                (sql, results)
+            };
+
+        // Suppress unused variable warning
+        let _ = sql;
+
+        // Convert raw results to MessageSearchResult with snippets and highlights
+        let results = raw_results
+            .into_iter()
+            .map(|(message_id, conv_id, conv_title, role, content, created_at)| {
+                let snippet = Some(Self::extract_snippet(&content, query));
+                let highlights = Self::find_highlights(&content, query);
+                MessageSearchResult {
+                    message_id,
+                    conversation_id: conv_id,
+                    conversation_title: conv_title,
+                    role,
+                    content,
+                    created_at,
+                    snippet,
+                    highlights,
+                }
+            })
+            .collect();
+
+        Ok(results)
+    }
+
+    /// Get conversation count by date range.
+    pub async fn get_conversation_stats(
+        &self,
+        from_date: Option<&str>,
+        to_date: Option<&str>,
+    ) -> Result<ConversationStats> {
+        let conn = self.conn.lock().await;
+
+        let mut sql = "SELECT COUNT(*) FROM conversations WHERE 1=1".to_string();
+        if from_date.is_some() {
+            sql.push_str(" AND created_at >= ?1");
+        }
+        if to_date.is_some() {
+            sql.push_str(" AND created_at <= ?2");
+        }
+
+        let count: i64 = match (from_date, to_date) {
+            (Some(from), Some(to)) => {
+                conn.query_row(&sql, params![from, to], |row| row.get(0))?
+            }
+            (Some(from), None) => conn.query_row(&sql, params![from], |row| row.get(0))?,
+            (None, Some(to)) => {
+                sql = "SELECT COUNT(*) FROM conversations WHERE created_at <= ?1".to_string();
+                conn.query_row(&sql, params![to], |row| row.get(0))?
+            }
+            (None, None) => conn.query_row(&sql, [], |row| row.get(0))?,
+        };
+
+        let message_count: i64 = conn.query_row("SELECT COUNT(*) FROM messages", [], |row| {
+            row.get(0)
+        })?;
+
+        let oldest: Option<String> = conn
+            .query_row(
+                "SELECT created_at FROM conversations ORDER BY created_at ASC LIMIT 1",
+                [],
+                |row| row.get(0),
+            )
+            .optional()?;
+
+        let newest: Option<String> = conn
+            .query_row(
+                "SELECT created_at FROM conversations ORDER BY created_at DESC LIMIT 1",
+                [],
+                |row| row.get(0),
+            )
+            .optional()?;
+
+        Ok(ConversationStats {
+            total_conversations: count as usize,
+            total_messages: message_count as usize,
+            oldest_conversation: oldest,
+            newest_conversation: newest,
+        })
+    }
+
+    /// Delete conversations older than the specified date.
+    pub async fn prune_conversations(&self, older_than: &str) -> Result<usize> {
+        let conn = self.conn.lock().await;
+        let affected = conn.execute(
+            "DELETE FROM conversations WHERE created_at < ?1",
+            params![older_than],
+        )?;
+        info!(deleted = affected, older_than = %older_than, "Pruned old conversations");
+        Ok(affected)
+    }
+
+    /// Extract a snippet from content around the matching query.
+    fn extract_snippet(content: &str, query: &str) -> String {
+        let content_lower = content.to_lowercase();
+        let query_lower = query.to_lowercase();
+
+        if let Some(pos) = content_lower.find(&query_lower) {
+            let start = pos.saturating_sub(50);
+            let end = (pos + query.len() + 50).min(content.len());
+
+            // Find word boundaries
+            let start = content[..start]
+                .rfind(char::is_whitespace)
+                .map(|p| p + 1)
+                .unwrap_or(start);
+            let end = content[end..]
+                .find(char::is_whitespace)
+                .map(|p| end + p)
+                .unwrap_or(end);
+
+            let mut snippet = String::new();
+            if start > 0 {
+                snippet.push_str("...");
+            }
+            snippet.push_str(content[start..end].trim());
+            if end < content.len() {
+                snippet.push_str("...");
+            }
+            snippet
+        } else {
+            // Return first 100 chars if no match found
+            let end = content.len().min(100);
+            let mut snippet = content[..end].to_string();
+            if end < content.len() {
+                snippet.push_str("...");
+            }
+            snippet
+        }
+    }
+
+    /// Find highlight positions for the query in the content.
+    fn find_highlights(content: &str, query: &str) -> Vec<HighlightSpan> {
+        let content_lower = content.to_lowercase();
+        let query_lower = query.to_lowercase();
+        let mut highlights = Vec::new();
+
+        let mut search_start = 0;
+        while let Some(pos) = content_lower[search_start..].find(&query_lower) {
+            let absolute_pos = search_start + pos;
+            highlights.push(HighlightSpan {
+                start: absolute_pos,
+                end: absolute_pos + query.len(),
+            });
+            search_start = absolute_pos + query.len();
+        }
+
+        highlights
+    }
+
     // =========================================================================
     // Message Operations
     // =========================================================================
@@ -552,6 +868,113 @@ pub struct MemoryRecord {
     pub tags: Option<Vec<String>>,
     /// Optional JSON metadata.
     pub metadata: Option<String>,
+}
+
+// =========================================================================
+// Search Types
+// =========================================================================
+
+/// Options for conversation search.
+#[derive(Debug, Clone)]
+pub struct SearchOptions {
+    /// How to sort results.
+    pub sort_by: SearchSortBy,
+    /// Filter: only conversations created after this date.
+    pub from_date: Option<String>,
+    /// Filter: only conversations created before this date.
+    pub to_date: Option<String>,
+    /// Maximum number of results to return.
+    pub limit: usize,
+    /// Number of results to skip (for pagination).
+    pub offset: usize,
+}
+
+impl Default for SearchOptions {
+    fn default() -> Self {
+        Self {
+            sort_by: SearchSortBy::Relevance,
+            from_date: None,
+            to_date: None,
+            limit: 20,
+            offset: 0,
+        }
+    }
+}
+
+/// Sort order for search results.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum SearchSortBy {
+    /// Sort by relevance (matches in title first, then by date).
+    #[default]
+    Relevance,
+    /// Sort by date, newest first.
+    DateNewest,
+    /// Sort by date, oldest first.
+    DateOldest,
+    /// Sort by number of messages.
+    MessageCount,
+}
+
+/// A search result for conversation search.
+#[derive(Debug, Clone)]
+pub struct SearchResult {
+    /// The conversation ID.
+    pub conversation_id: String,
+    /// The conversation title.
+    pub title: Option<String>,
+    /// When the conversation was created.
+    pub created_at: String,
+    /// When the conversation was last updated.
+    pub updated_at: String,
+    /// Number of messages in the conversation.
+    pub message_count: i64,
+    /// A snippet showing the matching content.
+    pub snippet: Option<String>,
+    /// Positions of highlighted matches in the snippet.
+    pub highlights: Vec<HighlightSpan>,
+}
+
+/// A search result for message search.
+#[derive(Debug, Clone)]
+pub struct MessageSearchResult {
+    /// The message ID.
+    pub message_id: String,
+    /// The conversation ID containing this message.
+    pub conversation_id: String,
+    /// The conversation title.
+    pub conversation_title: Option<String>,
+    /// The message role (user, assistant, system).
+    pub role: String,
+    /// The full message content.
+    pub content: String,
+    /// When the message was created.
+    pub created_at: String,
+    /// A snippet showing the matching content.
+    pub snippet: Option<String>,
+    /// Positions of highlighted matches.
+    pub highlights: Vec<HighlightSpan>,
+}
+
+/// Statistics about conversations.
+#[derive(Debug, Clone)]
+pub struct ConversationStats {
+    /// Total number of conversations.
+    pub total_conversations: usize,
+    /// Total number of messages across all conversations.
+    pub total_messages: usize,
+    /// Timestamp of the oldest conversation.
+    pub oldest_conversation: Option<String>,
+    /// Timestamp of the newest conversation.
+    pub newest_conversation: Option<String>,
+}
+
+/// A span indicating highlighted text position.
+#[derive(Debug, Clone, Copy)]
+pub struct HighlightSpan {
+    /// Start position (byte offset).
+    pub start: usize,
+    /// End position (byte offset).
+    pub end: usize,
 }
 
 #[cfg(test)]
