@@ -45,6 +45,9 @@ tracing = { workspace = true }
 # Regex for routing
 regex = { workspace = true }
 
+# Base64 encoding for vision
+base64 = "0.22"
+
 # Streaming utilities
 async-stream = "0.3"
 tokio-util = { version = "0.7", features = ["io"] }

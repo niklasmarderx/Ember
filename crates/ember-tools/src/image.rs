@@ -14,7 +14,7 @@ use serde_json::{json, Value};
 use std::path::{Path, PathBuf};
 use tokio::fs;
 use tokio::process::Command;
-use tracing::{debug, warn};
+use tracing::debug;
 
 use crate::{Error, Result, ToolDefinition, ToolHandler, ToolOutput};
 
@@ -236,9 +236,8 @@ impl ImageTool {
             return true;
         }
 
-        let path = match path.canonicalize() {
-            Ok(p) => p,
-            Err(_) => return false,
+        let Ok(path) = path.canonicalize() else {
+            return false;
         };
 
         self.config.allowed_dirs.iter().any(|allowed| {
@@ -251,7 +250,7 @@ impl ImageTool {
     }
 
     /// Execute image operation.
-    pub async fn execute(&self, operation: ImageOperation) -> Result<ToolOutput> {
+    pub async fn execute_operation(&self, operation: ImageOperation) -> Result<ToolOutput> {
         match operation {
             ImageOperation::Info { path } => self.get_info(&path).await,
             ImageOperation::Resize {
@@ -318,7 +317,7 @@ impl ImageTool {
         // Use ImageMagick identify if available
         if self.config.use_imagemagick {
             if let Ok(info) = self.identify_with_imagemagick(path).await {
-                return Ok(ToolOutput::success(json!(info)));
+                return Ok(ToolOutput::success(serde_json::to_string(&info).unwrap_or_default()));
             }
         }
 
@@ -342,7 +341,7 @@ impl ImageTool {
             exif: None,
         };
 
-        Ok(ToolOutput::success(json!(info)))
+        Ok(ToolOutput::success(serde_json::to_string(&info).unwrap_or_default()))
     }
 
     async fn identify_with_imagemagick(&self, path: &Path) -> Result<ImageMetadata> {
@@ -439,11 +438,11 @@ impl ImageTool {
             .map_err(|e| Error::execution_failed("image", format!("ImageMagick error: {}", e)))?;
 
         if output.status.success() {
-            Ok(ToolOutput::success(json!({
+            Ok(ToolOutput::success(serde_json::to_string(&json!({
                 "status": "success",
                 "output": output_path.display().to_string(),
                 "geometry": geometry
-            })))
+            })).unwrap_or_default()))
         } else {
             Err(Error::execution_failed(
                 "image",
@@ -488,11 +487,11 @@ impl ImageTool {
             .map_err(|e| Error::execution_failed("image", format!("ImageMagick error: {}", e)))?;
 
         if output_result.status.success() {
-            Ok(ToolOutput::success(json!({
+            Ok(ToolOutput::success(serde_json::to_string(&json!({
                 "status": "success",
                 "output": output_path.display().to_string(),
                 "format": format.extension()
-            })))
+            })).unwrap_or_default()))
         } else {
             Err(Error::execution_failed(
                 "image",
@@ -526,11 +525,11 @@ impl ImageTool {
             .map_err(|e| Error::execution_failed("image", format!("ImageMagick error: {}", e)))?;
 
         if output_result.status.success() {
-            Ok(ToolOutput::success(json!({
+            Ok(ToolOutput::success(serde_json::to_string(&json!({
                 "status": "success",
                 "output": output_path.display().to_string(),
                 "rotation": degrees
-            })))
+            })).unwrap_or_default()))
         } else {
             Err(Error::execution_failed(
                 "image",
@@ -561,11 +560,11 @@ impl ImageTool {
             .map_err(|e| Error::execution_failed("image", format!("ImageMagick error: {}", e)))?;
 
         if output_result.status.success() {
-            Ok(ToolOutput::success(json!({
+            Ok(ToolOutput::success(serde_json::to_string(&json!({
                 "status": "success",
                 "output": output_path.display().to_string(),
                 "direction": format!("{:?}", direction)
-            })))
+            })).unwrap_or_default()))
         } else {
             Err(Error::execution_failed(
                 "image",
@@ -613,7 +612,7 @@ impl ImageTool {
             .map_err(|e| Error::execution_failed("image", format!("ImageMagick error: {}", e)))?;
 
         if output_result.status.success() {
-            Ok(ToolOutput::success(json!({
+            Ok(ToolOutput::success(serde_json::to_string(&json!({
                 "status": "success",
                 "output": output_path.display().to_string(),
                 "crop": {
@@ -622,7 +621,7 @@ impl ImageTool {
                     "width": width,
                     "height": height
                 }
-            })))
+            })).unwrap_or_default()))
         } else {
             Err(Error::execution_failed(
                 "image",
@@ -649,11 +648,11 @@ impl ImageTool {
             .map_err(|e| Error::execution_failed("image", format!("ImageMagick error: {}", e)))?;
 
         if output_result.status.success() {
-            Ok(ToolOutput::success(json!({
+            Ok(ToolOutput::success(serde_json::to_string(&json!({
                 "status": "success",
                 "output": output_path.display().to_string(),
                 "max_size": size
-            })))
+            })).unwrap_or_default()))
         } else {
             Err(Error::execution_failed(
                 "image",
@@ -748,7 +747,7 @@ impl ToolHandler for ImageTool {
         }
     }
 
-    async fn call(&self, arguments: Value) -> Result<ToolOutput> {
+    async fn execute(&self, arguments: Value) -> Result<ToolOutput> {
         debug!("Image tool called with: {:?}", arguments);
 
         let operation: ImageOperation =
@@ -756,7 +755,7 @@ impl ToolHandler for ImageTool {
                 Error::invalid_arguments("image", format!("Invalid arguments: {}", e))
             })?;
 
-        self.execute(operation).await
+        self.execute_operation(operation).await
     }
 }
 

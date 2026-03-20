@@ -90,9 +90,9 @@ pub use runtime::{LoadedPlugin, PluginInput, PluginOutput, PluginRuntime, Runtim
 
 #[cfg(feature = "marketplace")]
 pub use marketplace::{
-    CacheStats, CachedPluginInfo, FeaturedPlugins, MarketplaceClient, PluginAuthor, PluginCache,
-    PluginRegistryEntry, PluginSearchQuery, PluginSearchResults, PluginSortField, SortOrder,
-    TagInfo,
+    Author, InstalledPlugin, License, PluginCategory as MarketplacePluginCategory, PluginDependency,
+    PluginMetadata, PluginReview, PluginStats, PluginUpdate, PluginVersion, SearchQuery,
+    SearchResults, SearchSort, SemVer, SortOrder, VersionParseError, VersionRequirement,
 };
 
 #[cfg(feature = "hot-reload")]
@@ -117,7 +117,7 @@ pub mod prelude {
 
     #[cfg(feature = "marketplace")]
     pub use crate::marketplace::{
-        CachedPluginInfo, MarketplaceClient, PluginCache, PluginRegistryEntry, PluginSearchQuery,
+        InstalledPlugin, PluginMetadata, SearchQuery, SearchResults,
     };
 
     #[cfg(feature = "hot-reload")]

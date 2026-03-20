@@ -139,7 +139,7 @@ impl InputValidator {
 
         // File path detection regex (Unix and Windows)
         let path_regex = Regex::new(
-            r"(?:^|[\s\"'])(?:/[\w.-]+)+|(?:[A-Za-z]:)?\\[\w.-\\]+"
+            r#"(?:^|[\s"'])(?:/[\w.-]+)+|(?:[A-Za-z]:)?\\[\w.-\\]+"#
         ).unwrap();
 
         // Common injection patterns

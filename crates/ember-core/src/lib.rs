@@ -180,7 +180,7 @@ pub use tool_selector::{
     ToolSelectorConfig,
 };
 pub use context_manager::{
-    ContextManagerV2, ContextManagerBuilder as ContextManagerV2Builder, ContextMessage,
+    ContextManager as ContextManagerV2, ContextManagerBuilder as ContextManagerV2Builder, ContextMessage,
     MessageRole, PruningStrategy, PriorityWeights, TokenCount,
 };
 pub use security::{

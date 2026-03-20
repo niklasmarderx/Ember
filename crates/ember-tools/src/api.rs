@@ -92,10 +92,11 @@ impl HttpMethod {
 }
 
 /// Authentication scheme.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum AuthScheme {
     /// No authentication
+    #[default]
     None,
     /// API key in header
     ApiKey {
@@ -123,11 +124,6 @@ pub enum AuthScheme {
     },
 }
 
-impl Default for AuthScheme {
-    fn default() -> Self {
-        AuthScheme::None
-    }
-}
 
 /// API request configuration.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -239,7 +235,7 @@ impl ApiTool {
 
     /// Execute API request.
     #[cfg(feature = "web")]
-    pub async fn execute(&self, request: ApiRequest) -> Result<ApiResponse> {
+    pub async fn execute_request(&self, request: ApiRequest) -> Result<ApiResponse> {
         self.is_host_allowed(&request.url)?;
 
         let start = std::time::Instant::now();
@@ -260,7 +256,7 @@ impl ApiTool {
                         return Err(e);
                     }
                     warn!("API request failed, retrying ({}/{}): {}", retries, self.config.max_retries, e);
-                    tokio::time::sleep(Duration::from_millis(self.config.retry_delay_ms * retries as u64)).await;
+                    tokio::time::sleep(Duration::from_millis(self.config.retry_delay_ms * u64::from(retries))).await;
                 }
             }
         }
@@ -381,7 +377,7 @@ impl ApiTool {
             .and_then(|v| v.to_str().ok())
             .map(String::from);
 
-        let content_length = response
+        let _content_length: Option<usize> = response
             .headers()
             .get(reqwest::header::CONTENT_LENGTH)
             .and_then(|v| v.to_str().ok())
@@ -435,7 +431,7 @@ impl ApiTool {
     }
 
     #[cfg(not(feature = "web"))]
-    pub async fn execute(&self, _request: ApiRequest) -> Result<ApiResponse> {
+    pub async fn execute_request(&self, _request: ApiRequest) -> Result<ApiResponse> {
         Err(Error::execution_failed(
             "api",
             "API tool requires the 'web' feature to be enabled",
@@ -533,15 +529,15 @@ impl ToolHandler for ApiTool {
         }
     }
 
-    async fn call(&self, arguments: Value) -> Result<ToolOutput> {
+    async fn execute(&self, arguments: Value) -> Result<ToolOutput> {
         debug!("API tool called with: {:?}", arguments);
 
         let request: ApiRequest = serde_json::from_value(arguments)
             .map_err(|e| Error::invalid_arguments("api", format!("Invalid arguments: {}", e)))?;
 
-        let response = self.execute(request).await?;
+        let response = self.execute_request(request).await?;
 
-        Ok(ToolOutput::success(json!(response)))
+        Ok(ToolOutput::success(serde_json::to_string(&response).unwrap_or_default()))
     }
 }
 

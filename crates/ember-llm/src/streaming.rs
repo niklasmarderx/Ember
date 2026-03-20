@@ -7,13 +7,13 @@
 //! - Streaming metrics and monitoring
 
 use async_trait::async_trait;
-use futures::{Stream, StreamExt};
+use futures::Stream;
 use std::pin::Pin;
 use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::task::{Context, Poll};
 use std::time::{Duration, Instant};
-use tokio::sync::{mpsc, Semaphore};
+use tokio::sync::Semaphore;
 
 use crate::{Result, StreamChunk};
 
@@ -218,7 +218,7 @@ where
 
         match Pin::new(&mut self.inner).poll_next(cx) {
             Poll::Ready(Some(Ok(chunk))) => {
-                let bytes = chunk.content.len();
+                let bytes = chunk.content.as_ref().map(|s| s.len()).unwrap_or(0);
                 self.add_to_buffer(bytes);
                 self.metrics.record_bytes(bytes);
                 self.metrics.record_chunk();
@@ -392,7 +392,8 @@ where
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         while self.current_index < self.streams.len() {
-            match Pin::new(&mut self.streams[self.current_index]).poll_next(cx) {
+            let idx = self.current_index;
+            match Pin::new(&mut self.streams[idx]).poll_next(cx) {
                 Poll::Ready(Some(item)) => return Poll::Ready(Some(item)),
                 Poll::Ready(None) => {
                     self.current_index += 1;
@@ -468,11 +469,10 @@ mod tests {
 
     fn make_chunk(content: &str) -> StreamChunk {
         StreamChunk {
-            content: content.to_string(),
+            content: Some(content.to_string()),
             done: false,
-            tool_calls: vec![],
+            tool_calls: None,
             finish_reason: None,
-            usage: None,
         }
     }
 
@@ -537,8 +537,11 @@ mod tests {
         let mut aggregator = StreamAggregator::new(vec![stream1, stream2]);
         
         let mut results = vec![];
+        use futures::StreamExt;
         while let Some(Ok(chunk)) = aggregator.next().await {
-            results.push(chunk.content);
+            if let Some(content) = chunk.content {
+                results.push(content);
+            }
         }
         
         assert_eq!(results, vec!["a", "b", "c"]);

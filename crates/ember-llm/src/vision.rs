@@ -25,23 +25,32 @@ pub enum ImageSource {
     /// Base64-encoded image data
     #[serde(rename = "base64")]
     Base64 {
+        /// The base64-encoded image data
         data: String,
+        /// The media type of the image
         media_type: MediaType,
     },
     /// URL to the image
     #[serde(rename = "url")]
-    Url { url: String },
+    Url {
+        /// The URL to the image
+        url: String,
+    },
 }
 
 /// Supported image media types
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 pub enum MediaType {
+    /// JPEG image format
     #[serde(rename = "image/jpeg")]
     Jpeg,
+    /// PNG image format
     #[serde(rename = "image/png")]
     Png,
+    /// GIF image format
     #[serde(rename = "image/gif")]
     Gif,
+    /// WebP image format
     #[serde(rename = "image/webp")]
     WebP,
 }
@@ -95,7 +104,10 @@ pub struct MultimodalContent {
 pub enum ContentPart {
     /// Text content
     #[serde(rename = "text")]
-    Text { text: String },
+    Text {
+        /// The text content
+        text: String,
+    },
     /// Image content
     #[serde(rename = "image")]
     Image(ImageInput),

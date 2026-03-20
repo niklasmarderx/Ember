@@ -6,10 +6,8 @@ use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::collections::HashMap;
-use std::path::PathBuf;
 
-use crate::error::{ToolError, ToolResult};
-use crate::Tool;
+use crate::{Error, Result, ToolDefinition, ToolHandler, ToolOutput};
 
 /// Supported database types
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -163,10 +161,10 @@ impl DatabaseTool {
     }
 
     /// Validate the SQL query against configuration
-    fn validate_query(&self, sql: &str) -> ToolResult<()> {
+    fn validate_query(&self, sql: &str) -> Result<()> {
         // Check write access
         if !self.config.allow_write && !self.is_read_only_query(sql) {
-            return Err(ToolError::NotAllowed(
+            return Err(Error::PathNotAllowed(
                 "Write operations are not allowed. This database is read-only.".to_string()
             ));
         }
@@ -175,7 +173,7 @@ impl DatabaseTool {
         let tables = self.extract_tables_from_sql(sql);
         for table in tables {
             if !self.is_table_allowed(&table) {
-                return Err(ToolError::NotAllowed(
+                return Err(Error::PathNotAllowed(
                     format!("Access to table '{}' is not allowed.", table)
                 ));
             }
@@ -185,15 +183,15 @@ impl DatabaseTool {
     }
 
     /// Execute a query on SQLite database
-    #[cfg(feature = "sqlite")]
-    async fn execute_sqlite(&self, sql: &str) -> ToolResult<QueryResult> {
+    #[cfg(feature = "rusqlite")]
+    async fn execute_sqlite(&self, sql: &str) -> Result<QueryResult> {
         use rusqlite::Connection;
         
         let conn = Connection::open(&self.config.connection)
-            .map_err(|e| ToolError::ExecutionFailed(format!("Failed to open database: {}", e)))?;
+            .map_err(|e| Error::execution_failed("database", format!("Failed to open database: {}", e)))?;
         
         let mut stmt = conn.prepare(sql)
-            .map_err(|e| ToolError::ExecutionFailed(format!("Failed to prepare statement: {}", e)))?;
+            .map_err(|e| Error::execution_failed("database", format!("Failed to prepare statement: {}", e)))?;
         
         let column_names: Vec<String> = stmt.column_names()
             .into_iter()
@@ -216,7 +214,7 @@ impl DatabaseTool {
                 }
                 Ok(map)
             })
-            .map_err(|e| ToolError::ExecutionFailed(format!("Query failed: {}", e)))?
+            .map_err(|e| Error::execution_failed("database", format!("Query failed: {}", e)))?
             .take(self.config.max_rows)
             .filter_map(|r| r.ok())
             .collect();
@@ -229,9 +227,9 @@ impl DatabaseTool {
     }
 
     /// Execute a query (fallback without SQLite feature)
-    #[cfg(not(feature = "sqlite"))]
-    async fn execute_sqlite(&self, _sql: &str) -> ToolResult<QueryResult> {
-        Err(ToolError::NotAvailable(
+    #[cfg(not(feature = "rusqlite"))]
+    async fn execute_sqlite(&self, _sql: &str) -> Result<QueryResult> {
+        Err(Error::ToolDisabled(
             "SQLite support is not compiled. Enable the 'sqlite' feature.".to_string()
         ))
     }
@@ -308,47 +306,40 @@ impl QueryResult {
 }
 
 #[async_trait]
-impl Tool for DatabaseTool {
-    fn name(&self) -> &str {
-        "database"
-    }
-
-    fn description(&self) -> &str {
-        "Execute SQL queries on a database. Supports SELECT queries and optionally write operations."
-    }
-
-    fn parameters_schema(&self) -> Value {
-        json!({
-            "type": "object",
-            "properties": {
-                "operation": {
-                    "type": "string",
-                    "description": "The operation to perform",
-                    "enum": ["query", "schema", "tables"]
+impl ToolHandler for DatabaseTool {
+    fn definition(&self) -> ToolDefinition {
+        ToolDefinition::new("database", "Execute SQL queries on a database. Supports SELECT queries and optionally write operations.")
+            .with_parameters(json!({
+                "type": "object",
+                "properties": {
+                    "operation": {
+                        "type": "string",
+                        "description": "The operation to perform",
+                        "enum": ["query", "schema", "tables"]
+                    },
+                    "sql": {
+                        "type": "string",
+                        "description": "The SQL query to execute (for 'query' operation)"
+                    },
+                    "table": {
+                        "type": "string",
+                        "description": "Table name (for 'schema' operation)"
+                    }
                 },
-                "sql": {
-                    "type": "string",
-                    "description": "The SQL query to execute (for 'query' operation)"
-                },
-                "table": {
-                    "type": "string",
-                    "description": "Table name (for 'schema' operation)"
-                }
-            },
-            "required": ["operation"]
-        })
+                "required": ["operation"]
+            }))
     }
 
-    async fn execute(&self, args: Value) -> ToolResult<Value> {
+    async fn execute(&self, args: Value) -> Result<ToolOutput> {
         let operation = args.get("operation")
             .and_then(|v| v.as_str())
-            .ok_or_else(|| ToolError::InvalidArguments("Missing 'operation' argument".to_string()))?;
+            .ok_or_else(|| Error::invalid_arguments("database", "Missing 'operation' argument"))?;
 
         match operation {
             "query" => {
                 let sql = args.get("sql")
                     .and_then(|v| v.as_str())
-                    .ok_or_else(|| ToolError::InvalidArguments("Missing 'sql' argument".to_string()))?;
+                    .ok_or_else(|| Error::invalid_arguments("database", "Missing 'sql' argument"))?;
                 
                 // Validate the query
                 self.validate_query(sql)?;
@@ -357,21 +348,23 @@ impl Tool for DatabaseTool {
                 let result = match self.config.db_type {
                     DatabaseType::Sqlite => self.execute_sqlite(sql).await?,
                     DatabaseType::Postgres => {
-                        return Err(ToolError::NotAvailable("PostgreSQL not yet implemented".to_string()));
+                        return Err(Error::ToolDisabled("PostgreSQL not yet implemented".to_string()));
                     }
                     DatabaseType::Mysql => {
-                        return Err(ToolError::NotAvailable("MySQL not yet implemented".to_string()));
+                        return Err(Error::ToolDisabled("MySQL not yet implemented".to_string()));
                     }
                 };
                 
-                Ok(json!({
-                    "success": true,
-                    "columns": result.columns,
-                    "rows": result.rows,
-                    "row_count": result.rows.len(),
-                    "truncated": result.truncated,
-                    "formatted": result.to_table_string()
-                }))
+                Ok(ToolOutput::success_with_data(
+                    result.to_table_string(),
+                    json!({
+                        "success": true,
+                        "columns": result.columns,
+                        "rows": result.rows,
+                        "row_count": result.rows.len(),
+                        "truncated": result.truncated
+                    })
+                ))
             }
             "tables" => {
                 // List all tables
@@ -383,7 +376,7 @@ impl Tool for DatabaseTool {
                 
                 let result = match self.config.db_type {
                     DatabaseType::Sqlite => self.execute_sqlite(sql).await?,
-                    _ => return Err(ToolError::NotAvailable("Only SQLite is currently implemented".to_string())),
+                    _ => return Err(Error::ToolDisabled("Only SQLite is currently implemented".to_string())),
                 };
                 
                 let tables: Vec<String> = result.rows
@@ -392,39 +385,34 @@ impl Tool for DatabaseTool {
                     .filter(|t| self.is_table_allowed(t))
                     .collect();
                 
-                Ok(json!({
-                    "success": true,
-                    "tables": tables
-                }))
+                Ok(ToolOutput::success_with_data(
+                    format!("Found {} tables", tables.len()),
+                    json!({ "tables": tables })
+                ))
             }
             "schema" => {
                 let table = args.get("table")
                     .and_then(|v| v.as_str())
-                    .ok_or_else(|| ToolError::InvalidArguments("Missing 'table' argument".to_string()))?;
+                    .ok_or_else(|| Error::invalid_arguments("database", "Missing 'table' argument"))?;
                 
                 if !self.is_table_allowed(table) {
-                    return Err(ToolError::NotAllowed(format!("Access to table '{}' is not allowed", table)));
+                    return Err(Error::PathNotAllowed(format!("Access to table '{}' is not allowed", table)));
                 }
                 
                 let sql = match self.config.db_type {
                     DatabaseType::Sqlite => format!("PRAGMA table_info({})", table),
-                    _ => return Err(ToolError::NotAvailable("Only SQLite is currently implemented".to_string())),
+                    _ => return Err(Error::ToolDisabled("Only SQLite is currently implemented".to_string())),
                 };
                 
                 let result = self.execute_sqlite(&sql).await?;
                 
-                Ok(json!({
-                    "success": true,
-                    "table": table,
-                    "schema": result.rows
-                }))
+                Ok(ToolOutput::success_with_data(
+                    format!("Schema for table '{}'", table),
+                    json!({ "table": table, "schema": result.rows })
+                ))
             }
-            _ => Err(ToolError::InvalidArguments(format!("Unknown operation: {}", operation)))
+            _ => Err(Error::invalid_arguments("database", format!("Unknown operation: {}", operation)))
         }
-    }
-
-    fn requires_approval(&self) -> bool {
-        self.config.allow_write
     }
 }
 

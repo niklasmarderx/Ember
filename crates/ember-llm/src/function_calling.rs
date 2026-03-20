@@ -71,12 +71,19 @@ pub struct PropertySchema {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 pub enum PropertyType {
+    /// String type
     String,
+    /// Number type (floating point)
     Number,
+    /// Integer type (whole numbers)
     Integer,
+    /// Boolean type (true/false)
     Boolean,
+    /// Array type (list of items)
     Array,
+    /// Object type (nested structure)
     Object,
+    /// Null type (no value)
     Null,
 }
 
@@ -122,23 +129,21 @@ pub struct FunctionResult {
 }
 
 /// Tool choice options for the model
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum ToolChoice {
     /// Let the model decide whether to use tools
+    #[default]
     Auto,
     /// Don't use any tools
     None,
     /// The model must use a tool
     Required,
     /// Force use of a specific tool
-    Function { name: String },
-}
-
-impl Default for ToolChoice {
-    fn default() -> Self {
-        Self::Auto
-    }
+    Function {
+        /// Name of the function to use
+        name: String,
+    },
 }
 
 /// Builder for creating function definitions easily

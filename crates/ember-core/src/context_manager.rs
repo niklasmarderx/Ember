@@ -52,7 +52,7 @@ pub struct ContextConfig {
 impl Default for ContextConfig {
     fn default() -> Self {
         Self {
-            max_tokens: 128000,
+            max_tokens: 128_000,
             reserved_response_tokens: 4096,
             reserved_system_tokens: 2000,
             pruning_strategy: PruningStrategy::SlidingWindow,

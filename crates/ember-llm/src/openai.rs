@@ -7,9 +7,8 @@ use std::env;
 use tracing::{debug, instrument};
 
 use crate::{
-    provider::StreamResponse, CompletionRequest, CompletionResponse, ContentPart, Error,
-    FinishReason, ImageSource, LLMProvider, ModelInfo, Result, StreamChunk, TokenUsage, ToolCall,
-    ToolCallDelta,
+    provider::StreamResponse, CompletionRequest, CompletionResponse, Error, FinishReason,
+    LLMProvider, ModelInfo, Result, StreamChunk, TokenUsage, ToolCall, ToolCallDelta,
 };
 
 use tokio_stream::wrappers::ReceiverStream;
@@ -484,15 +483,15 @@ struct OpenAIModel {
 // Conversion implementations
 
 /// Convert Ember ContentPart to OpenAI ContentPart
-fn convert_content_part(part: &ContentPart) -> OpenAIContentPart {
+fn convert_content_part(part: &crate::types::ContentPart) -> OpenAIContentPart {
     match part {
-        ContentPart::Text { text } => OpenAIContentPart::Text { text: text.clone() },
-        ContentPart::Image { source, .. } => {
+        crate::types::ContentPart::Text { text } => OpenAIContentPart::Text { text: text.clone() },
+        crate::types::ContentPart::Image { source, .. } => {
             let url = match source {
-                ImageSource::Base64 { media_type, data } => {
+                crate::types::ImageSource::Base64 { media_type, data } => {
                     format!("data:{};base64,{}", media_type.as_mime_type(), data)
                 }
-                ImageSource::Url { url } => url.clone(),
+                crate::types::ImageSource::Url { url } => url.clone(),
             };
             OpenAIContentPart::ImageUrl {
                 image_url: OpenAIImageUrl {

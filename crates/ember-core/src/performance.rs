@@ -10,10 +10,10 @@
 use std::collections::{HashMap, VecDeque};
 use std::future::Future;
 use std::pin::Pin;
-use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
-use tokio::sync::{mpsc, oneshot, Mutex, RwLock, Semaphore};
+use tokio::sync::{oneshot, Mutex, RwLock, Semaphore};
 use serde::{Deserialize, Serialize};
 
 // ============================================================================
@@ -70,14 +70,14 @@ pub struct PoolStats {
 }
 
 /// Generic pooled connection wrapper
-pub struct PooledConnection<T> {
+pub struct PooledConnection<T: Send + 'static> {
     connection: Option<T>,
     pool: Arc<ConnectionPoolInner<T>>,
     acquired_at: Instant,
     created_at: Instant,
 }
 
-impl<T> PooledConnection<T> {
+impl<T: Send + 'static> PooledConnection<T> {
     /// Get reference to the connection
     pub fn get(&self) -> &T {
         self.connection.as_ref().unwrap()
@@ -494,13 +494,13 @@ impl<T: Send + 'static> ObjectPool<T> {
 }
 
 /// Pooled object wrapper
-pub struct PooledObject<T> {
+pub struct PooledObject<T: Send + 'static> {
     object: Option<T>,
     pool: Arc<Mutex<Vec<T>>>,
     max_size: usize,
 }
 
-impl<T> PooledObject<T> {
+impl<T: Send + 'static> PooledObject<T> {
     /// Get reference to the object
     pub fn get(&self) -> &T {
         self.object.as_ref().unwrap()
@@ -595,9 +595,9 @@ pub struct TaskScheduler {
     config: SchedulerConfig,
     semaphore: Arc<Semaphore>,
     queue: Arc<Mutex<Vec<ScheduledTask>>>,
-    completed: AtomicU64,
-    failed: AtomicU64,
-    active: AtomicUsize,
+    completed: Arc<AtomicU64>,
+    failed: Arc<AtomicU64>,
+    active: Arc<AtomicUsize>,
 }
 
 impl TaskScheduler {
@@ -607,9 +607,9 @@ impl TaskScheduler {
             semaphore: Arc::new(Semaphore::new(config.max_concurrent)),
             config,
             queue: Arc::new(Mutex::new(Vec::new())),
-            completed: AtomicU64::new(0),
-            failed: AtomicU64::new(0),
-            active: AtomicUsize::new(0),
+            completed: Arc::new(AtomicU64::new(0)),
+            failed: Arc::new(AtomicU64::new(0)),
+            active: Arc::new(AtomicUsize::new(0)),
         }
     }
 

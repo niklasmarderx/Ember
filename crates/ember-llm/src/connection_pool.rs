@@ -12,8 +12,6 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::sync::{Mutex, RwLock, Semaphore};
 
-use crate::Result;
-
 /// Configuration for connection pools
 #[derive(Debug, Clone)]
 pub struct PoolConfig {

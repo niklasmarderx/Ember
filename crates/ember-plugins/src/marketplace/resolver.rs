@@ -185,7 +185,7 @@ impl DependencyResolver {
 
             // Check for conflicts with existing requirements
             if let Some(existing_reqs) = requirements.get(&current_id) {
-                for (existing_req, existing_by) in existing_reqs {
+                for (existing_req, _existing_by) in existing_reqs {
                     if !version.version.is_compatible_with(existing_req) {
                         return Err(ResolverError::VersionConflict {
                             plugin: current_id.clone(),
@@ -272,7 +272,7 @@ impl DependencyResolver {
         metadata: &PluginMetadata,
         requirement: &VersionRequirement,
     ) -> Result<PluginVersion, ResolverError> {
-        let ember_req = VersionRequirement::GreaterThanOrEqual(self.config.ember_version.clone());
+        let _ember_req = VersionRequirement::GreaterThanOrEqual(self.config.ember_version.clone());
 
         // Filter compatible versions
         let mut compatible: Vec<_> = metadata
