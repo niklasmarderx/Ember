@@ -509,10 +509,16 @@ mod tests {
 
     #[test]
     fn test_highlight_text() {
+        // Force colored output even in CI environments without a TTY
+        colored::control::set_override(true);
+        
         let text = "Hello World, hello again";
         let result = highlight_text(text, "hello");
         // Should contain ANSI codes for yellow/bold
         assert!(result.contains("\x1b["));
+        
+        // Reset to default behavior
+        colored::control::unset_override();
     }
 
     #[test]
