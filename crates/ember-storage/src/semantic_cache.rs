@@ -76,7 +76,7 @@ impl CacheEntry {
     pub fn is_expired(&self) -> bool {
         let now = Utc::now();
         let age = now.signed_duration_since(self.created_at);
-        age.num_seconds() as u64 > self.ttl_seconds
+        age.num_seconds() as u64 >= self.ttl_seconds
     }
 }
 
@@ -631,7 +631,7 @@ mod tests {
         assert_eq!(hit.response, "The capital of France is Paris.");
 
         // Similar query should hit (depending on embedder quality)
-        let hit = cache.get("Tell me the capital city of France", &context);
+        let _hit = cache.get("Tell me the capital city of France", &context);
         // With simple embedder, this may or may not hit
         // In production with proper embeddings, this should hit
     }
