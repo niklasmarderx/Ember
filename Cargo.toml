@@ -10,7 +10,14 @@ members = [
     "crates/ember-browser",
     "crates/ember-cli",
     "crates/ember-web",
+    "crates/ember-desktop",
+    "crates/ember-telemetry",
+    "crates/ember-i18n",
     "crates/ember-benchmarks",
+    "crates/ember-code",
+    "crates/ember-learn",
+    "crates/ember-voice",
+    "crates/ember-enterprise",
 ]
 
 [workspace.package]
@@ -36,6 +43,14 @@ ember-mcp = { path = "crates/ember-mcp" }
 ember-cli = { path = "crates/ember-cli" }
 ember-web = { path = "crates/ember-web" }
 ember-browser = { path = "crates/ember-browser" }
+ember-desktop = { path = "crates/ember-desktop" }
+ember-telemetry = { path = "crates/ember-telemetry" }
+ember-i18n = { path = "crates/ember-i18n" }
+ember-benchmarks = { path = "crates/ember-benchmarks" }
+ember-code = { path = "crates/ember-code" }
+ember-learn = { path = "crates/ember-learn" }
+ember-voice = { path = "crates/ember-voice" }
+ember-enterprise = { path = "crates/ember-enterprise" }
 
 # Async runtime
 tokio = { version = "1", features = ["full"] }

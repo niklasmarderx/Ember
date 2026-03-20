@@ -1,0 +1,72 @@
+# Codecov Configuration
+# https://docs.codecov.com/docs/codecov-yaml
+
+coverage:
+  precision: 2
+  round: down
+  range: "60...100"
+  
+  status:
+    project:
+      default:
+        target: auto
+        threshold: 2%
+        informational: true
+    patch:
+      default:
+        target: 80%
+        threshold: 5%
+        informational: true
+
+parsers:
+  gcov:
+    branch_detection:
+      conditional: yes
+      loop: yes
+      method: no
+      macro: no
+
+comment:
+  layout: "reach,diff,flags,files,footer"
+  behavior: default
+  require_changes: false
+  require_base: false
+  require_head: true
+
+flags:
+  ember-core:
+    paths:
+      - crates/ember-core/
+    carryforward: true
+  ember-llm:
+    paths:
+      - crates/ember-llm/
+    carryforward: true
+  ember-tools:
+    paths:
+      - crates/ember-tools/
+    carryforward: true
+  ember-storage:
+    paths:
+      - crates/ember-storage/
+    carryforward: true
+  ember-cli:
+    paths:
+      - crates/ember-cli/
+    carryforward: true
+  ember-plugins:
+    paths:
+      - crates/ember-plugins/
+    carryforward: true
+  ember-mcp:
+    paths:
+      - crates/ember-mcp/
+    carryforward: true
+
+ignore:
+  - "target/**/*"
+  - "tests/**/*"
+  - "**/tests/**/*"
+  - "**/benches/**/*"
+  - "examples/**/*"
+  - "crates/ember-benchmarks/**/*"

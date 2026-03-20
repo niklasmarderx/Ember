@@ -54,6 +54,16 @@ pub enum Locale {
     ChineseSimplified,
     /// Japanese (日本語)
     Japanese,
+    /// Portuguese Brazilian (Português Brasileiro)
+    PortugueseBrazilian,
+    /// Korean (한국어)
+    Korean,
+    /// Italian (Italiano)
+    Italian,
+    /// Russian (Русский)
+    Russian,
+    /// Arabic (العربية) - RTL
+    Arabic,
 }
 
 impl Locale {
@@ -66,6 +76,11 @@ impl Locale {
             Locale::Spanish => "es",
             Locale::ChineseSimplified => "zh-CN",
             Locale::Japanese => "ja",
+            Locale::PortugueseBrazilian => "pt-BR",
+            Locale::Korean => "ko",
+            Locale::Italian => "it",
+            Locale::Russian => "ru",
+            Locale::Arabic => "ar",
         }
     }
 
@@ -78,6 +93,11 @@ impl Locale {
             Locale::Spanish => "Español",
             Locale::ChineseSimplified => "简体中文",
             Locale::Japanese => "日本語",
+            Locale::PortugueseBrazilian => "Português (Brasil)",
+            Locale::Korean => "한국어",
+            Locale::Italian => "Italiano",
+            Locale::Russian => "Русский",
+            Locale::Arabic => "العربية",
         }
     }
 
@@ -90,7 +110,22 @@ impl Locale {
             Locale::Spanish => "Spanish",
             Locale::ChineseSimplified => "Chinese (Simplified)",
             Locale::Japanese => "Japanese",
+            Locale::PortugueseBrazilian => "Portuguese (Brazil)",
+            Locale::Korean => "Korean",
+            Locale::Italian => "Italian",
+            Locale::Russian => "Russian",
+            Locale::Arabic => "Arabic",
         }
+    }
+
+    /// Check if this locale uses right-to-left text direction
+    pub fn is_rtl(&self) -> bool {
+        matches!(self, Locale::Arabic)
+    }
+
+    /// Get the text direction for this locale
+    pub fn direction(&self) -> &'static str {
+        if self.is_rtl() { "rtl" } else { "ltr" }
     }
 
     /// Get all supported locales
@@ -102,7 +137,17 @@ impl Locale {
             Locale::Spanish,
             Locale::ChineseSimplified,
             Locale::Japanese,
+            Locale::PortugueseBrazilian,
+            Locale::Korean,
+            Locale::Italian,
+            Locale::Russian,
+            Locale::Arabic,
         ]
+    }
+
+    /// Get all RTL locales
+    pub fn rtl_locales() -> &'static [Locale] {
+        &[Locale::Arabic]
     }
 
     /// Parse a locale from a string (BCP 47 code)
@@ -117,6 +162,11 @@ impl Locale {
             "es" => Some(Locale::Spanish),
             "zh" => Some(Locale::ChineseSimplified),
             "ja" => Some(Locale::Japanese),
+            "pt" => Some(Locale::PortugueseBrazilian),
+            "ko" => Some(Locale::Korean),
+            "it" => Some(Locale::Italian),
+            "ru" => Some(Locale::Russian),
+            "ar" => Some(Locale::Arabic),
             _ => None,
         }
     }
@@ -484,6 +534,11 @@ mod tests {
         assert_eq!(Locale::Spanish.code(), "es");
         assert_eq!(Locale::ChineseSimplified.code(), "zh-CN");
         assert_eq!(Locale::Japanese.code(), "ja");
+        assert_eq!(Locale::PortugueseBrazilian.code(), "pt-BR");
+        assert_eq!(Locale::Korean.code(), "ko");
+        assert_eq!(Locale::Italian.code(), "it");
+        assert_eq!(Locale::Russian.code(), "ru");
+        assert_eq!(Locale::Arabic.code(), "ar");
     }
 
     #[test]
@@ -493,6 +548,11 @@ mod tests {
         assert_eq!(Locale::from_code("de-DE"), Some(Locale::German));
         assert_eq!(Locale::from_code("en-US"), Some(Locale::English));
         assert_eq!(Locale::from_code("zh-CN"), Some(Locale::ChineseSimplified));
+        assert_eq!(Locale::from_code("pt-BR"), Some(Locale::PortugueseBrazilian));
+        assert_eq!(Locale::from_code("ko"), Some(Locale::Korean));
+        assert_eq!(Locale::from_code("it"), Some(Locale::Italian));
+        assert_eq!(Locale::from_code("ru"), Some(Locale::Russian));
+        assert_eq!(Locale::from_code("ar"), Some(Locale::Arabic));
         assert_eq!(Locale::from_code("xx"), None);
     }
 
@@ -501,15 +561,32 @@ mod tests {
         assert_eq!(Locale::German.native_name(), "Deutsch");
         assert_eq!(Locale::French.native_name(), "Français");
         assert_eq!(Locale::Japanese.native_name(), "日本語");
+        assert_eq!(Locale::Korean.native_name(), "한국어");
+        assert_eq!(Locale::Russian.native_name(), "Русский");
+        assert_eq!(Locale::Arabic.native_name(), "العربية");
     }
 
     #[test]
     fn test_all_locales() {
         let all = Locale::all();
-        assert_eq!(all.len(), 6);
+        assert_eq!(all.len(), 11);
         assert!(all.contains(&Locale::English));
         assert!(all.contains(&Locale::German));
         assert!(all.contains(&Locale::Japanese));
+        assert!(all.contains(&Locale::PortugueseBrazilian));
+        assert!(all.contains(&Locale::Korean));
+        assert!(all.contains(&Locale::Italian));
+        assert!(all.contains(&Locale::Russian));
+        assert!(all.contains(&Locale::Arabic));
+    }
+
+    #[test]
+    fn test_rtl_support() {
+        assert!(!Locale::English.is_rtl());
+        assert!(!Locale::German.is_rtl());
+        assert!(Locale::Arabic.is_rtl());
+        assert_eq!(Locale::English.direction(), "ltr");
+        assert_eq!(Locale::Arabic.direction(), "rtl");
     }
 
     #[test]

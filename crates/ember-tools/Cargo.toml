@@ -45,13 +45,25 @@ schemars = "0.8"
 # Regex for shell security patterns
 regex = { workspace = true }
 
+# SQLite for database tool
+rusqlite = { version = "0.31", features = ["bundled"], optional = true }
+
+# URL parsing for API tool
+url = { version = "2.5", optional = true }
+
+# Base64 encoding for API authentication
+base64 = { version = "0.22", optional = true }
+
 [features]
-default = ["shell", "filesystem", "web", "git", "code-execution"]
+default = ["shell", "filesystem", "web", "git", "code-execution", "database", "image", "api"]
 shell = []
 filesystem = []
 web = ["reqwest"]
 git = []
 code-execution = ["tokio/io-util"]
+database = ["rusqlite"]
+image = []
+api = ["web", "url", "base64"]
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }

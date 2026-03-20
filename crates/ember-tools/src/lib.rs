@@ -68,6 +68,15 @@ pub mod git;
 #[cfg(feature = "code-execution")]
 pub mod code_execution;
 
+#[cfg(feature = "database")]
+pub mod database;
+
+#[cfg(feature = "image")]
+pub mod image;
+
+#[cfg(feature = "api")]
+pub mod api;
+
 pub use error::{Error, Result};
 pub use registry::{ToolDefinition, ToolHandler, ToolOutput, ToolRegistry};
 
@@ -90,6 +99,15 @@ pub use git::GitTool;
 pub use code_execution::{
     CodeExecutionConfig, CodeExecutionTool, ExecutionResult, Language, ReplSession,
 };
+
+#[cfg(feature = "database")]
+pub use database::{DatabaseConfig, DatabaseTool, DatabaseType, QueryResult};
+
+#[cfg(feature = "image")]
+pub use image::{FlipDirection, ImageConfig, ImageFormat, ImageMetadata, ImageOperation, ImageTool};
+
+#[cfg(feature = "api")]
+pub use api::{ApiConfig, ApiRequest, ApiRequestBuilder, ApiResponse, ApiTool, AuthScheme, HttpMethod};
 
 /// Prelude for convenient imports.
 pub mod prelude {
@@ -115,4 +133,13 @@ pub mod prelude {
     pub use crate::{
         CodeExecutionConfig, CodeExecutionTool, ExecutionResult, Language, ReplSession,
     };
+
+    #[cfg(feature = "database")]
+    pub use crate::{DatabaseConfig, DatabaseTool, DatabaseType, QueryResult};
+
+    #[cfg(feature = "image")]
+    pub use crate::{FlipDirection, ImageConfig, ImageFormat, ImageMetadata, ImageOperation, ImageTool};
+
+    #[cfg(feature = "api")]
+    pub use crate::{ApiConfig, ApiRequest, ApiRequestBuilder, ApiResponse, ApiTool, AuthScheme, HttpMethod};
 }

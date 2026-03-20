@@ -1,0 +1,8 @@
+# Ember Kubernetes Namespace
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ember
+  labels:
+    app.kubernetes.io/name: ember
+    app.kubernetes.io/part-of: ember

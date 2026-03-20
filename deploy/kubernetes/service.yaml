@@ -1,0 +1,43 @@
+# Ember API Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: ember-api
+  namespace: ember
+  labels:
+    app.kubernetes.io/name: ember
+    app.kubernetes.io/component: api
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+      protocol: TCP
+    - name: ws
+      port: 8081
+      targetPort: ws
+      protocol: TCP
+  selector:
+    app.kubernetes.io/name: ember
+    app.kubernetes.io/component: api
+---
+# Ember Web Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: ember-web
+  namespace: ember
+  labels:
+    app.kubernetes.io/name: ember
+    app.kubernetes.io/component: web
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+      protocol: TCP
+  selector:
+    app.kubernetes.io/name: ember
+    app.kubernetes.io/component: web

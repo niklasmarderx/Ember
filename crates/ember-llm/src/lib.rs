@@ -71,9 +71,13 @@ pub mod xai;
 pub mod bedrock;
 
 pub mod analyzer;
+pub mod connection_pool;
+pub mod function_calling;
 pub mod model_registry;
 pub mod router;
 pub mod scorer;
+pub mod streaming;
+pub mod vision;
 
 #[cfg(any(test, feature = "mock"))]
 pub mod mock;
@@ -121,6 +125,16 @@ pub use retry::{complete_with_retry, RetryConfig};
 pub use router::LLMRouter;
 pub use scorer::{
     ModelCapabilities as ScorerModelCapabilities, ModelScore, ModelScorer, UserPreferences,
+};
+
+// Vision and Function Calling
+pub use function_calling::{
+    FunctionBuilder, FunctionCall, FunctionCallingCapable, FunctionCallingModels,
+    FunctionDefinition, FunctionResult, JsonSchema, PropertySchema, PropertyType, ToolChoice,
+};
+pub use vision::{
+    ContentPart, ImageDetail, ImageInput, ImageSource, MediaType, MultimodalContent,
+    VisionCapable, VisionModels,
 };
 
 #[cfg(any(test, feature = "mock"))]

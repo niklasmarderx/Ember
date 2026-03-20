@@ -15,6 +15,10 @@
 - [Interactive Mode](./guide/interactive.md)
 - [Agent Mode with Tools](./guide/agent-mode.md)
 - [Terminal UI](./guide/tui.md)
+- [Tool Selection](./guide/tool-selection.md)
+- [Context Management](./guide/context-management.md)
+- [Security](./guide/security.md)
+- [Performance](./guide/performance.md)
 
 # Providers
 
@@ -37,6 +41,7 @@
 - [Filesystem Tool](./tools/filesystem.md)
 - [Web Tool](./tools/web.md)
 - [Browser Tool](./tools/browser.md)
+- [Custom Tools](./custom-tools.md)
 
 # Examples
 
@@ -44,15 +49,34 @@
 
 # Advanced
 
+- [Overview](./advanced/index.md)
 - [Streaming](./advanced/streaming.md)
 - [Memory & RAG](./advanced/memory-rag.md)
 - [Checkpoints](./advanced/checkpoints.md)
 - [Plan/Act Mode](./advanced/plan-act.md)
 - [MCP Protocol](./advanced/mcp.md)
 - [WASM Plugins](./advanced/plugins.md)
+- [Plugin Development](./advanced/plugin-development.md)
+
+# Deployment
+
+- [Cloud Deployment](./deployment/index.md)
+- [Docker](./deployment/docker.md)
+- [Kubernetes](./deployment/kubernetes.md)
+- [Helm Chart](./deployment/helm.md)
+- [Terraform](./deployment/terraform.md)
+
+# Enterprise
+
+- [Enterprise Features](./enterprise/index.md)
+- [SSO/SAML/OIDC](./enterprise/sso.md)
+- [RBAC](./enterprise/rbac.md)
+- [Audit Logging](./enterprise/audit.md)
+- [Teams](./enterprise/teams.md)
 
 # API Reference
 
+- [API Overview](./api/index.md)
 - [ember-llm](./api/ember-llm.md)
 - [ember-core](./api/ember-core.md)
 - [ember-tools](./api/ember-tools.md)
@@ -60,6 +84,7 @@
 
 # Development
 
+- [Developer Guide](./developer/index.md)
 - [Building from Source](./dev/building.md)
 - [Testing](./dev/testing.md)
 - [Benchmarking](./dev/benchmarking.md)

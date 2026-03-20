@@ -1,0 +1,20 @@
+apiVersion: v2
+name: ember
+description: Ember AI Agent Framework - Helm Chart
+type: application
+version: 1.5.0
+appVersion: "1.5.0"
+keywords:
+  - ai
+  - llm
+  - agent
+  - rust
+  - cli
+home: https://ember.dev
+sources:
+  - https://github.com/ember-ai/ember
+maintainers:
+  - name: Ember Team
+    email: team@ember.dev
+    url: https://ember.dev
+dependencies: []

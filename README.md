@@ -305,8 +305,12 @@ ssh user@server "ember serve"
 | **ember-web** | Web interface | REST API, WebSocket, React dashboard |
 | **ember-desktop** | Desktop app | Tauri-based native application |
 | **ember-telemetry** | Analytics | Privacy-first, opt-in, anonymized metrics |
-| **ember-i18n** | Internationalization | 6 languages (EN, DE, FR, ES, ZH, JA) |
+| **ember-i18n** | Internationalization | 11 languages (EN, DE, FR, ES, ZH, JA, PT, KO, IT, RU, AR) |
 | **ember-benchmarks** | Performance | Criterion benchmarks, CI integration |
+| **ember-code** | Code Intelligence | Code analysis, refactoring, test generation |
+| **ember-learn** | Adaptive Learning | User preferences, pattern recognition, smart suggestions |
+| **ember-voice** | Voice Interface | Speech-to-text, text-to-speech, voice commands |
+| **ember-enterprise** | Enterprise | SSO (SAML/OIDC), RBAC, audit logging, team management |
 
 ---
 
@@ -356,6 +360,51 @@ ssh user@server "ember serve"
 | **Dark Mode** | System-aware theme switching |
 | **REST API** | Programmatic access to all features |
 | **WebSocket** | Real-time streaming for integrations |
+
+### Code Intelligence (v1.5)
+
+| Feature | Description |
+|---------|-------------|
+| **Code Analysis** | Static analysis, complexity metrics, dependency graphs |
+| **Smart Refactoring** | Extract functions, rename symbols, optimize imports |
+| **Test Generation** | Automatic unit test creation for Rust, Python, TypeScript |
+| **Git Integration** | Semantic commit messages, PR descriptions, changelog generation |
+
+### Adaptive Learning (v1.5)
+
+| Feature | Description |
+|---------|-------------|
+| **User Preferences** | Learns coding style, preferred providers, response format |
+| **Pattern Recognition** | Detects repetitive tasks and suggests automation |
+| **Smart Suggestions** | Context-aware recommendations based on usage history |
+| **Profile Management** | Export/import user profiles across installations |
+
+### Voice Interface (v1.5)
+
+| Feature | Description |
+|---------|-------------|
+| **Speech-to-Text** | Whisper integration for voice input |
+| **Text-to-Speech** | Natural voice output for responses |
+| **Voice Commands** | Hands-free control ("Hey Ember, run tests") |
+| **Multi-language** | Voice recognition in 10+ languages |
+
+### Enterprise Features (v1.5)
+
+| Feature | Description |
+|---------|-------------|
+| **SSO Authentication** | SAML 2.0, OIDC, OAuth2 integration |
+| **Role-Based Access Control** | Fine-grained permissions and policies |
+| **Audit Logging** | Complete activity trail for compliance |
+| **Team Management** | Organizations, projects, resource sharing |
+
+### Cloud Deployment (v1.5)
+
+| Feature | Description |
+|---------|-------------|
+| **Kubernetes** | Production-ready manifests with auto-scaling |
+| **Helm Charts** | One-command deployment with customization |
+| **Terraform** | AWS infrastructure as code (EKS, RDS, S3) |
+| **High Availability** | Multi-replica, health checks, rolling updates |
 
 ---
 
@@ -506,6 +555,10 @@ async fn main() -> Result<()> {
 | **Self-healing** | No | No | No | No | **Yes** |
 | **Privacy shield** | No | No | No | No | **Yes** |
 | **Security sandbox** | No | No | No | No | **Yes** |
+| **Voice interface** | No | No | No | No | **Yes** |
+| **Code intelligence** | No | No | No | No | **Yes** |
+| **Enterprise SSO/RBAC** | No | No | No | No | **Yes** |
+| **Kubernetes/Helm** | No | No | No | No | **Yes** |
 
 ---
 
@@ -636,8 +689,16 @@ ember/
 │   ├── ember-web/        # Web UI and REST API
 │   ├── ember-desktop/    # Tauri desktop application
 │   ├── ember-telemetry/  # Privacy-first analytics
-│   ├── ember-i18n/       # Internationalization (6 langs)
-│   └── ember-benchmarks/ # Performance benchmarks
+│   ├── ember-i18n/       # Internationalization (11 langs)
+│   ├── ember-benchmarks/ # Performance benchmarks
+│   ├── ember-code/       # Code intelligence (v1.5)
+│   ├── ember-learn/      # Adaptive learning (v1.5)
+│   ├── ember-voice/      # Voice interface (v1.5)
+│   └── ember-enterprise/ # Enterprise features (v1.5)
+├── deploy/               # Cloud deployment (v1.5)
+│   ├── kubernetes/       # K8s manifests
+│   ├── helm/             # Helm charts
+│   └── terraform/        # Infrastructure as code
 ├── examples/             # Code examples
 ├── docs/                 # Documentation (mdBook)
 ├── extensions/           # VS Code extension

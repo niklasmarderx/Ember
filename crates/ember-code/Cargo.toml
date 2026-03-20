@@ -1,0 +1,62 @@
+[package]
+name = "ember-code"
+version = "0.1.0"
+edition = "2021"
+description = "AI-powered code intelligence for Ember"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/niklasmarderx/Ember"
+keywords = ["ai", "code-analysis", "refactoring", "code-generation"]
+categories = ["development-tools", "text-processing"]
+
+[dependencies]
+# Core
+ember-core = { path = "../ember-core" }
+ember-llm = { path = "../ember-llm" }
+
+# Async runtime
+tokio = { version = "1.35", features = ["full"] }
+async-trait = "0.1"
+futures = "0.3"
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# Error handling
+thiserror = "1.0"
+anyhow = "1.0"
+
+# Code parsing
+tree-sitter = "0.20"
+tree-sitter-rust = "0.20"
+tree-sitter-python = "0.20"
+tree-sitter-javascript = "0.20"
+tree-sitter-typescript = "0.20"
+tree-sitter-go = "0.20"
+tree-sitter-java = "0.20"
+
+# Text processing
+regex = "1.10"
+similar = "2.3"
+syntect = "5.1"
+
+# Metrics
+rayon = "1.8"
+
+# Logging
+tracing = "0.1"
+
+[dev-dependencies]
+tokio-test = "0.4"
+tempfile = "3.9"
+pretty_assertions = "1.4"
+
+[features]
+default = ["all-languages"]
+all-languages = ["rust", "python", "javascript", "typescript", "go", "java"]
+rust = []
+python = []
+javascript = []
+typescript = []
+go = []
+java = []

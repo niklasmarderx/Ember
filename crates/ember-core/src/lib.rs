@@ -93,11 +93,13 @@ mod checkpoint;
 mod collaboration;
 mod config;
 mod context;
+mod context_manager;
 mod conversation;
 mod cost_predictor;
 mod error;
 mod knowledge_graph;
 mod memory;
+pub mod memory_optimization;
 mod orchestrator;
 mod planning;
 mod privacy;
@@ -105,8 +107,11 @@ mod sandbox;
 mod self_healing;
 mod streaming;
 mod task_planner;
+pub mod performance;
+pub mod security;
 pub mod thinking;
 pub mod tool_executor;
+mod tool_selector;
 
 pub use error::{Error, Result};
 /// Alias for CoreError used by internal modules
@@ -169,6 +174,41 @@ pub use task_planner::{
 pub use tool_executor::{
     AsyncFunctionTool, AsyncTool, ExecutionMetrics, ExecutorConfig, FunctionTool, MetricsSummary,
     ToolContext, ToolExecutionResult, ToolExecutor, ToolRegistry,
+};
+pub use tool_selector::{
+    SelectionContext, ToolCapability, ToolMetadata, ToolRecommendation, ToolSelector,
+    ToolSelectorConfig,
+};
+pub use context_manager::{
+    ContextManagerV2, ContextManagerBuilder as ContextManagerV2Builder, ContextMessage,
+    MessageRole, PruningStrategy, PriorityWeights, TokenCount,
+};
+pub use security::{
+    // Input Validation
+    InputValidator, ValidationConfig, ValidationError, ValidationResult, ValidationMetadata,
+    // Rate Limiting
+    RateLimiter, RateLimitConfig, RateLimitResult,
+    // Audit Logging
+    AuditLogger, AuditConfig, AuditEvent, AuditSeverity, AuditCategory, AuditOutcome, AuditQuery,
+    // Security Policy Engine
+    PolicyEngine, PolicyContext, PolicyResult, SecurityPolicy, SecurityRule, RuleAction,
+    RuleCondition, ConditionOperator,
+};
+pub use performance::{
+    // Connection Pooling
+    ConnectionPool, PoolConfig, PoolStats, PooledConnection,
+    // Object Pooling
+    ObjectPool, PooledObject, ObjectPoolStats,
+    // Batch Processing
+    BatchProcessor, BatchConfig, BatchResult,
+    // Task Scheduler
+    TaskScheduler, SchedulerConfig, SchedulerStats, TaskPriority as PerformanceTaskPriority,
+    // Throttler
+    Throttler,
+    // Circuit Breaker
+    CircuitBreakerV2, BreakerConfig, BreakerState, CircuitBreakerError, CircuitBreakerStats,
+    // String Interner
+    StringInterner, InternerStats,
 };
 
 /// Re-export commonly used types from ember-llm

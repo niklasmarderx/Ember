@@ -1,0 +1,158 @@
+name: Test Coverage
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  coverage:
+    name: Code Coverage
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: llvm-tools-preview
+
+      - name: Install cargo-llvm-cov
+        uses: taiki-e/install-action@cargo-llvm-cov
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libssl-dev pkg-config
+
+      - name: Generate coverage report
+        run: |
+          cargo llvm-cov --all-features --workspace \
+            --ignore-filename-regex='(tests/|benches/|examples/)' \
+            --lcov --output-path lcov.info
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          files: lcov.info
+          fail_ci_if_error: false
+          verbose: true
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+
+      - name: Generate HTML report
+        run: |
+          cargo llvm-cov --all-features --workspace \
+            --ignore-filename-regex='(tests/|benches/|examples/)' \
+            --html
+
+      - name: Upload HTML report
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: target/llvm-cov/html/
+
+  coverage-per-crate:
+    name: Per-Crate Coverage
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        crate:
+          - ember-core
+          - ember-llm
+          - ember-tools
+          - ember-storage
+          - ember-plugins
+          - ember-mcp
+          - ember-cli
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: llvm-tools-preview
+
+      - name: Install cargo-llvm-cov
+        uses: taiki-e/install-action@cargo-llvm-cov
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libssl-dev pkg-config
+
+      - name: Generate coverage for ${{ matrix.crate }}
+        run: |
+          cargo llvm-cov --package ${{ matrix.crate }} \
+            --ignore-filename-regex='(tests/|benches/)' \
+            --json --output-path coverage-${{ matrix.crate }}.json
+
+      - name: Upload crate coverage
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-${{ matrix.crate }}
+          path: coverage-${{ matrix.crate }}.json
+
+  coverage-summary:
+    name: Coverage Summary
+    runs-on: ubuntu-latest
+    needs: [coverage, coverage-per-crate]
+    if: always()
+    steps:
+      - name: Download all coverage artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: coverage-*
+          merge-multiple: true
+
+      - name: Generate summary
+        run: |
+          echo "## Test Coverage Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Crate | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|--------|" >> $GITHUB_STEP_SUMMARY
+          for file in coverage-*.json; do
+            if [ -f "$file" ]; then
+              crate=$(echo "$file" | sed 's/coverage-//' | sed 's/.json//')
+              echo "| $crate | Collected |" >> $GITHUB_STEP_SUMMARY
+            fi
+          done
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "[View full HTML report in artifacts]()" >> $GITHUB_STEP_SUMMARY
+
+  mutation-testing:
+    name: Mutation Testing (Sample)
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Rust nightly
+        uses: dtolnay/rust-toolchain@nightly
+
+      - name: Install cargo-mutants
+        run: cargo install cargo-mutants
+
+      - name: Run mutation testing on ember-core (sample)
+        run: |
+          cargo mutants --package ember-core \
+            --timeout 60 \
+            --jobs 2 \
+            --output mutants-report \
+            -- --lib 2>&1 | head -100 || true
+        continue-on-error: true
+
+      - name: Upload mutation report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: mutation-report
+          path: mutants-report/

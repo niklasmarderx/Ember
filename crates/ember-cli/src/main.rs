@@ -31,7 +31,7 @@ mod error_display;
 #[cfg(feature = "tui")]
 mod tui;
 
-use commands::{chat, completions, config as config_cmd, export, history, serve};
+use commands::{chat, code, completions, config as config_cmd, export, git, history, plugin, serve};
 use config::AppConfig;
 
 /// Ember CLI - AI assistant for your terminal.
@@ -261,6 +261,98 @@ Search supports filtering by date range and various sorting options.",
     )]
     History(history::HistoryArgs),
 
+    /// Manage Ember plugins.
+    ///
+    /// Search, install, update, and manage plugins from the Ember marketplace.
+    ///
+    /// Examples:
+    ///   ember plugin search weather
+    ///   ember plugin install weather
+    ///   ember plugin list
+    ///   ember plugin update --all
+    #[command(
+        about = "Manage Ember plugins.",
+        long_about = "Search, install, update, and manage Ember plugins.
+
+The plugin system allows you to extend Ember with additional tools and capabilities.
+Plugins are distributed as WebAssembly modules and run in a secure sandbox.
+
+Features:
+  - Search the plugin marketplace
+  - Install plugins with version pinning
+  - Update plugins individually or all at once
+  - View plugin details and ratings
+  - Manage plugin cache",
+        after_help = "Examples:
+  ember plugin search \"weather\"
+  ember plugin install slack
+  ember plugin install github@1.5.0
+  ember plugin list
+  ember plugin update --all
+  ember plugin info weather"
+    )]
+    Plugin(plugin::PluginArgs),
+
+    /// AI-powered code intelligence.
+    ///
+    /// Analyze code, generate refactoring suggestions, and create tests automatically.
+    ///
+    /// Examples:
+    ///   ember code analyze src/
+    ///   ember code refactor src/main.rs
+    ///   ember code testgen src/lib.rs
+    ///   ember code stats .
+    #[command(
+        about = "AI-powered code intelligence.",
+        long_about = "AI-powered code analysis, refactoring, and test generation.
+
+Features:
+  - Analyze code complexity and detect code smells
+  - Generate refactoring suggestions with confidence levels
+  - Auto-generate unit tests, edge case tests, and error handling tests
+  - Calculate code statistics by language
+
+Supports: Rust, Python, JavaScript, TypeScript, Go, Java",
+        after_help = "Examples:
+  ember code analyze src/
+  ember code analyze --format json --output report.json .
+  ember code refactor --min-confidence high src/main.rs
+  ember code testgen --framework pytest src/utils.py
+  ember code stats --by-language ."
+    )]
+    Code(code::CodeArgs),
+
+    /// Git-native AI integration.
+    ///
+    /// Smart commit messages, PR descriptions, branch naming, and code review.
+    ///
+    /// Examples:
+    ///   ember git commit
+    ///   ember git pr --template detailed
+    ///   ember git review --focus security
+    ///   ember git changelog --from v1.0.0
+    #[command(
+        about = "Git-native AI integration.",
+        long_about = "AI-powered git operations for seamless developer workflow.
+
+Features:
+  - Generate smart commit messages from staged changes
+  - Create PR descriptions automatically
+  - Suggest branch names from descriptions
+  - Help resolve merge conflicts
+  - Generate code reviews
+  - Create release changelogs
+
+Supports: Conventional Commits, emoji style, detailed format",
+        after_help = "Examples:
+  ember git commit --style conventional
+  ember git pr --base main --template detailed
+  ember git branch \"add user auth\" --create
+  ember git review --focus security
+  ember git changelog --from v1.0.0 --to v1.1.0"
+    )]
+    Git(git::GitArgs),
+
     /// Generate shell completion scripts.
     ///
     /// Generates shell completions that enable tab-completion for Ember commands.
@@ -426,6 +518,18 @@ async fn run() -> Result<()> {
 
         Commands::History(args) => {
             history::execute(args).await?;
+        }
+
+        Commands::Plugin(args) => {
+            plugin::execute(args).await?;
+        }
+
+        Commands::Code(args) => {
+            code::execute(args).await?;
+        }
+
+        Commands::Git(args) => {
+            git::execute(args).await?;
         }
     }
 
@@ -596,15 +700,59 @@ fn print_info() -> Result<()> {
     println!("{} {}", "Arch:".bright_blue(), std::env::consts::ARCH);
     println!();
     println!("{}", "Supported Providers:".bright_blue());
-    println!("  • OpenAI (GPT-4, GPT-3.5)");
-    println!("  • Ollama (Local models)");
+    println!("  {} OpenAI       - GPT-4o, GPT-4o-mini, o1, o3-mini", "[x]".green());
+    println!("  {} Anthropic    - Claude 3.5 Sonnet/Haiku/Opus", "[x]".green());
+    println!("  {} Google       - Gemini 2.0 Flash, 1.5 Pro (2M context)", "[x]".green());
+    println!("  {} Ollama       - Local models (Llama, Qwen, DeepSeek)", "[x]".green());
+    println!("  {} Groq         - Ultra-fast inference (Llama 3.3 70B)", "[x]".green());
+    println!("  {} DeepSeek     - V3, R1 Reasoner (cost-effective)", "[x]".green());
+    println!("  {} Mistral      - Large, Codestral, Pixtral", "[x]".green());
+    println!("  {} OpenRouter   - 200+ models via single API", "[x]".green());
+    println!("  {} xAI          - Grok 2, Grok Vision", "[x]".green());
+    println!("  {} AWS Bedrock  - Claude, Titan, Llama via AWS", "[x]".green());
+    println!();
+    println!("{}", "Available Tools:".bright_blue());
+    println!("  {} Shell        - Execute terminal commands", "[x]".green());
+    println!("  {} Filesystem   - Read, write, search files", "[x]".green());
+    println!("  {} Git          - Clone, commit, push, branch", "[x]".green());
+    println!("  {} Web          - HTTP requests, web scraping", "[x]".green());
+    println!("  {} Browser      - Headless browser automation", "[x]".green());
+    println!("  {} Code         - Execute Python, JS, Rust", "[x]".green());
+    println!();
+    println!("{}", "Features:".bright_blue());
+    println!("  {} Streaming responses", "[x]".green());
+    println!("  {} Conversation memory", "[x]".green());
+    println!("  {} Cost tracking & budgets", "[x]".green());
+    println!("  {} Checkpoints (undo/redo)", "[x]".green());
+    println!("  {} Multi-agent orchestration", "[x]".green());
+    println!("  {} WASM plugin system", "[x]".green());
+    println!("  {} Web UI & REST API", "[x]".green());
+    println!("  {} Privacy shield (PII redaction)", "[x]".green());
     println!();
     println!("{}", "Configuration:".bright_blue());
     println!(
-        "  {}",
+        "  Path: {}",
         config::AppConfig::config_path()
             .map(|p| p.display().to_string())
             .unwrap_or_else(|_| "Not found".to_string())
+    );
+    println!();
+    println!("{}", "Quick Start:".bright_blue());
+    println!("  ember chat \"Hello!\"              # One-shot chat");
+    println!("  ember chat                        # Interactive mode");
+    println!("  ember chat --provider ollama      # Use local models");
+    println!("  ember serve                       # Start web UI");
+    println!("  ember plugin search weather       # Find plugins");
+    println!();
+    println!(
+        "{} {}",
+        "Documentation:".bright_blue(),
+        "https://ember.dev/docs".cyan()
+    );
+    println!(
+        "{} {}",
+        "Repository:".bright_blue(),
+        "https://github.com/niklasmarderx/Ember".cyan()
     );
 
     Ok(())

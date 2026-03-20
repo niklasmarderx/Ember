@@ -1,0 +1,56 @@
+# Ember ConfigMap
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ember-config
+  namespace: ember
+  labels:
+    app.kubernetes.io/name: ember
+data:
+  EMBER_DEFAULT_MODEL: "gpt-4"
+  EMBER_DEFAULT_PROVIDER: "openai"
+  EMBER_LOG_LEVEL: "info"
+  EMBER_TELEMETRY_ENABLED: "false"
+  EMBER_MAX_TOKENS: "4096"
+  EMBER_TEMPERATURE: "0.7"
+  EMBER_CORS_ORIGINS: "*"
+  EMBER_RATE_LIMIT_REQUESTS: "100"
+  EMBER_RATE_LIMIT_WINDOW: "60"
+---
+# Ember Config Files
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ember-config-files
+  namespace: ember
+  labels:
+    app.kubernetes.io/name: ember
+data:
+  ember.toml: |
+    [general]
+    default_model = "gpt-4"
+    default_provider = "openai"
+    
+    [api]
+    host = "0.0.0.0"
+    port = 8080
+    cors_origins = ["*"]
+    
+    [logging]
+    level = "info"
+    format = "json"
+    
+    [providers]
+    # Provider configurations are loaded from secrets
+    
+    [tools]
+    enabled = ["shell", "filesystem", "web", "browser", "git", "code"]
+    
+    [memory]
+    backend = "sqlite"
+    path = "/data/ember.db"
+    
+    [rag]
+    enabled = true
+    chunk_size = 512
+    overlap = 50

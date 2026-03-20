@@ -1,0 +1,79 @@
+[package]
+name = "ember-enterprise"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Enterprise features for Ember: SSO, audit logging, RBAC, and team management"
+keywords = ["enterprise", "sso", "rbac", "audit", "team"]
+categories = ["authentication", "development-tools"]
+
+[dependencies]
+ember-core = { workspace = true }
+ember-storage = { workspace = true }
+
+# Async runtime
+tokio = { workspace = true }
+
+# Serialization
+serde = { workspace = true }
+serde_json = { workspace = true }
+toml = { workspace = true }
+
+# HTTP client for SSO providers
+reqwest = { workspace = true }
+
+# Error handling
+thiserror = { workspace = true }
+anyhow = { workspace = true }
+
+# Logging
+tracing = { workspace = true }
+
+# Async utilities
+async-trait = { workspace = true }
+
+# UUID for IDs
+uuid = { workspace = true }
+
+# Time
+chrono = { workspace = true }
+
+# Cryptography for tokens and signatures
+sha2 = "0.10"
+hmac = "0.12"
+base64 = "0.22"
+rand = "0.8"
+
+# JWT for token handling
+jsonwebtoken = "9"
+
+# SAML support
+xml-rs = "0.8"
+
+# LDAP support
+ldap3 = { version = "0.11", default-features = false, features = ["tls-rustls"] }
+
+# OAuth2/OIDC
+oauth2 = "4"
+
+# IP address handling
+ipnetwork = "0.20"
+
+# Regex for patterns
+regex = { workspace = true }
+
+[dev-dependencies]
+tokio-test = "0.4"
+mockall = { workspace = true }
+tempfile = { workspace = true }
+
+[features]
+default = ["sso", "audit", "rbac", "teams"]
+sso = []
+audit = []
+rbac = []
+teams = []
+ldap = []
+saml = []

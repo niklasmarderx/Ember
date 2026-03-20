@@ -1,0 +1,139 @@
+# Ember API Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ember-api
+  namespace: ember
+  labels:
+    app.kubernetes.io/name: ember
+    app.kubernetes.io/component: api
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: ember
+      app.kubernetes.io/component: api
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: ember
+        app.kubernetes.io/component: api
+    spec:
+      serviceAccountName: ember
+      containers:
+        - name: ember-api
+          image: ghcr.io/ember-ai/ember:latest
+          imagePullPolicy: Always
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+            - name: ws
+              containerPort: 8081
+              protocol: TCP
+          env:
+            - name: RUST_LOG
+              value: "info,ember=debug"
+            - name: EMBER_ENV
+              value: "production"
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: ember-secrets
+                  key: database-url
+            - name: OPENAI_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: ember-secrets
+                  key: openai-api-key
+                  optional: true
+            - name: ANTHROPIC_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: ember-secrets
+                  key: anthropic-api-key
+                  optional: true
+          envFrom:
+            - configMapRef:
+                name: ember-config
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "250m"
+            limits:
+              memory: "1Gi"
+              cpu: "1000m"
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          volumeMounts:
+            - name: data
+              mountPath: /data
+            - name: config
+              mountPath: /etc/ember
+              readOnly: true
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: ember-data
+        - name: config
+          configMap:
+            name: ember-config-files
+---
+# Ember Web Frontend Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ember-web
+  namespace: ember
+  labels:
+    app.kubernetes.io/name: ember
+    app.kubernetes.io/component: web
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: ember
+      app.kubernetes.io/component: web
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: ember
+        app.kubernetes.io/component: web
+    spec:
+      containers:
+        - name: ember-web
+          image: ghcr.io/ember-ai/ember-web:latest
+          imagePullPolicy: Always
+          ports:
+            - name: http
+              containerPort: 80
+              protocol: TCP
+          resources:
+            requests:
+              memory: "64Mi"
+              cpu: "50m"
+            limits:
+              memory: "256Mi"
+              cpu: "200m"
+          livenessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 3
+            periodSeconds: 5
