@@ -553,7 +553,7 @@ mod tests {
         );
 
         let result = registry.execute_tool_call(&tool_call).await.unwrap();
-        assert!(result.content.contains("test input"));
+        assert!(result.output.contains("test input"));
     }
 
     // ==================== ToolDefinition Builder Tests ====================
@@ -703,7 +703,7 @@ mod tests {
         let output = ToolOutput::success("Result content");
         let llm_result = output.to_llm_result("call_123");
 
-        assert!(llm_result.content.contains("Result content"));
+        assert!(llm_result.output.contains("Result content"));
     }
 
     #[test]
@@ -711,7 +711,7 @@ mod tests {
         let output = ToolOutput::error("Error message");
         let llm_result = output.to_llm_result("call_456");
 
-        assert!(llm_result.content.contains("Error message"));
+        assert!(llm_result.output.contains("Error message"));
     }
 
     // ==================== Concurrent Access Tests ====================

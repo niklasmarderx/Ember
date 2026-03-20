@@ -487,7 +487,9 @@ mod tests {
         assert_eq!(analysis.task_type, TaskType::CodeGeneration);
         assert!(analysis.detected_keywords.contains(&"function".to_string()));
         assert!(analysis.detected_keywords.contains(&"python".to_string()));
-        assert!(analysis.detected_keywords.contains(&"implement".to_string()));
+        assert!(analysis
+            .detected_keywords
+            .contains(&"implement".to_string()));
     }
 
     #[test]
