@@ -456,12 +456,11 @@ impl ModelScorer {
         };
 
         // Higher quality models handle complex tasks better
-        if task.complexity == TaskComplexity::Complex
-            || task.complexity == TaskComplexity::Specialized
+        if (task.complexity == TaskComplexity::Complex
+            || task.complexity == TaskComplexity::Specialized)
+            && base_quality >= 0.9
         {
-            if base_quality >= 0.9 {
-                return base_quality; // Top-tier models maintain quality
-            }
+            return base_quality; // Top-tier models maintain quality
         }
 
         base_quality * complexity_factor

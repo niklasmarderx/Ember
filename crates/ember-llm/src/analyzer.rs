@@ -432,7 +432,7 @@ impl TaskAnalyzer {
     /// Estimate output tokens based on task type.
     fn estimate_output_tokens(&self, task_type: &TaskType, input_tokens: usize) -> usize {
         match task_type {
-            TaskType::Chat => input_tokens.max(50).min(200),
+            TaskType::Chat => input_tokens.clamp(50, 200),
             TaskType::CodeGeneration => input_tokens.max(100) * 3,
             TaskType::CodeReview => input_tokens.max(100) * 2,
             TaskType::Summarization => (input_tokens / 4).max(50),
@@ -440,7 +440,7 @@ impl TaskAnalyzer {
             TaskType::Math => input_tokens.max(100) * 2,
             TaskType::Creative => input_tokens.max(200) * 4,
             TaskType::Analysis => input_tokens.max(100) * 2,
-            TaskType::QuestionAnswering => input_tokens.max(50).min(500),
+            TaskType::QuestionAnswering => input_tokens.clamp(50, 500),
             TaskType::InstructionFollowing => input_tokens.max(100) * 2,
         }
     }
@@ -462,21 +462,10 @@ impl TaskAnalyzer {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{Message, Role};
+    use crate::Message;
 
     fn make_request(content: &str) -> CompletionRequest {
-        CompletionRequest {
-            messages: vec![Message {
-                role: Role::User,
-                content: content.to_string(),
-                name: None,
-            }],
-            model: "gpt-4".to_string(),
-            temperature: None,
-            max_tokens: None,
-            tools: None,
-            stream: false,
-        }
+        CompletionRequest::new("gpt-4").with_message(Message::user(content))
     }
 
     #[test]

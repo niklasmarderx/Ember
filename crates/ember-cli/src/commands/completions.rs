@@ -3,7 +3,7 @@
 //! Generates shell completions for bash, zsh, fish, and PowerShell.
 
 use anyhow::Result;
-use clap::{Command, CommandFactory};
+use clap::CommandFactory;
 use clap_complete::{generate, Shell};
 use std::io;
 

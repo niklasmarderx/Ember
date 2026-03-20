@@ -7,6 +7,7 @@ use std::fmt;
 use std::path::PathBuf;
 
 /// Configuration validation error with helpful suggestions.
+#[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub struct ConfigValidationError {
     /// The field that has an invalid value
@@ -36,6 +37,7 @@ impl fmt::Display for ConfigValidationError {
 }
 
 /// Configuration validation warning (non-fatal).
+#[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub struct ConfigValidationWarning {
     /// Description of the warning
@@ -52,6 +54,7 @@ impl fmt::Display for ConfigValidationWarning {
 }
 
 /// Result of configuration validation.
+#[allow(dead_code)]
 #[derive(Debug, Default)]
 pub struct ValidationResult {
     /// List of validation errors
@@ -60,6 +63,7 @@ pub struct ValidationResult {
     pub warnings: Vec<ConfigValidationWarning>,
 }
 
+#[allow(dead_code)]
 impl ValidationResult {
     /// Create a new empty validation result.
     pub fn new() -> Self {
@@ -324,6 +328,7 @@ impl Default for AppConfig {
 }
 
 /// Known valid provider names.
+#[allow(dead_code)]
 const VALID_PROVIDERS: &[&str] = &[
     "openai",
     "anthropic",
@@ -338,8 +343,10 @@ const VALID_PROVIDERS: &[&str] = &[
 ];
 
 /// Known valid configuration sections.
+#[allow(dead_code)]
 const VALID_SECTIONS: &[&str] = &["provider", "agent", "tools"];
 
+#[allow(dead_code)]
 impl AppConfig {
     /// Get the configuration file path.
     pub fn config_path() -> Result<PathBuf> {
@@ -486,25 +493,22 @@ impl AppConfig {
         }
 
         // Validate Anthropic settings
-        if provider_lower == "anthropic" {
-            if std::env::var("ANTHROPIC_API_KEY").is_err() {
-                result.add_warning(ConfigValidationWarning {
-                    message: "Anthropic API key not configured".to_string(),
-                    suggestion: "Set ANTHROPIC_API_KEY environment variable".to_string(),
-                });
-            }
+        if provider_lower == "anthropic" && std::env::var("ANTHROPIC_API_KEY").is_err() {
+            result.add_warning(ConfigValidationWarning {
+                message: "Anthropic API key not configured".to_string(),
+                suggestion: "Set ANTHROPIC_API_KEY environment variable".to_string(),
+            });
         }
 
         // Validate Gemini settings
-        if provider_lower == "gemini" {
-            if std::env::var("GOOGLE_API_KEY").is_err() && std::env::var("GEMINI_API_KEY").is_err()
-            {
-                result.add_warning(ConfigValidationWarning {
-                    message: "Google/Gemini API key not configured".to_string(),
-                    suggestion: "Set GOOGLE_API_KEY or GEMINI_API_KEY environment variable"
-                        .to_string(),
-                });
-            }
+        if provider_lower == "gemini"
+            && std::env::var("GOOGLE_API_KEY").is_err()
+            && std::env::var("GEMINI_API_KEY").is_err()
+        {
+            result.add_warning(ConfigValidationWarning {
+                message: "Google/Gemini API key not configured".to_string(),
+                suggestion: "Set GOOGLE_API_KEY or GEMINI_API_KEY environment variable".to_string(),
+            });
         }
     }
 

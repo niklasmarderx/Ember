@@ -337,6 +337,7 @@ impl SqliteStorage {
     }
 
     /// Search only within message content.
+    #[allow(clippy::type_complexity)]
     pub async fn search_messages(
         &self,
         query: &str,

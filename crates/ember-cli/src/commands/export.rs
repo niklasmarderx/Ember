@@ -38,7 +38,7 @@ pub struct ExportArgs {
 /// Execute the export command.
 pub fn run(args: ExportArgs) -> Result<()> {
     // Parse format
-    let format = ExportFormat::from_str(&args.format).ok_or_else(|| {
+    let format = ExportFormat::parse(&args.format).ok_or_else(|| {
         anyhow::anyhow!(
             "Unknown format '{}'. Supported formats: json, markdown (md), html",
             args.format
@@ -97,6 +97,7 @@ pub fn run(args: ExportArgs) -> Result<()> {
 }
 
 /// Export a conversation directly (for use in chat mode).
+#[allow(dead_code)]
 pub fn export_conversation(
     conversation: &Conversation,
     format_str: &str,
@@ -104,7 +105,7 @@ pub fn export_conversation(
     provider: Option<&str>,
     model: Option<&str>,
 ) -> Result<PathBuf> {
-    let format = ExportFormat::from_str(format_str).ok_or_else(|| {
+    let format = ExportFormat::parse(format_str).ok_or_else(|| {
         anyhow::anyhow!(
             "Unknown format '{}'. Supported: json, markdown, html",
             format_str
@@ -197,6 +198,7 @@ fn load_conversation(id: Option<&str>) -> Result<Conversation> {
 }
 
 /// List available conversations.
+#[allow(dead_code)]
 pub fn list_conversations() -> Result<Vec<(String, String, chrono::DateTime<Utc>)>> {
     let data_dir = dirs::data_dir()
         .map(|d| d.join("ember").join("conversations"))
@@ -299,15 +301,15 @@ mod tests {
 
     #[test]
     fn test_export_format_parsing() {
-        assert_eq!(ExportFormat::from_str("json"), Some(ExportFormat::Json));
-        assert_eq!(ExportFormat::from_str("JSON"), Some(ExportFormat::Json));
+        assert_eq!(ExportFormat::parse("json"), Some(ExportFormat::Json));
+        assert_eq!(ExportFormat::parse("JSON"), Some(ExportFormat::Json));
         assert_eq!(
-            ExportFormat::from_str("markdown"),
+            ExportFormat::parse("markdown"),
             Some(ExportFormat::Markdown)
         );
-        assert_eq!(ExportFormat::from_str("md"), Some(ExportFormat::Markdown));
-        assert_eq!(ExportFormat::from_str("html"), Some(ExportFormat::Html));
-        assert_eq!(ExportFormat::from_str("HTML"), Some(ExportFormat::Html));
-        assert_eq!(ExportFormat::from_str("invalid"), None);
+        assert_eq!(ExportFormat::parse("md"), Some(ExportFormat::Markdown));
+        assert_eq!(ExportFormat::parse("html"), Some(ExportFormat::Html));
+        assert_eq!(ExportFormat::parse("HTML"), Some(ExportFormat::Html));
+        assert_eq!(ExportFormat::parse("invalid"), None);
     }
 }

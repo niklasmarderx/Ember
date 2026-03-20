@@ -353,10 +353,10 @@ impl SemanticCache {
 
             let similarity = cosine_similarity(&query_embedding, &entry.embedding);
 
-            if similarity >= self.config.similarity_threshold {
-                if best_match.map(|(_, s)| similarity > s).unwrap_or(true) {
-                    best_match = Some((idx, similarity));
-                }
+            if similarity >= self.config.similarity_threshold
+                && best_match.map(|(_, s)| similarity > s).unwrap_or(true)
+            {
+                best_match = Some((idx, similarity));
             }
         }
 
