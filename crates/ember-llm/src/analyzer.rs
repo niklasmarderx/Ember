@@ -481,12 +481,13 @@ mod tests {
     #[test]
     fn test_code_generation() {
         let analyzer = TaskAnalyzer::new();
-        let request = make_request("Write a Python function to calculate fibonacci numbers");
+        let request = make_request("Write a Python function to implement fibonacci numbers");
         let analysis = analyzer.analyze(&request);
 
         assert_eq!(analysis.task_type, TaskType::CodeGeneration);
         assert!(analysis.detected_keywords.contains(&"function".to_string()));
         assert!(analysis.detected_keywords.contains(&"python".to_string()));
+        assert!(analysis.detected_keywords.contains(&"implement".to_string()));
     }
 
     #[test]
