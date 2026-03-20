@@ -37,8 +37,6 @@ use crate::config::AppConfig;
 use anyhow::{Context, Result};
 use colored::Colorize;
 
-
-
 /// Initialize a new Ember configuration file.
 ///
 /// This creates a default configuration file if one does not exist.
@@ -96,9 +94,6 @@ pub fn init(force: bool) -> Result<()> {
 
     Ok(())
 }
-
-
-
 
 /// Display the current configuration.
 ///
@@ -201,8 +196,6 @@ pub fn show(config: &AppConfig) -> Result<()> {
     Ok(())
 }
 
-
-
 /// Set a configuration key to a new value.
 ///
 /// Example:
@@ -228,8 +221,6 @@ pub fn set(key: &str, value: &str) -> Result<()> {
 
     Ok(())
 }
-
-
 
 /// Retrieve a configuration value.
 ///
@@ -257,9 +248,6 @@ pub fn get(config: &AppConfig, key: &str) -> Result<()> {
     Ok(())
 }
 
-
-
-
 /// Display the location of the Ember configuration file.
 ///
 /// Example:
@@ -282,8 +270,6 @@ pub fn path() -> Result<()> {
 
     Ok(())
 }
-
-
 
 /// Print all supported configuration keys.
 ///

@@ -214,8 +214,7 @@ async fn run() -> Result<()> {
 
     init_logging(cli.verbose)?;
 
-    let config = AppConfig::load(cli.config.as_deref())
-        .context("Failed to load configuration")?;
+    let config = AppConfig::load(cli.config.as_deref()).context("Failed to load configuration")?;
 
     match cli.command {
         #[cfg(feature = "tui")]

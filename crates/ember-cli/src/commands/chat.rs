@@ -147,9 +147,6 @@ impl ProgressIndicator {
     }
 }
 
-
-
-
 /// Execute the `ember chat` command.
 ///
 /// This function determines whether to run:
@@ -247,8 +244,6 @@ pub async fn run(
     Ok(())
 }
 
-
-
 /// Build a registry of enabled tools.
 ///
 /// The registry is used by the agent to discover and execute tools.
@@ -294,8 +289,6 @@ fn create_tool_registry(tool_names: &[String]) -> Result<ToolRegistry> {
     Ok(registry)
 }
 
-
-
 /// Create an LLM provider based on configuration and provider name.
 fn create_provider(config: &AppConfig, provider_name: &str) -> Result<Arc<dyn LLMProvider>> {
     match provider_name {
@@ -327,8 +320,6 @@ fn create_provider(config: &AppConfig, provider_name: &str) -> Result<Arc<dyn LL
         }
     }
 }
-
-
 
 /// Execute a single AI task and exit.
 ///
@@ -474,8 +465,6 @@ async fn agent_one_shot(
 
     Ok(())
 }
-
-
 
 /// Interactive agent mode with tool execution.
 ///
@@ -773,8 +762,6 @@ async fn one_shot_chat(
 
     Ok(())
 }
-
-
 
 /// Start interactive chat mode.
 ///
