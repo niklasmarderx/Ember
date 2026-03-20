@@ -10,7 +10,7 @@
 use clap::{Args, Subcommand};
 use colored::Colorize;
 use ember_plugins::marketplace::{
-    MarketplaceClient, PluginSearchQuery, PluginSortField, SortOrder,
+    PluginCategory, RegistryClient, RegistryConfig, SearchQuery, SearchSort,
 };
 use std::path::PathBuf;
 use tabled::{Table, Tabled};
@@ -30,10 +30,10 @@ pub enum PluginCommand {
     Search {
         /// Search query.
         query: String,
-        /// Filter by tags (comma-separated).
+        /// Filter by category.
         #[arg(short, long)]
-        tags: Option<String>,
-        /// Sort by field (downloads, rating, name, published, updated).
+        category: Option<String>,
+        /// Sort by field (downloads, rating, name, updated, trending).
         #[arg(short, long, default_value = "downloads")]
         sort: String,
         /// Number of results to show.
@@ -72,12 +72,10 @@ pub enum PluginCommand {
     CheckUpdates,
     /// Show featured plugins from the marketplace.
     Featured,
-    /// Show available plugin tags.
-    Tags,
+    /// Show trending plugins from the marketplace.
+    Trending,
     /// Clear plugin cache.
     CacheClear,
-    /// Show cache statistics.
-    CacheInfo,
 }
 
 /// Table row for plugin list.
@@ -102,10 +100,8 @@ struct InstalledPluginRow {
     name: String,
     #[tabled(rename = "Version")]
     version: String,
-    #[tabled(rename = "Installed")]
-    installed: String,
-    #[tabled(rename = "Size")]
-    size: String,
+    #[tabled(rename = "Status")]
+    status: String,
 }
 
 /// Get the plugin cache directory.
@@ -116,15 +112,24 @@ fn get_cache_dir() -> PathBuf {
         .join("plugins")
 }
 
+/// Create a registry client with custom cache directory.
+fn create_client() -> Result<RegistryClient, anyhow::Error> {
+    let config = RegistryConfig {
+        cache_dir: get_cache_dir(),
+        ..Default::default()
+    };
+    Ok(RegistryClient::with_config(config)?)
+}
+
 /// Execute plugin command.
 pub async fn execute(args: PluginArgs) -> anyhow::Result<()> {
     match args.command {
         PluginCommand::Search {
             query,
-            tags,
+            category,
             sort,
             limit,
-        } => search_plugins(&query, tags, &sort, limit).await,
+        } => search_plugins(&query, category, &sort, limit).await,
         PluginCommand::Install { name, version } => install_plugin(&name, version).await,
         PluginCommand::Uninstall { name } => uninstall_plugin(&name).await,
         PluginCommand::Update { name, all } => update_plugins(name, all).await,
@@ -132,44 +137,51 @@ pub async fn execute(args: PluginArgs) -> anyhow::Result<()> {
         PluginCommand::Info { name } => show_plugin_info(&name).await,
         PluginCommand::CheckUpdates => check_updates().await,
         PluginCommand::Featured => show_featured().await,
-        PluginCommand::Tags => show_tags().await,
+        PluginCommand::Trending => show_trending().await,
         PluginCommand::CacheClear => clear_cache().await,
-        PluginCommand::CacheInfo => show_cache_info().await,
     }
 }
 
 /// Search for plugins.
 async fn search_plugins(
     query: &str,
-    tags: Option<String>,
+    category: Option<String>,
     sort: &str,
     limit: u32,
 ) -> anyhow::Result<()> {
-    println!("{}", "🔍 Searching plugins...".cyan());
+    println!("{}", "Searching plugins...".cyan());
 
-    let client = MarketplaceClient::new(get_cache_dir()).await?;
+    let client = create_client()?;
 
     let sort_by = match sort.to_lowercase().as_str() {
-        "name" => PluginSortField::Name,
-        "downloads" => PluginSortField::Downloads,
-        "rating" => PluginSortField::Rating,
-        "published" => PluginSortField::Published,
-        "updated" => PluginSortField::Updated,
-        _ => PluginSortField::Downloads,
+        "downloads" => Some(SearchSort::Downloads),
+        "rating" => Some(SearchSort::Rating),
+        "updated" => Some(SearchSort::RecentlyUpdated),
+        "trending" => Some(SearchSort::Trending),
+        _ => Some(SearchSort::Downloads),
     };
 
-    let search_query = PluginSearchQuery {
+    let plugin_category = category.and_then(|c| match c.to_lowercase().as_str() {
+        "ai" | "ml" => Some(PluginCategory::Ai),
+        "productivity" => Some(PluginCategory::Productivity),
+        "devtools" | "developer" => Some(PluginCategory::Developer),
+        "integration" => Some(PluginCategory::Integration),
+        "utility" | "utilities" => Some(PluginCategory::Utility),
+        "data" => Some(PluginCategory::Data),
+        "communication" => Some(PluginCategory::Communication),
+        "security" => Some(PluginCategory::Security),
+        _ => None,
+    });
+
+    let search_query = SearchQuery {
         query: Some(query.to_string()),
-        tags: tags
-            .map(|t| t.split(',').map(|s| s.trim().to_string()).collect())
-            .unwrap_or_default(),
+        category: plugin_category,
         sort_by,
-        sort_order: SortOrder::Descending,
-        per_page: limit,
+        page_size: Some(limit),
         ..Default::default()
     };
 
-    match client.search(search_query).await {
+    match client.search(&search_query).await {
         Ok(results) => {
             if results.plugins.is_empty() {
                 println!("{}", "No plugins found matching your query.".yellow());
@@ -178,7 +190,7 @@ async fn search_plugins(
 
             println!(
                 "\n{} Found {} plugins (showing {})\n",
-                "✓".green(),
+                "[OK]".green(),
                 results.total,
                 results.plugins.len()
             );
@@ -187,11 +199,11 @@ async fn search_plugins(
                 .plugins
                 .iter()
                 .map(|p| PluginRow {
-                    name: p.manifest.name.clone(),
-                    version: p.manifest.version.clone(),
-                    description: truncate(&p.manifest.description, 40),
-                    downloads: format_number(p.downloads),
-                    rating: format!("⭐ {:.1}", p.rating),
+                    name: p.name.clone(),
+                    version: p.latest_version().map(|v| v.version.to_string()).unwrap_or_else(|| "N/A".to_string()),
+                    description: truncate(&p.description, 40),
+                    downloads: format_number(p.stats.downloads),
+                    rating: format!("{:.1}", p.stats.average_rating),
                 })
                 .collect();
 
@@ -200,15 +212,14 @@ async fn search_plugins(
 
             println!(
                 "\n{} Use {} to install a plugin",
-                "💡".blue(),
+                "[Tip]".blue(),
                 "ember plugin install <name>".cyan()
             );
         }
-        Err(_e) => {
-            // Fallback: Show mock data for demo
+        Err(e) => {
             println!(
                 "{}",
-                "⚠️  Could not connect to marketplace. Showing example plugins:".yellow()
+                format!("Could not connect to marketplace: {}", e).yellow()
             );
             show_example_plugins();
         }
@@ -221,7 +232,7 @@ async fn search_plugins(
 async fn install_plugin(name: &str, version: Option<String>) -> anyhow::Result<()> {
     println!(
         "{} Installing plugin: {}{}",
-        "📦".cyan(),
+        "[Install]".cyan(),
         name.green(),
         version
             .as_ref()
@@ -229,24 +240,53 @@ async fn install_plugin(name: &str, version: Option<String>) -> anyhow::Result<(
             .unwrap_or_default()
     );
 
-    let mut client = MarketplaceClient::new(get_cache_dir()).await?;
+    let client = create_client()?;
 
-    match client.install(name, version.as_deref()).await {
-        Ok(path) => {
-            println!(
-                "\n{} Plugin {} installed successfully!",
-                "✓".green(),
-                name.green()
-            );
-            println!("  Location: {}", path.display());
+    // Get plugin info
+    match client.get_plugin(name).await {
+        Ok(metadata) => {
+            let target_version = if let Some(v) = version {
+                // Find specific version
+                match client.get_plugin_version(name, &v).await {
+                    Ok(ver) => ver,
+                    Err(e) => {
+                        println!("\n{} Version not found: {}", "[Error]".red(), e);
+                        return Ok(());
+                    }
+                }
+            } else {
+                // Use latest version
+                match metadata.latest_version() {
+                    Some(v) => v.clone(),
+                    None => {
+                        println!("\n{} No versions available for this plugin", "[Error]".red());
+                        return Ok(());
+                    }
+                }
+            };
+
+            // Download the plugin
+            match client.download_plugin(name, &target_version).await {
+                Ok(path) => {
+                    println!(
+                        "\n{} Plugin {} v{} installed successfully!",
+                        "[OK]".green(),
+                        name.green(),
+                        target_version.version
+                    );
+                    println!("  Location: {}", path.display());
+                }
+                Err(e) => {
+                    println!("\n{} Download failed: {}", "[Error]".red(), e);
+                }
+            }
         }
         Err(e) => {
-            // Provide helpful error message
-            println!("\n{} Could not install plugin: {}", "✗".red(), e);
-            println!("\n{} Tips:", "💡".blue());
-            println!("  • Check if the plugin name is correct");
-            println!("  • Verify your internet connection");
-            println!("  • Try: ember plugin search {}", name);
+            println!("\n{} Could not find plugin: {}", "[Error]".red(), e);
+            println!("\n{} Tips:", "[Tip]".blue());
+            println!("  - Check if the plugin name is correct");
+            println!("  - Verify your internet connection");
+            println!("  - Try: ember plugin search {}", name);
         }
     }
 
@@ -255,72 +295,66 @@ async fn install_plugin(name: &str, version: Option<String>) -> anyhow::Result<(
 
 /// Uninstall a plugin.
 async fn uninstall_plugin(name: &str) -> anyhow::Result<()> {
-    println!("{} Uninstalling plugin: {}", "🗑️ ".cyan(), name.yellow());
+    println!("{} Uninstalling plugin: {}", "[Uninstall]".cyan(), name.yellow());
 
-    let mut client = MarketplaceClient::new(get_cache_dir()).await?;
+    let cache_dir = get_cache_dir();
+    let plugin_dir = cache_dir.join(name);
 
-    client.uninstall(name).await?;
-
-    println!(
-        "\n{} Plugin {} uninstalled successfully!",
-        "✓".green(),
-        name.green()
-    );
+    if plugin_dir.exists() {
+        fs::remove_dir_all(&plugin_dir).await?;
+        println!(
+            "\n{} Plugin {} uninstalled successfully!",
+            "[OK]".green(),
+            name.green()
+        );
+    } else {
+        println!("\n{} Plugin {} is not installed.", "[Info]".yellow(), name);
+    }
 
     Ok(())
 }
 
 /// Update plugins.
 async fn update_plugins(name: Option<String>, all: bool) -> anyhow::Result<()> {
-    let mut client = MarketplaceClient::new(get_cache_dir()).await?;
-
     if all {
-        println!("{} Checking for updates...", "🔄".cyan());
-
-        let updates = client.check_updates().await?;
-
-        if updates.is_empty() {
-            println!("{} All plugins are up to date!", "✓".green());
-            return Ok(());
-        }
-
-        println!("\n{} Updates available:", "📦".blue());
-        for (plugin_name, current, latest) in &updates {
-            println!(
-                "  • {} {} → {}",
-                plugin_name.cyan(),
-                current.yellow(),
-                latest.green()
-            );
-        }
-
-        println!("\n{} Updating {} plugins...", "🔄".cyan(), updates.len());
-
-        for (plugin_name, _, _) in updates {
-            match client.update(&plugin_name).await {
-                Ok(_) => println!("  {} {} updated", "✓".green(), plugin_name),
-                Err(e) => println!("  {} {} failed: {}", "✗".red(), plugin_name, e),
-            }
-        }
+        println!("{} Checking for updates...", "[Update]".cyan());
+        // TODO: Implement batch update when installed plugin tracking is available
+        println!("{} Batch update not yet implemented.", "[Info]".yellow());
+        println!("  Use: ember plugin update <plugin-name>");
     } else if let Some(plugin_name) = name {
-        println!("{} Updating plugin: {}", "🔄".cyan(), plugin_name.yellow());
+        println!("{} Updating plugin: {}", "[Update]".cyan(), plugin_name.yellow());
 
-        match client.update(&plugin_name).await {
-            Ok(_path) => {
-                println!(
-                    "\n{} Plugin {} updated successfully!",
-                    "✓".green(),
-                    plugin_name.green()
-                );
+        let client = create_client()?;
+
+        match client.get_plugin(&plugin_name).await {
+            Ok(metadata) => {
+                if let Some(latest) = metadata.latest_version() {
+                    match client.download_plugin(&plugin_name, latest).await {
+                        Ok(path) => {
+                            println!(
+                                "\n{} Plugin {} updated to v{}!",
+                                "[OK]".green(),
+                                plugin_name.green(),
+                                latest.version
+                            );
+                            println!("  Location: {}", path.display());
+                        }
+                        Err(e) => {
+                            println!("\n{} Update failed: {}", "[Error]".red(), e);
+                        }
+                    }
+                } else {
+                    println!("\n{} No versions available", "[Error]".red());
+                }
             }
             Err(e) => {
-                println!("\n{} Failed to update plugin: {}", "✗".red(), e);
+                println!("\n{} Could not find plugin: {}", "[Error]".red(), e);
             }
         }
     } else {
         println!(
             "{} Please specify a plugin name or use --all",
-            "⚠️".yellow()
+            "[Warning]".yellow()
         );
     }
 
@@ -329,84 +363,77 @@ async fn update_plugins(name: Option<String>, all: bool) -> anyhow::Result<()> {
 
 /// List installed plugins.
 async fn list_plugins() -> anyhow::Result<()> {
-    println!("{} Installed plugins:\n", "📦".cyan());
+    println!("{} Installed plugins:\n", "[Plugins]".cyan());
 
-    let client = MarketplaceClient::new(get_cache_dir()).await?;
-    let installed = client.list_installed();
+    let cache_dir = get_cache_dir();
 
-    if installed.is_empty() {
+    if !cache_dir.exists() {
         println!("{}", "No plugins installed.".yellow());
         println!(
             "\n{} Use {} to search for plugins",
-            "💡".blue(),
+            "[Tip]".blue(),
             "ember plugin search <query>".cyan()
         );
         return Ok(());
     }
 
-    let rows: Vec<InstalledPluginRow> = installed
-        .iter()
-        .map(|p| InstalledPluginRow {
-            name: p.name.clone(),
-            version: p.version.clone(),
-            installed: p.installed_at.format("%Y-%m-%d").to_string(),
-            size: format_size(get_file_size(&p.wasm_path)),
-        })
-        .collect();
+    let mut entries = fs::read_dir(&cache_dir).await?;
+    let mut plugins = Vec::new();
 
-    let table = Table::new(rows).to_string();
+    while let Some(entry) = entries.next_entry().await? {
+        if entry.file_type().await?.is_dir() {
+            let name = entry.file_name().to_string_lossy().to_string();
+            plugins.push(InstalledPluginRow {
+                name,
+                version: "installed".to_string(),
+                status: "active".green().to_string(),
+            });
+        }
+    }
+
+    if plugins.is_empty() {
+        println!("{}", "No plugins installed.".yellow());
+        return Ok(());
+    }
+
+    let table = Table::new(&plugins).to_string();
     println!("{}", table);
 
-    println!("\n{} {} plugins installed", "📊".blue(), installed.len());
+    println!("\n{} {} plugins installed", "[Stats]".blue(), plugins.len());
 
     Ok(())
 }
 
 /// Show plugin details.
 async fn show_plugin_info(name: &str) -> anyhow::Result<()> {
-    println!("{} Plugin info: {}\n", "ℹ️ ".cyan(), name.green());
+    println!("{} Plugin info: {}\n", "[Info]".cyan(), name.green());
 
-    let client = MarketplaceClient::new(get_cache_dir()).await?;
+    let client = create_client()?;
 
-    // Check if installed locally
-    if let Some(info) = client.list_installed().iter().find(|p| p.name == name) {
-        println!("{}", "Local Installation:".blue().bold());
-        println!("  Name:      {}", info.name);
-        println!("  Version:   {}", info.version);
-        println!(
-            "  Installed: {}",
-            info.installed_at.format("%Y-%m-%d %H:%M")
-        );
-        println!("  Path:      {}", info.wasm_path.display());
-        println!("  Checksum:  {}", info.checksum);
-        println!();
-    }
-
-    // Try to get remote info
     match client.get_plugin(name).await {
-        Ok(entry) => {
+        Ok(metadata) => {
+            let author_name = metadata.authors.first()
+                .map(|a| a.name.clone())
+                .unwrap_or_else(|| "Unknown".to_string());
             println!("{}", "Marketplace Info:".blue().bold());
-            println!("  Name:        {}", entry.manifest.name);
-            println!("  Version:     {}", entry.manifest.version);
-            println!("  Description: {}", entry.manifest.description);
-            println!("  Author:      {}", entry.author.name);
-            println!("  License:     {}", entry.license);
-            println!("  Downloads:   {}", format_number(entry.downloads));
-            println!(
-                "  Rating:      ⭐ {:.1} ({} ratings)",
-                entry.rating, entry.rating_count
-            );
-            println!("  Published:   {}", entry.published_at.format("%Y-%m-%d"));
-            println!("  Updated:     {}", entry.updated_at.format("%Y-%m-%d"));
-            if let Some(repo) = &entry.repository {
-                println!("  Repository:  {}", repo);
-            }
-            if !entry.tags.is_empty() {
-                println!("  Tags:        {}", entry.tags.join(", "));
+            println!("  Name:        {}", metadata.name);
+            println!("  ID:          {}", metadata.id);
+            println!("  Description: {}", metadata.description);
+            println!("  Author:      {}", author_name);
+            println!("  Downloads:   {}", format_number(metadata.stats.downloads));
+            println!("  Rating:      {:.1} ({} ratings)", metadata.stats.average_rating, metadata.stats.review_count);
+            println!("  Featured:    {}", if metadata.featured { "Yes" } else { "No" });
+            println!("  Verified:    {}", if metadata.verified { "Yes" } else { "No" });
+
+            if let Some(latest) = metadata.latest_version() {
+                println!("\n{}", "Latest Version:".blue().bold());
+                println!("  Version:     {}", latest.version);
+                println!("  Released:    {}", latest.released_at.format("%Y-%m-%d"));
+                println!("  Min Ember:   {}", latest.ember_version);
             }
         }
-        Err(_) => {
-            println!("{} Could not fetch remote plugin info", "⚠️".yellow());
+        Err(e) => {
+            println!("{} Could not fetch plugin info: {}", "[Error]".red(), e);
         }
     }
 
@@ -415,81 +442,40 @@ async fn show_plugin_info(name: &str) -> anyhow::Result<()> {
 
 /// Check for updates.
 async fn check_updates() -> anyhow::Result<()> {
-    println!("{} Checking for updates...\n", "🔄".cyan());
+    println!("{} Checking for updates...\n", "[Check]".cyan());
 
-    let client = MarketplaceClient::new(get_cache_dir()).await?;
-    let updates = client.check_updates().await?;
-
-    if updates.is_empty() {
-        println!("{} All plugins are up to date!", "✓".green());
-    } else {
-        println!("{} Updates available:\n", "📦".blue());
-        for (name, current, latest) in &updates {
-            println!(
-                "  • {} {} → {}",
-                name.cyan(),
-                current.yellow(),
-                latest.green()
-            );
-        }
-        println!(
-            "\n{} Run {} to update all",
-            "💡".blue(),
-            "ember plugin update --all".cyan()
-        );
-    }
+    // TODO: Implement proper installed plugin tracking
+    println!("{} Update checking requires installed plugin tracking.", "[Info]".yellow());
+    println!("  This feature will be available in a future version.");
 
     Ok(())
 }
 
 /// Show featured plugins.
 async fn show_featured() -> anyhow::Result<()> {
-    println!("{} Featured Plugins\n", "⭐".cyan());
+    println!("{} Featured Plugins\n", "[Featured]".cyan());
 
-    let client = MarketplaceClient::new(get_cache_dir()).await?;
+    let client = create_client()?;
 
     match client.get_featured().await {
-        Ok(featured) => {
-            if !featured.editors_picks.is_empty() {
-                println!("{}", "🏆 Editor's Picks:".blue().bold());
-                for p in &featured.editors_picks {
-                    println!(
-                        "  • {} v{} - {}",
-                        p.manifest.name.green(),
-                        p.manifest.version,
-                        truncate(&p.manifest.description, 50)
-                    );
-                }
-                println!();
+        Ok(plugins) => {
+            if plugins.is_empty() {
+                println!("{}", "No featured plugins available.".yellow());
+                return Ok(());
             }
 
-            if !featured.popular.is_empty() {
-                println!("{}", "📈 Most Popular:".blue().bold());
-                for p in &featured.popular {
-                    println!(
-                        "  • {} ({} downloads) - {}",
-                        p.manifest.name.green(),
-                        format_number(p.downloads),
-                        truncate(&p.manifest.description, 40)
-                    );
-                }
-                println!();
-            }
-
-            if !featured.trending.is_empty() {
-                println!("{}", "🔥 Trending:".blue().bold());
-                for p in &featured.trending {
-                    println!(
-                        "  • {} ⭐{:.1} - {}",
-                        p.manifest.name.green(),
-                        p.rating,
-                        truncate(&p.manifest.description, 40)
-                    );
-                }
+            for p in &plugins {
+                println!(
+                    "  - {} v{} - {}",
+                    p.name.green(),
+                    p.latest_version().map(|v| v.version.to_string()).unwrap_or_else(|| "?".to_string()),
+                    truncate(&p.description, 50)
+                );
+                println!("    {} downloads, {:.1} rating", format_number(p.stats.downloads), p.stats.average_rating);
             }
         }
-        Err(_) => {
-            // Fallback to example plugins
+        Err(e) => {
+            println!("{} Could not fetch featured plugins: {}", "[Error]".yellow(), e);
             show_example_plugins();
         }
     }
@@ -497,52 +483,40 @@ async fn show_featured() -> anyhow::Result<()> {
     Ok(())
 }
 
-/// Show available tags.
-async fn show_tags() -> anyhow::Result<()> {
-    println!("{} Available Tags\n", "🏷️ ".cyan());
+/// Show trending plugins.
+async fn show_trending() -> anyhow::Result<()> {
+    println!("{} Trending Plugins\n", "[Trending]".cyan());
 
-    let client = MarketplaceClient::new(get_cache_dir()).await?;
+    let client = create_client()?;
 
-    match client.get_tags().await {
-        Ok(tags) => {
-            for tag in tags {
+    match client.get_trending().await {
+        Ok(plugins) => {
+            if plugins.is_empty() {
+                println!("{}", "No trending plugins available.".yellow());
+                return Ok(());
+            }
+
+            for p in &plugins {
                 println!(
-                    "  {} ({} plugins){}",
-                    tag.name.cyan(),
-                    tag.count,
-                    tag.description
-                        .map(|d| format!(" - {}", d))
-                        .unwrap_or_default()
+                    "  - {} v{} - {}",
+                    p.name.green(),
+                    p.latest_version().map(|v| v.version.to_string()).unwrap_or_else(|| "?".to_string()),
+                    truncate(&p.description, 50)
                 );
             }
         }
-        Err(_) => {
-            // Show example tags
-            let example_tags = vec![
-                ("ai", 15, "AI and machine learning tools"),
-                ("productivity", 12, "Productivity enhancements"),
-                ("devtools", 10, "Developer tools"),
-                ("integration", 8, "Third-party integrations"),
-                ("utility", 6, "General utilities"),
-            ];
-            for (name, count, desc) in example_tags {
-                println!("  {} ({} plugins) - {}", name.cyan(), count, desc);
-            }
+        Err(e) => {
+            println!("{} Could not fetch trending plugins: {}", "[Error]".yellow(), e);
+            show_example_plugins();
         }
     }
-
-    println!(
-        "\n{} Use {} to filter by tag",
-        "💡".blue(),
-        "ember plugin search --tags ai".cyan()
-    );
 
     Ok(())
 }
 
 /// Clear plugin cache.
 async fn clear_cache() -> anyhow::Result<()> {
-    println!("{} Clearing plugin cache...", "🗑️ ".cyan());
+    println!("{} Clearing plugin cache...", "[Cache]".cyan());
 
     let cache_dir = get_cache_dir();
     if cache_dir.exists() {
@@ -550,21 +524,7 @@ async fn clear_cache() -> anyhow::Result<()> {
         fs::create_dir_all(&cache_dir).await?;
     }
 
-    println!("{} Plugin cache cleared!", "✓".green());
-
-    Ok(())
-}
-
-/// Show cache information.
-async fn show_cache_info() -> anyhow::Result<()> {
-    println!("{} Plugin Cache Info\n", "📊".cyan());
-
-    let client = MarketplaceClient::new(get_cache_dir()).await?;
-    let stats = client.cache_stats().await?;
-
-    println!("  Location:     {}", stats.cache_dir.display());
-    println!("  Plugins:      {}", stats.plugin_count);
-    println!("  Total Size:   {}", format_size(stats.total_size));
+    println!("{} Plugin cache cleared!", "[OK]".green());
 
     Ok(())
 }
@@ -578,46 +538,16 @@ fn show_example_plugins() {
     println!("\n{}", "Example Plugins:".blue().bold());
 
     let examples = vec![
-        (
-            "weather",
-            "1.2.0",
-            "Get weather forecasts for any location",
-            "12.5k",
-            "4.8",
-        ),
-        (
-            "slack",
-            "2.0.1",
-            "Send messages and notifications to Slack",
-            "8.3k",
-            "4.6",
-        ),
-        (
-            "github",
-            "1.5.0",
-            "Interact with GitHub repositories and issues",
-            "15.2k",
-            "4.9",
-        ),
-        (
-            "jira",
-            "1.1.0",
-            "Create and manage Jira tickets",
-            "5.7k",
-            "4.3",
-        ),
-        (
-            "calendar",
-            "1.0.0",
-            "Manage Google Calendar events",
-            "3.2k",
-            "4.5",
-        ),
+        ("weather", "1.2.0", "Get weather forecasts for any location", "12.5k", "4.8"),
+        ("slack", "2.0.1", "Send messages and notifications to Slack", "8.3k", "4.6"),
+        ("github", "1.5.0", "Interact with GitHub repositories and issues", "15.2k", "4.9"),
+        ("jira", "1.1.0", "Create and manage Jira tickets", "5.7k", "4.3"),
+        ("calendar", "1.0.0", "Manage Google Calendar events", "3.2k", "4.5"),
     ];
 
     for (name, version, desc, downloads, rating) in examples {
         println!(
-            "  • {} v{} ({} downloads, ⭐{}) - {}",
+            "  - {} v{} ({} downloads, rating {}) - {}",
             name.green(),
             version,
             downloads,
@@ -628,7 +558,7 @@ fn show_example_plugins() {
 
     println!(
         "\n{} These are example plugins for demonstration.",
-        "ℹ️ ".blue()
+        "[Info]".blue()
     );
 }
 
@@ -637,7 +567,7 @@ fn truncate(s: &str, max_len: usize) -> String {
     if s.len() <= max_len {
         s.to_string()
     } else {
-        format!("{}...", &s[..max_len - 3])
+        format!("{}...", &s[..max_len.saturating_sub(3)])
     }
 }
 
@@ -650,20 +580,4 @@ fn format_number(n: u64) -> String {
     } else {
         n.to_string()
     }
-}
-
-/// Format file size.
-fn format_size(bytes: u64) -> String {
-    if bytes >= 1_024 * 1_024 {
-        format!("{:.1} MB", bytes as f64 / (1_024.0 * 1_024.0))
-    } else if bytes >= 1_024 {
-        format!("{:.1} KB", bytes as f64 / 1_024.0)
-    } else {
-        format!("{} B", bytes)
-    }
-}
-
-/// Get file size (0 if not exists).
-fn get_file_size(path: &std::path::Path) -> u64 {
-    std::fs::metadata(path).map(|m| m.len()).unwrap_or(0)
 }

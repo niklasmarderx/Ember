@@ -299,11 +299,11 @@ impl<T: Send + Sync + 'static> ProviderPool<T> {
     /// Try to acquire a connection from the pool
     pub async fn try_acquire(&self) -> Option<PooledConnection<T>> {
         let mut connections = self.connections.lock().await;
-        
+
         // Find a healthy, non-expired connection
-        let idx = connections.iter().position(|c| {
-            c.state.healthy && !c.state.is_idle_expired(self.config.idle_timeout)
-        });
+        let idx = connections
+            .iter()
+            .position(|c| c.state.healthy && !c.state.is_idle_expired(self.config.idle_timeout));
 
         if let Some(idx) = idx {
             let mut conn = connections.remove(idx);
@@ -319,7 +319,7 @@ impl<T: Send + Sync + 'static> ProviderPool<T> {
     /// Return a connection to the pool
     pub async fn release(&self, mut conn: PooledConnection<T>) {
         let mut connections = self.connections.lock().await;
-        
+
         // Only keep if healthy and not expired
         if conn.state.healthy && !conn.state.is_idle_expired(self.config.idle_timeout) {
             conn.state.last_used = Instant::now();
@@ -327,7 +327,7 @@ impl<T: Send + Sync + 'static> ProviderPool<T> {
         } else {
             self.metrics.connection_closed();
         }
-        
+
         self.update_metrics(&connections).await;
     }
 
@@ -336,7 +336,7 @@ impl<T: Send + Sync + 'static> ProviderPool<T> {
         let idle = connections.len();
         let total = self.config.max_connections - self.semaphore.available_permits();
         let active = total.saturating_sub(idle);
-        
+
         self.metrics.set_idle(idle);
         self.metrics.set_active(active);
     }
@@ -345,16 +345,14 @@ impl<T: Send + Sync + 'static> ProviderPool<T> {
     pub async fn cleanup(&self) {
         let mut connections = self.connections.lock().await;
         let before = connections.len();
-        
-        connections.retain(|c| {
-            !c.state.is_idle_expired(self.config.idle_timeout)
-        });
-        
+
+        connections.retain(|c| !c.state.is_idle_expired(self.config.idle_timeout));
+
         let removed = before - connections.len();
         for _ in 0..removed {
             self.metrics.connection_closed();
         }
-        
+
         self.update_metrics(&connections).await;
     }
 
@@ -368,7 +366,7 @@ impl<T: Send + Sync + 'static> ProviderPool<T> {
     pub async fn stats(&self) -> PoolStats {
         let connections = self.connections.lock().await;
         let snapshot = self.metrics.snapshot();
-        
+
         PoolStats {
             provider: self.provider.clone(),
             idle_connections: connections.len(),
@@ -432,7 +430,7 @@ impl<T: Send + Sync + 'static> ConnectionPoolManager<T> {
 
         // Create new pool
         let mut pools = self.pools.write().await;
-        
+
         // Double-check after acquiring write lock
         if let Some(pool) = pools.get(provider) {
             return Arc::clone(pool);
@@ -455,11 +453,11 @@ impl<T: Send + Sync + 'static> ConnectionPoolManager<T> {
     pub async fn all_stats(&self) -> Vec<PoolStats> {
         let pools = self.pools.read().await;
         let mut stats = Vec::new();
-        
+
         for pool in pools.values() {
             stats.push(pool.stats().await);
         }
-        
+
         stats
     }
 
@@ -527,11 +525,11 @@ mod tests {
     #[tokio::test]
     async fn test_pool_metrics() {
         let metrics = PoolMetrics::new();
-        
+
         metrics.connection_created();
         metrics.acquired(Duration::from_millis(50));
         metrics.connection_reused();
-        
+
         let snapshot = metrics.snapshot();
         assert_eq!(snapshot.connections_created, 1);
         assert_eq!(snapshot.acquisitions, 1);
@@ -543,10 +541,10 @@ mod tests {
         let mut state = ConnectionState::new();
         assert!(state.healthy);
         assert_eq!(state.use_count, 0);
-        
+
         state.mark_used();
         assert_eq!(state.use_count, 1);
-        
+
         state.record_health_check(true);
         assert!(state.healthy);
         assert!(state.last_health_check.is_some());
@@ -556,9 +554,9 @@ mod tests {
     async fn test_provider_pool() {
         let config = PoolConfig::default();
         let pool: ProviderPool<String> = ProviderPool::new("test".to_string(), config);
-        
+
         assert_eq!(pool.size().await, 0);
-        
+
         let stats = pool.stats().await;
         assert_eq!(stats.provider, "test");
         assert_eq!(stats.idle_connections, 0);
@@ -568,15 +566,15 @@ mod tests {
     async fn test_connection_pool_manager() {
         let config = PoolConfig::default();
         let manager: ConnectionPoolManager<String> = ConnectionPoolManager::new(config);
-        
+
         let pool1 = manager.get_pool("openai").await;
         let pool2 = manager.get_pool("anthropic").await;
         let pool3 = manager.get_pool("openai").await;
-        
+
         // Same pool returned for same provider
         assert!(Arc::ptr_eq(&pool1, &pool3));
         assert!(!Arc::ptr_eq(&pool1, &pool2));
-        
+
         let providers = manager.providers().await;
         assert_eq!(providers.len(), 2);
     }
@@ -584,10 +582,10 @@ mod tests {
     #[tokio::test]
     async fn test_metrics_utilization() {
         let metrics = PoolMetrics::new();
-        
+
         metrics.set_active(3);
         metrics.set_idle(7);
-        
+
         let utilization = metrics.utilization();
         assert!((utilization - 0.3).abs() < 0.001);
     }
@@ -595,10 +593,10 @@ mod tests {
     #[tokio::test]
     async fn test_connection_idle_expiry() {
         let state = ConnectionState::new();
-        
+
         // Not expired with long timeout
         assert!(!state.is_idle_expired(Duration::from_secs(60)));
-        
+
         // Would be expired with zero timeout
         assert!(state.is_idle_expired(Duration::ZERO));
     }

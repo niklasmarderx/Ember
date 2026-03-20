@@ -82,7 +82,7 @@ impl ComplexityMetrics {
         } else {
             0.0
         };
-        
+
         let raw = 171.0 - 0.23 * self.cyclomatic as f32 - 16.2 * loc_factor;
         self.maintainability_index = (raw * 100.0 / 171.0).clamp(0.0, 100.0);
     }
@@ -346,13 +346,13 @@ impl Default for AnalyzerConfig {
 pub enum AnalyzerError {
     #[error("IO error: {0}")]
     Io(#[from] std::io::Error),
-    
+
     #[error("Parse error in {file}: {message}")]
     Parse { file: PathBuf, message: String },
-    
+
     #[error("Unsupported language: {0:?}")]
     UnsupportedLanguage(Language),
-    
+
     #[error("Configuration error: {0}")]
     Config(String),
 }
@@ -378,11 +378,9 @@ impl CodeAnalyzer {
     /// Analyze a single file
     pub async fn analyze_file(&self, path: &Path) -> Result<FileAnalysis, AnalyzerError> {
         let content = tokio::fs::read_to_string(path).await?;
-        let extension = path.extension()
-            .and_then(|e| e.to_str())
-            .unwrap_or("");
+        let extension = path.extension().and_then(|e| e.to_str()).unwrap_or("");
         let language = Language::from_extension(extension);
-        
+
         self.analyze_content(path.to_path_buf(), &content, language)
     }
 
@@ -395,13 +393,13 @@ impl CodeAnalyzer {
     ) -> Result<FileAnalysis, AnalyzerError> {
         let lines: Vec<&str> = content.lines().collect();
         let total_lines = lines.len() as u32;
-        
+
         // Calculate basic metrics
         let mut metrics = ComplexityMetrics::default();
         let mut blank_lines = 0u32;
         let mut comment_lines = 0u32;
         let mut in_multiline_comment = false;
-        
+
         for line in &lines {
             let trimmed = line.trim();
             if trimmed.is_empty() {
@@ -410,27 +408,27 @@ impl CodeAnalyzer {
                 comment_lines += 1;
             }
         }
-        
+
         metrics.loc = total_lines;
         metrics.sloc = total_lines - blank_lines - comment_lines;
         metrics.blank_lines = blank_lines;
         metrics.comment_lines = comment_lines;
-        
+
         // Calculate cyclomatic complexity
         metrics.cyclomatic = self.calculate_cyclomatic(content, language);
         metrics.cognitive = self.calculate_cognitive(content, language);
         metrics.max_nesting = self.calculate_max_nesting(content, language);
         metrics.calculate_maintainability();
-        
+
         // Extract symbols
         let symbols = self.extract_symbols(content, language)?;
-        
+
         // Detect code smells
         let smells = self.detect_smells(&path, content, language, &metrics, &symbols);
-        
+
         // Extract imports
         let imports = self.extract_imports(content, language);
-        
+
         Ok(FileAnalysis {
             path,
             language,
@@ -447,15 +445,15 @@ impl CodeAnalyzer {
     pub async fn analyze_project(&self, root: &Path) -> Result<ProjectAnalysis, AnalyzerError> {
         use std::time::Instant;
         let start = Instant::now();
-        
+
         let mut files = Vec::new();
         let mut all_smells = Vec::new();
         let mut language_stats: HashMap<Language, LanguageStats> = HashMap::new();
         let mut total_metrics = ComplexityMetrics::default();
-        
+
         // Collect all source files
         let source_files = self.collect_source_files(root).await?;
-        
+
         // Analyze each file
         for path in source_files {
             match self.analyze_file(&path).await {
@@ -465,16 +463,16 @@ impl CodeAnalyzer {
                     stats.file_count += 1;
                     stats.total_loc += analysis.metrics.sloc;
                     stats.symbol_count += analysis.symbols.len() as u32;
-                    
+
                     // Aggregate metrics
                     total_metrics.loc += analysis.metrics.loc;
                     total_metrics.sloc += analysis.metrics.sloc;
                     total_metrics.comment_lines += analysis.metrics.comment_lines;
                     total_metrics.blank_lines += analysis.metrics.blank_lines;
-                    
+
                     // Collect smells
                     all_smells.extend(analysis.smells.clone());
-                    
+
                     files.push(analysis);
                 }
                 Err(e) => {
@@ -482,19 +480,19 @@ impl CodeAnalyzer {
                 }
             }
         }
-        
+
         // Calculate average complexity per language
         for (_lang, stats) in language_stats.iter_mut() {
             if stats.file_count > 0 {
                 stats.avg_complexity = stats.total_loc as f32 / stats.file_count as f32;
             }
         }
-        
+
         // Calculate total maintainability
         total_metrics.calculate_maintainability();
-        
+
         let duration_ms = start.elapsed().as_millis() as u64;
-        
+
         Ok(ProjectAnalysis {
             root: root.to_path_buf(),
             files,
@@ -509,27 +507,26 @@ impl CodeAnalyzer {
     /// Collect all source files recursively
     async fn collect_source_files(&self, root: &Path) -> Result<Vec<PathBuf>, AnalyzerError> {
         use tokio::fs;
-        
+
         let mut files = Vec::new();
         let mut stack = vec![root.to_path_buf()];
-        
+
         while let Some(dir) = stack.pop() {
             let mut entries = fs::read_dir(&dir).await?;
-            
+
             while let Some(entry) = entries.next_entry().await? {
                 let path = entry.path();
                 let metadata = entry.metadata().await?;
-                
+
                 if metadata.is_dir() {
                     // Check ignore patterns
                     let path_str = path.to_string_lossy();
-                    let should_ignore = self.config.ignore_patterns.iter()
-                        .any(|pattern| {
-                            glob::Pattern::new(pattern)
-                                .map(|p| p.matches(&path_str))
-                                .unwrap_or(false)
-                        });
-                    
+                    let should_ignore = self.config.ignore_patterns.iter().any(|pattern| {
+                        glob::Pattern::new(pattern)
+                            .map(|p| p.matches(&path_str))
+                            .unwrap_or(false)
+                    });
+
                     if !should_ignore {
                         stack.push(path);
                     }
@@ -543,14 +540,18 @@ impl CodeAnalyzer {
                 }
             }
         }
-        
+
         Ok(files)
     }
 
     /// Check if a line is a comment
     fn is_comment_line(&self, line: &str, language: Language, in_multiline: &mut bool) -> bool {
         match language {
-            Language::Rust | Language::Go | Language::Java | Language::JavaScript | Language::TypeScript => {
+            Language::Rust
+            | Language::Go
+            | Language::Java
+            | Language::JavaScript
+            | Language::TypeScript => {
                 if *in_multiline {
                     if line.contains("*/") {
                         *in_multiline = false;
@@ -577,7 +578,8 @@ impl CodeAnalyzer {
                     return true;
                 }
                 if line.starts_with("\"\"\"") || line.starts_with("'''") {
-                    *in_multiline = !(line.matches("\"\"\"").count() >= 2 || line.matches("'''").count() >= 2);
+                    *in_multiline =
+                        !(line.matches("\"\"\"").count() >= 2 || line.matches("'''").count() >= 2);
                     return true;
                 }
                 false
@@ -589,20 +591,28 @@ impl CodeAnalyzer {
     /// Calculate cyclomatic complexity
     fn calculate_cyclomatic(&self, content: &str, language: Language) -> u32 {
         let mut complexity = 1u32; // Base complexity
-        
+
         let keywords = match language {
-            Language::Rust => vec!["if", "else if", "while", "for", "loop", "match", "&&", "||", "?"],
+            Language::Rust => vec![
+                "if", "else if", "while", "for", "loop", "match", "&&", "||", "?",
+            ],
             Language::Python => vec!["if", "elif", "while", "for", "and", "or", "except", "with"],
-            Language::JavaScript | Language::TypeScript => vec!["if", "else if", "while", "for", "switch", "case", "catch", "&&", "||", "?", "?."],
-            Language::Go => vec!["if", "else if", "for", "switch", "case", "select", "&&", "||"],
-            Language::Java => vec!["if", "else if", "while", "for", "switch", "case", "catch", "&&", "||", "?"],
+            Language::JavaScript | Language::TypeScript => vec![
+                "if", "else if", "while", "for", "switch", "case", "catch", "&&", "||", "?", "?.",
+            ],
+            Language::Go => vec![
+                "if", "else if", "for", "switch", "case", "select", "&&", "||",
+            ],
+            Language::Java => vec![
+                "if", "else if", "while", "for", "switch", "case", "catch", "&&", "||", "?",
+            ],
             Language::Unknown => vec![],
         };
-        
+
         for keyword in keywords {
             complexity += content.matches(keyword).count() as u32;
         }
-        
+
         complexity
     }
 
@@ -610,36 +620,41 @@ impl CodeAnalyzer {
     fn calculate_cognitive(&self, content: &str, language: Language) -> u32 {
         let mut complexity = 0u32;
         let mut nesting = 0u32;
-        
+
         let lines: Vec<&str> = content.lines().collect();
-        
+
         for line in lines {
             let trimmed = line.trim();
-            
+
             // Track nesting
             let opens = trimmed.matches('{').count() + trimmed.matches('(').count();
             let closes = trimmed.matches('}').count() + trimmed.matches(')').count();
-            
+
             // Add complexity for control structures with nesting penalty
             let control_keywords = match language {
                 Language::Rust => vec!["if ", "else ", "while ", "for ", "loop ", "match "],
-                Language::Python => vec!["if ", "elif ", "else:", "while ", "for ", "try:", "except "],
-                Language::JavaScript | Language::TypeScript | Language::Java => 
-                    vec!["if ", "else ", "while ", "for ", "switch ", "try ", "catch "],
+                Language::Python => {
+                    vec!["if ", "elif ", "else:", "while ", "for ", "try:", "except "]
+                }
+                Language::JavaScript | Language::TypeScript | Language::Java => vec![
+                    "if ", "else ", "while ", "for ", "switch ", "try ", "catch ",
+                ],
                 Language::Go => vec!["if ", "else ", "for ", "switch ", "select "],
                 Language::Unknown => vec![],
             };
-            
+
             for keyword in control_keywords {
                 if trimmed.starts_with(keyword) || trimmed.contains(&format!(" {}", keyword)) {
                     complexity += 1 + nesting; // Base + nesting penalty
                 }
             }
-            
+
             // Update nesting level
-            nesting = nesting.saturating_add(opens as u32).saturating_sub(closes as u32);
+            nesting = nesting
+                .saturating_add(opens as u32)
+                .saturating_sub(closes as u32);
         }
-        
+
         complexity
     }
 
@@ -647,7 +662,7 @@ impl CodeAnalyzer {
     fn calculate_max_nesting(&self, content: &str, _language: Language) -> u32 {
         let mut max_nesting = 0u32;
         let mut current_nesting = 0u32;
-        
+
         for ch in content.chars() {
             match ch {
                 '{' | '(' | '[' => {
@@ -660,15 +675,19 @@ impl CodeAnalyzer {
                 _ => {}
             }
         }
-        
+
         max_nesting
     }
 
     /// Extract code symbols from content
-    fn extract_symbols(&self, content: &str, language: Language) -> Result<Vec<CodeSymbol>, AnalyzerError> {
+    fn extract_symbols(
+        &self,
+        content: &str,
+        language: Language,
+    ) -> Result<Vec<CodeSymbol>, AnalyzerError> {
         let mut symbols = Vec::new();
         let lines: Vec<&str> = content.lines().collect();
-        
+
         let function_patterns = match language {
             Language::Rust => vec![
                 (r"pub\s+fn\s+(\w+)", Visibility::Public),
@@ -698,7 +717,7 @@ impl CodeAnalyzer {
             ],
             Language::Unknown => vec![],
         };
-        
+
         for (line_num, line) in lines.iter().enumerate() {
             for (pattern, visibility) in &function_patterns {
                 if let Ok(re) = regex::Regex::new(pattern) {
@@ -721,7 +740,7 @@ impl CodeAnalyzer {
                 }
             }
         }
-        
+
         Ok(symbols)
     }
 
@@ -730,13 +749,13 @@ impl CodeAnalyzer {
         if line_num == 0 {
             return None;
         }
-        
+
         let mut doc_lines = Vec::new();
         let mut i = line_num - 1;
-        
+
         loop {
             let line = lines.get(i)?.trim();
-            
+
             if line.starts_with("///") {
                 doc_lines.push(line.trim_start_matches("///").trim());
             } else if line.starts_with("//!") {
@@ -749,13 +768,13 @@ impl CodeAnalyzer {
             } else if !line.is_empty() {
                 break;
             }
-            
+
             if i == 0 {
                 break;
             }
             i -= 1;
         }
-        
+
         if doc_lines.is_empty() {
             None
         } else {
@@ -769,10 +788,11 @@ impl CodeAnalyzer {
         match language {
             Language::Python => {
                 // Python: track indentation
-                let start_indent = lines.get(start)
+                let start_indent = lines
+                    .get(start)
                     .map(|l| l.len() - l.trim_start().len())
                     .unwrap_or(0);
-                
+
                 for (i, line) in lines.iter().enumerate().skip(start + 1) {
                     let line_indent = line.len() - line.trim_start().len();
                     if !line.trim().is_empty() && line_indent <= start_indent {
@@ -785,7 +805,7 @@ impl CodeAnalyzer {
                 // Brace-based languages
                 let mut brace_count = 0i32;
                 let mut found_start = false;
-                
+
                 for (i, line) in lines.iter().enumerate().skip(start) {
                     for ch in line.chars() {
                         match ch {
@@ -819,7 +839,7 @@ impl CodeAnalyzer {
     ) -> Vec<CodeSmell> {
         let mut smells = Vec::new();
         let lines: Vec<&str> = content.lines().collect();
-        
+
         // Check file length
         if metrics.sloc > self.config.max_file_length {
             smells.push(CodeSmell {
@@ -838,12 +858,12 @@ impl CodeAnalyzer {
                 snippet: None,
             });
         }
-        
+
         // Check each function
         for symbol in symbols {
             if symbol.kind == SymbolKind::Function || symbol.kind == SymbolKind::Method {
                 let func_lines = symbol.end_line.saturating_sub(symbol.start_line);
-                
+
                 // Long function
                 if func_lines > self.config.max_function_length {
                     smells.push(CodeSmell {
@@ -859,11 +879,12 @@ impl CodeAnalyzer {
                         end_line: symbol.end_line,
                         end_column: 1,
                         suggestion: Some("Consider extracting smaller functions".to_string()),
-                        snippet: lines.get((symbol.start_line - 1) as usize)
+                        snippet: lines
+                            .get((symbol.start_line - 1) as usize)
                             .map(|s| s.to_string()),
                     });
                 }
-                
+
                 // Missing documentation
                 if symbol.documentation.is_none() && symbol.visibility == Visibility::Public {
                     smells.push(CodeSmell {
@@ -881,7 +902,7 @@ impl CodeAnalyzer {
                 }
             }
         }
-        
+
         // Check nesting depth
         if metrics.max_nesting > self.config.max_nesting {
             smells.push(CodeSmell {
@@ -900,7 +921,7 @@ impl CodeAnalyzer {
                 snippet: None,
             });
         }
-        
+
         // Check for magic numbers
         let magic_number_re = regex::Regex::new(r"\b\d{2,}\b").unwrap();
         for (i, line) in lines.iter().enumerate() {
@@ -909,12 +930,13 @@ impl CodeAnalyzer {
             if trimmed.starts_with("//") || trimmed.starts_with('#') || trimmed.starts_with("/*") {
                 continue;
             }
-            
+
             // Skip constant definitions
-            if trimmed.contains("const ") || trimmed.contains("static ") || trimmed.contains(" = ") {
+            if trimmed.contains("const ") || trimmed.contains("static ") || trimmed.contains(" = ")
+            {
                 continue;
             }
-            
+
             for mat in magic_number_re.find_iter(line) {
                 let num: i64 = mat.as_str().parse().unwrap_or(0);
                 // Skip common acceptable values
@@ -934,7 +956,7 @@ impl CodeAnalyzer {
                 }
             }
         }
-        
+
         // Check for TODO/FIXME comments
         for (i, line) in lines.iter().enumerate() {
             if line.contains("TODO") || line.contains("FIXME") || line.contains("HACK") {
@@ -952,7 +974,7 @@ impl CodeAnalyzer {
                 });
             }
         }
-        
+
         smells
     }
 
@@ -960,7 +982,7 @@ impl CodeAnalyzer {
     fn extract_imports(&self, content: &str, language: Language) -> Vec<ImportInfo> {
         let mut imports = Vec::new();
         let lines: Vec<&str> = content.lines().collect();
-        
+
         let import_patterns: Vec<(&str, bool)> = match language {
             Language::Rust => vec![
                 (r"use\s+([\w:]+)(?:::\{([^}]+)\})?", false),
@@ -986,16 +1008,25 @@ impl CodeAnalyzer {
             ],
             Language::Unknown => vec![],
         };
-        
+
         for (line_num, line) in lines.iter().enumerate() {
             for (pattern, is_wildcard) in &import_patterns {
                 if let Ok(re) = regex::Regex::new(pattern) {
                     if let Some(caps) = re.captures(line) {
-                        let module = caps.get(1).map(|m| m.as_str().to_string()).unwrap_or_default();
-                        let items = caps.get(2)
-                            .map(|m| m.as_str().split(',').map(|s| s.trim().to_string()).collect())
+                        let module = caps
+                            .get(1)
+                            .map(|m| m.as_str().to_string())
                             .unwrap_or_default();
-                        
+                        let items = caps
+                            .get(2)
+                            .map(|m| {
+                                m.as_str()
+                                    .split(',')
+                                    .map(|s| s.trim().to_string())
+                                    .collect()
+                            })
+                            .unwrap_or_default();
+
                         imports.push(ImportInfo {
                             module,
                             items,
@@ -1006,7 +1037,7 @@ impl CodeAnalyzer {
                 }
             }
         }
-        
+
         imports
     }
 }
@@ -1035,16 +1066,16 @@ mod tests {
     #[test]
     fn test_complexity_rating() {
         let mut metrics = ComplexityMetrics::default();
-        
+
         metrics.cyclomatic = 5;
         assert_eq!(metrics.rating(), ComplexityRating::Low);
-        
+
         metrics.cyclomatic = 15;
         assert_eq!(metrics.rating(), ComplexityRating::Moderate);
-        
+
         metrics.cyclomatic = 30;
         assert_eq!(metrics.rating(), ComplexityRating::High);
-        
+
         metrics.cyclomatic = 60;
         assert_eq!(metrics.rating(), ComplexityRating::VeryHigh);
     }
@@ -1064,13 +1095,11 @@ fn private_fn() {
     }
 }
 "#;
-        
-        let result = analyzer.analyze_content(
-            PathBuf::from("test.rs"),
-            code,
-            Language::Rust,
-        ).unwrap();
-        
+
+        let result = analyzer
+            .analyze_content(PathBuf::from("test.rs"), code, Language::Rust)
+            .unwrap();
+
         assert_eq!(result.language, Language::Rust);
         assert!(result.symbols.len() >= 2);
         assert!(result.metrics.sloc > 0);
@@ -1087,13 +1116,11 @@ def hello(name):
 async def fetch_data():
     pass
 "#;
-        
-        let result = analyzer.analyze_content(
-            PathBuf::from("test.py"),
-            code,
-            Language::Python,
-        ).unwrap();
-        
+
+        let result = analyzer
+            .analyze_content(PathBuf::from("test.py"), code, Language::Python)
+            .unwrap();
+
         assert_eq!(result.language, Language::Python);
         assert!(!result.symbols.is_empty());
     }

@@ -2160,9 +2160,11 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "async-trait",
+ "chrono",
  "ember-core",
  "ember-llm",
  "futures",
+ "glob",
  "pretty_assertions",
  "rayon",
  "regex",
@@ -2240,6 +2242,7 @@ dependencies = [
  "async-trait",
  "base64 0.22.1",
  "chrono",
+ "dirs 5.0.1",
  "ember-core",
  "ember-storage",
  "hmac",
@@ -2428,6 +2431,7 @@ version = "1.0.0"
 dependencies = [
  "anyhow",
  "async-trait",
+ "base64 0.22.1",
  "chrono",
  "cpal",
  "crossbeam-channel",

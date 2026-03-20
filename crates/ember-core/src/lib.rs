@@ -101,14 +101,14 @@ mod knowledge_graph;
 mod memory;
 pub mod memory_optimization;
 mod orchestrator;
+pub mod performance;
 mod planning;
 mod privacy;
 mod sandbox;
+pub mod security;
 mod self_healing;
 mod streaming;
 mod task_planner;
-pub mod performance;
-pub mod security;
 pub mod thinking;
 pub mod tool_executor;
 mod tool_selector;
@@ -128,6 +128,10 @@ pub use collaboration::{
 };
 pub use config::{AgentConfig, AgentConfigBuilder};
 pub use context::{Context, ContextManager};
+pub use context_manager::{
+    ContextManager as ContextManagerV2, ContextManagerBuilder as ContextManagerV2Builder,
+    ContextMessage, MessageRole, PriorityWeights, PruningStrategy, TokenCount,
+};
 pub use conversation::{
     Conversation, ConversationExport, ConversationId, ExportFormat, ExportMessage, ExportMetadata,
     ExportToolCall, Turn,
@@ -147,6 +151,37 @@ pub use orchestrator::{
     AgentId, AgentMessage, AgentMessageType, AgentRole, AgentStatus, Orchestrator,
     OrchestratorTask, TaskResult, WorkflowBuilder,
 };
+pub use performance::{
+    BatchConfig,
+    // Batch Processing
+    BatchProcessor,
+    BatchResult,
+    BreakerConfig,
+    BreakerState,
+    CircuitBreakerError,
+    CircuitBreakerStats,
+    // Circuit Breaker
+    CircuitBreakerV2,
+    // Connection Pooling
+    ConnectionPool,
+    InternerStats,
+    // Object Pooling
+    ObjectPool,
+    ObjectPoolStats,
+    PoolConfig,
+    PoolStats,
+    PooledConnection,
+    PooledObject,
+    SchedulerConfig,
+    SchedulerStats,
+    // String Interner
+    StringInterner,
+    TaskPriority as PerformanceTaskPriority,
+    // Task Scheduler
+    TaskScheduler,
+    // Throttler
+    Throttler,
+};
 pub use planning::{AgentMode, Plan, PlanBuilder, PlanStep, PlannerConfig};
 pub use privacy::{
     AccessType, AuditEntry, DataMinimizer, PiiMatch, PiiType, PrivacyConfig, PrivacyLevel,
@@ -155,6 +190,35 @@ pub use privacy::{
 pub use sandbox::{
     Capability, CommandRules, NetworkRules, PathRules, ResourceLimits, SecurityCheckResult,
     SecurityConfig, SecurityEvent, SecurityEventType, SecurityLevel, SecuritySandbox,
+};
+pub use security::{
+    AuditCategory,
+    AuditConfig,
+    AuditEvent,
+    // Audit Logging
+    AuditLogger,
+    AuditOutcome,
+    AuditQuery,
+    AuditSeverity,
+    ConditionOperator,
+    // Input Validation
+    InputValidator,
+    PolicyContext,
+    // Security Policy Engine
+    PolicyEngine,
+    PolicyResult,
+    RateLimitConfig,
+    RateLimitResult,
+    // Rate Limiting
+    RateLimiter,
+    RuleAction,
+    RuleCondition,
+    SecurityPolicy,
+    SecurityRule,
+    ValidationConfig,
+    ValidationError,
+    ValidationMetadata,
+    ValidationResult,
 };
 pub use self_healing::{
     CircuitBreaker, CircuitState, ErrorCategory, RecoveryRecord, RecoveryStats, RecoveryStrategy,
@@ -178,37 +242,6 @@ pub use tool_executor::{
 pub use tool_selector::{
     SelectionContext, ToolCapability, ToolMetadata, ToolRecommendation, ToolSelector,
     ToolSelectorConfig,
-};
-pub use context_manager::{
-    ContextManager as ContextManagerV2, ContextManagerBuilder as ContextManagerV2Builder, ContextMessage,
-    MessageRole, PruningStrategy, PriorityWeights, TokenCount,
-};
-pub use security::{
-    // Input Validation
-    InputValidator, ValidationConfig, ValidationError, ValidationResult, ValidationMetadata,
-    // Rate Limiting
-    RateLimiter, RateLimitConfig, RateLimitResult,
-    // Audit Logging
-    AuditLogger, AuditConfig, AuditEvent, AuditSeverity, AuditCategory, AuditOutcome, AuditQuery,
-    // Security Policy Engine
-    PolicyEngine, PolicyContext, PolicyResult, SecurityPolicy, SecurityRule, RuleAction,
-    RuleCondition, ConditionOperator,
-};
-pub use performance::{
-    // Connection Pooling
-    ConnectionPool, PoolConfig, PoolStats, PooledConnection,
-    // Object Pooling
-    ObjectPool, PooledObject, ObjectPoolStats,
-    // Batch Processing
-    BatchProcessor, BatchConfig, BatchResult,
-    // Task Scheduler
-    TaskScheduler, SchedulerConfig, SchedulerStats, TaskPriority as PerformanceTaskPriority,
-    // Throttler
-    Throttler,
-    // Circuit Breaker
-    CircuitBreakerV2, BreakerConfig, BreakerState, CircuitBreakerError, CircuitBreakerStats,
-    // String Interner
-    StringInterner, InternerStats,
 };
 
 /// Re-export commonly used types from ember-llm

@@ -133,8 +133,8 @@ pub use function_calling::{
     FunctionDefinition, FunctionResult, JsonSchema, PropertySchema, PropertyType, ToolChoice,
 };
 pub use vision::{
-    ContentPart, ImageDetail, ImageInput, ImageSource, MediaType, MultimodalContent,
-    VisionCapable, VisionModels,
+    ContentPart, ImageDetail, ImageInput, ImageSource, MediaType, MultimodalContent, VisionCapable,
+    VisionModels,
 };
 
 #[cfg(any(test, feature = "mock"))]

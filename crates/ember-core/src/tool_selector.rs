@@ -223,10 +223,7 @@ impl ToolSelector {
         let history_score = self.compute_history_score(&tool.name, &query_lower);
         total_score += history_score * self.config.history_weight;
         if history_score > 0.5 {
-            reasons.push(format!(
-                "Historical success: {:.0}%",
-                history_score * 100.0
-            ));
+            reasons.push(format!("Historical success: {:.0}%", history_score * 100.0));
         }
 
         // Compute confidence based on data availability
@@ -432,8 +429,8 @@ impl ToolSelector {
         }
 
         let success_count = records.iter().filter(|r| r.success).count();
-        let avg_time: u64 = records.iter().map(|r| r.execution_time_ms).sum::<u64>()
-            / records.len() as u64;
+        let avg_time: u64 =
+            records.iter().map(|r| r.execution_time_ms).sum::<u64>() / records.len() as u64;
 
         if let Some(tool) = self.tools.get_mut(tool_name) {
             tool.success_rate = Some(success_count as f64 / records.len() as f64);
@@ -746,8 +743,7 @@ mod tests {
         let mut selector = ToolSelector::new();
         selector.register_tools(builtin_tool_metadata());
 
-        let context = SelectionContext::new()
-            .require_capability(ToolCapability::Database);
+        let context = SelectionContext::new().require_capability(ToolCapability::Database);
 
         let recommendations = selector.select_tools("query data", &context);
 

@@ -27,8 +27,10 @@ fn model_name_strategy() -> impl Strategy<Value = String> {
 
 // Strategy for generating conversation IDs
 fn conversation_id_strategy() -> impl Strategy<Value = String> {
-    prop::string::string_regex("[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}")
-        .unwrap()
+    prop::string::string_regex(
+        "[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}",
+    )
+    .unwrap()
 }
 
 // Strategy for generating token counts
@@ -56,10 +58,10 @@ proptest! {
             "role": "user",
             "content": content.clone()
         });
-        
+
         let serialized = serde_json::to_string(&json).unwrap();
         let deserialized: serde_json::Value = serde_json::from_str(&serialized).unwrap();
-        
+
         prop_assert_eq!(deserialized["content"].as_str().unwrap(), content.as_str());
     }
 
@@ -85,12 +87,12 @@ proptest! {
         let input_cost = (input_tokens as f64 / 1000.0) * input_cost_per_1k;
         let output_cost = (output_tokens as f64 / 1000.0) * output_cost_per_1k;
         let total_cost = input_cost + output_cost;
-        
+
         // Cost should be non-negative
         prop_assert!(input_cost >= 0.0);
         prop_assert!(output_cost >= 0.0);
         prop_assert!(total_cost >= 0.0);
-        
+
         // Total cost should be at least as much as individual costs
         prop_assert!(total_cost >= input_cost);
         prop_assert!(total_cost >= output_cost);
@@ -102,7 +104,7 @@ proptest! {
         let clamped = raw_temp.clamp(0.0, 2.0);
         prop_assert!(clamped >= 0.0);
         prop_assert!(clamped <= 2.0);
-        
+
         if raw_temp >= 0.0 && raw_temp <= 2.0 {
             prop_assert_eq!(clamped, raw_temp);
         }
@@ -124,7 +126,7 @@ proptest! {
     #[test]
     fn message_ordering_preserved(messages in prop::collection::vec(message_content_strategy(), 1..20)) {
         let indexed: Vec<(usize, &String)> = messages.iter().enumerate().collect();
-        
+
         // Verify ordering is maintained
         for (i, (idx, _)) in indexed.iter().enumerate() {
             prop_assert_eq!(i, *idx);
@@ -138,11 +140,11 @@ proptest! {
         max_context in 1000u32..128000u32
     ) {
         let total_tokens: u32 = messages.iter().sum();
-        
+
         // Calculate how many messages fit in context
         let mut cumulative = 0u32;
         let mut messages_in_context = 0usize;
-        
+
         for &tokens in &messages {
             if cumulative + tokens <= max_context {
                 cumulative += tokens;
@@ -151,11 +153,11 @@ proptest! {
                 break;
             }
         }
-        
+
         // Invariants
         prop_assert!(cumulative <= max_context);
         prop_assert!(messages_in_context <= messages.len());
-        
+
         // If we stopped early, adding next message would exceed context
         if messages_in_context < messages.len() {
             prop_assert!(cumulative + messages[messages_in_context] > max_context);
@@ -170,9 +172,9 @@ proptest! {
     ) {
         let is_allowed = current_count < requests_per_minute;
         let remaining = if is_allowed { requests_per_minute - current_count } else { 0 };
-        
+
         prop_assert!(remaining <= requests_per_minute);
-        
+
         if is_allowed {
             prop_assert!(remaining > 0);
         } else {
@@ -185,10 +187,10 @@ proptest! {
     fn model_name_format(name in model_name_strategy()) {
         // Model names should be non-empty
         prop_assert!(!name.is_empty());
-        
+
         // Model names should only contain valid characters
         prop_assert!(name.chars().all(|c| c.is_alphanumeric() || c == '-' || c == '.' || c == '_'));
-        
+
         // Model names should start with alphanumeric
         prop_assert!(name.chars().next().map(|c| c.is_alphanumeric()).unwrap_or(false));
     }
@@ -203,11 +205,11 @@ proptest! {
             "role": role,
             "content": content
         });
-        
+
         // Should serialize and deserialize correctly
         let serialized = serde_json::to_string(&message).unwrap();
         let deserialized: serde_json::Value = serde_json::from_str(&serialized).unwrap();
-        
+
         prop_assert!(deserialized.is_object());
         prop_assert!(deserialized.get("role").is_some());
         prop_assert!(deserialized.get("content").is_some());
@@ -220,10 +222,10 @@ proptest! {
         keep_count in 1usize..5usize
     ) {
         let truncated: Vec<&String> = messages.iter().rev().take(keep_count).rev().collect();
-        
+
         // Truncated should have at most keep_count messages
         prop_assert!(truncated.len() <= keep_count);
-        
+
         // Truncated messages should match the end of original
         for (i, msg) in truncated.iter().enumerate() {
             let original_idx = messages.len() - truncated.len() + i;
@@ -264,9 +266,15 @@ mod edge_case_tests {
     #[test_case("" => false; "empty model")]
     #[test_case("invalid model!" => false; "invalid characters")]
     fn is_valid_model_name(name: &str) -> bool {
-        !name.is_empty() && 
-        name.chars().all(|c| c.is_alphanumeric() || c == '-' || c == '.' || c == '_') &&
-        name.chars().next().map(|c| c.is_alphanumeric()).unwrap_or(false)
+        !name.is_empty()
+            && name
+                .chars()
+                .all(|c| c.is_alphanumeric() || c == '-' || c == '.' || c == '_')
+            && name
+                .chars()
+                .next()
+                .map(|c| c.is_alphanumeric())
+                .unwrap_or(false)
     }
 
     #[test_case(-1.0 => 0.0; "negative clamped to zero")]

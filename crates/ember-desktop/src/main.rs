@@ -12,6 +12,7 @@
 
 use log::{error, info, warn};
 use serde::{Deserialize, Serialize};
+use std::sync::Mutex;
 use tauri::{
     menu::{Menu, MenuItem, PredefinedMenuItem, Submenu},
     tray::{TrayIcon, TrayIconBuilder},
@@ -20,7 +21,6 @@ use tauri::{
 use tauri_plugin_autostart::MacosLauncher;
 use tauri_plugin_notification::NotificationExt;
 use tauri_plugin_updater::UpdaterExt;
-use std::sync::Mutex;
 
 /// Application state
 pub struct AppState {
@@ -68,10 +68,7 @@ pub struct UpdateStatus {
 
 /// Send a chat message to the LLM
 #[tauri::command]
-async fn chat(
-    request: ChatRequest,
-    state: State<'_, AppState>,
-) -> Result<ChatResponse, String> {
+async fn chat(request: ChatRequest, state: State<'_, AppState>) -> Result<ChatResponse, String> {
     let model = request
         .model
         .unwrap_or_else(|| state.current_model.lock().unwrap().clone());
@@ -200,11 +197,7 @@ async fn install_update(app: AppHandle) -> Result<(), String> {
 
 /// Send a native notification
 #[tauri::command]
-fn send_notification(
-    app: AppHandle,
-    title: String,
-    body: String,
-) -> Result<(), String> {
+fn send_notification(app: AppHandle, title: String, body: String) -> Result<(), String> {
     app.notification()
         .builder()
         .title(&title)
@@ -227,7 +220,7 @@ fn get_autostart_enabled(app: AppHandle) -> Result<bool, String> {
 fn set_autostart_enabled(app: AppHandle, enabled: bool) -> Result<(), String> {
     use tauri_plugin_autostart::ManagerExt;
     let autolaunch = app.autolaunch();
-    
+
     if enabled {
         autolaunch.enable()
     } else {
@@ -242,7 +235,7 @@ fn setup_tray(app: &App) -> Result<TrayIcon, Box<dyn std::error::Error>> {
     let show = MenuItem::with_id(app, "show", "Show Window", true, None::<&str>)?;
     let hide = MenuItem::with_id(app, "hide", "Hide Window", true, None::<&str>)?;
     let separator1 = PredefinedMenuItem::separator(app)?;
-    
+
     // Model submenu
     let model_gpt4 = MenuItem::with_id(app, "model_gpt4", "GPT-4", true, None::<&str>)?;
     let model_claude = MenuItem::with_id(app, "model_claude", "Claude 3", true, None::<&str>)?;
@@ -254,9 +247,15 @@ fn setup_tray(app: &App) -> Result<TrayIcon, Box<dyn std::error::Error>> {
         true,
         &[&model_gpt4, &model_claude, &model_gemini, &model_local],
     )?;
-    
+
     let separator2 = PredefinedMenuItem::separator(app)?;
-    let check_updates = MenuItem::with_id(app, "check_updates", "Check for Updates...", true, None::<&str>)?;
+    let check_updates = MenuItem::with_id(
+        app,
+        "check_updates",
+        "Check for Updates...",
+        true,
+        None::<&str>,
+    )?;
     let preferences = MenuItem::with_id(app, "preferences", "Preferences...", true, None::<&str>)?;
     let separator3 = PredefinedMenuItem::separator(app)?;
     let quit = MenuItem::with_id(app, "quit", "Quit Ember", true, None::<&str>)?;
@@ -282,7 +281,7 @@ fn setup_tray(app: &App) -> Result<TrayIcon, Box<dyn std::error::Error>> {
         .on_menu_event(move |app, event| {
             let id = event.id.as_ref();
             info!("Tray menu event: {}", id);
-            
+
             match id {
                 "quit" => {
                     info!("Quitting application");
@@ -342,18 +341,18 @@ fn setup_tray(app: &App) -> Result<TrayIcon, Box<dyn std::error::Error>> {
                         "model_local" => "llama-3-70b",
                         _ => return,
                     };
-                    
+
                     if let Some(state) = app.try_state::<AppState>() {
                         *state.current_model.lock().unwrap() = model.to_string();
                         info!("Model switched to: {}", model);
-                        
+
                         let _ = app
                             .notification()
                             .builder()
                             .title("Model Changed")
                             .body(&format!("Now using {}", model))
                             .show();
-                            
+
                         if let Some(window) = app.get_webview_window("main") {
                             let _ = window.emit("model-changed", model);
                         }
@@ -364,7 +363,7 @@ fn setup_tray(app: &App) -> Result<TrayIcon, Box<dyn std::error::Error>> {
         })
         .on_tray_icon_event(|tray, event| {
             use tauri::tray::TrayIconEvent;
-            
+
             if let TrayIconEvent::Click { button, .. } = event {
                 if button == tauri::tray::MouseButton::Left {
                     if let Some(window) = tray.app_handle().get_webview_window("main") {
@@ -391,28 +390,30 @@ fn setup_shortcuts(app: &App) -> Result<(), Box<dyn std::error::Error>> {
     let toggle_shortcut: Shortcut = "CommandOrControl+Shift+E".parse()?;
     let app_handle = app.handle().clone();
 
-    app.global_shortcut().on_shortcut(toggle_shortcut, move |_app, _shortcut, _event| {
-        if let Some(window) = app_handle.get_webview_window("main") {
-            if window.is_visible().unwrap_or(false) {
-                let _ = window.hide();
-            } else {
-                let _ = window.show();
-                let _ = window.set_focus();
+    app.global_shortcut()
+        .on_shortcut(toggle_shortcut, move |_app, _shortcut, _event| {
+            if let Some(window) = app_handle.get_webview_window("main") {
+                if window.is_visible().unwrap_or(false) {
+                    let _ = window.hide();
+                } else {
+                    let _ = window.show();
+                    let _ = window.set_focus();
+                }
             }
-        }
-    })?;
+        })?;
 
     // Quick chat (Cmd/Ctrl + Shift + Space)
     let chat_shortcut: Shortcut = "CommandOrControl+Shift+Space".parse()?;
     let app_handle2 = app.handle().clone();
 
-    app.global_shortcut().on_shortcut(chat_shortcut, move |_app, _shortcut, _event| {
-        if let Some(window) = app_handle2.get_webview_window("main") {
-            let _ = window.show();
-            let _ = window.set_focus();
-            let _ = window.emit("focus-chat-input", ());
-        }
-    })?;
+    app.global_shortcut()
+        .on_shortcut(chat_shortcut, move |_app, _shortcut, _event| {
+            if let Some(window) = app_handle2.get_webview_window("main") {
+                let _ = window.show();
+                let _ = window.set_focus();
+                let _ = window.emit("focus-chat-input", ());
+            }
+        })?;
 
     info!("Global shortcuts registered");
     Ok(())

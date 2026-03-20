@@ -34,12 +34,14 @@ impl PreferenceLearner {
     /// Create from existing profile.
     pub fn from_profile(profile: &crate::UserProfile) -> Self {
         let mut learner = Self::new();
-        
+
         // Initialize from profile data.
         for (lang, count) in &profile.language_usage {
-            learner.language_preferences.insert(lang.clone(), *count as f64);
+            learner
+                .language_preferences
+                .insert(lang.clone(), *count as f64);
         }
-        
+
         learner
     }
 
@@ -60,10 +62,10 @@ impl PreferenceLearner {
             }
             _ => {}
         }
-        
+
         // Update activity patterns.
         self.activity_patterns.record_activity(event.timestamp);
-        
+
         // Update language preferences.
         if let Some(lang) = &event.context.language {
             *self.language_preferences.entry(lang.clone()).or_insert(0.0) += 1.0;
@@ -76,8 +78,16 @@ impl PreferenceLearner {
             + self.tool_preferences.len()
             + self.language_preferences.len()
             + self.framework_preferences.len()
-            + if self.coding_style.has_preferences() { 1 } else { 0 }
-            + if self.communication.has_preferences() { 1 } else { 0 }
+            + if self.coding_style.has_preferences() {
+                1
+            } else {
+                0
+            }
+            + if self.communication.has_preferences() {
+                1
+            } else {
+                0
+            }
     }
 
     /// Get preferred model for a task type.
@@ -97,7 +107,9 @@ impl PreferenceLearner {
 
     /// Get top N tools by preference.
     pub fn top_tools(&self, n: usize) -> Vec<(String, f64)> {
-        let mut tools: Vec<_> = self.tool_preferences.iter()
+        let mut tools: Vec<_> = self
+            .tool_preferences
+            .iter()
             .map(|(k, v)| (k.clone(), *v))
             .collect();
         tools.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
@@ -134,21 +146,28 @@ impl PreferenceLearner {
     fn update_communication_preferences(&mut self, event: &LearningEvent) {
         if let Some(length) = event.data.get("message_length").and_then(|v| v.as_u64()) {
             let normalized = (length as f64 / 500.0).min(1.0);
-            self.communication.message_length_preference = 
+            self.communication.message_length_preference =
                 self.communication.message_length_preference * 0.9 + normalized * 0.1;
         }
 
         if let Some(technical) = event.data.get("technical_level").and_then(|v| v.as_f64()) {
-            self.communication.technical_level = 
+            self.communication.technical_level =
                 self.communication.technical_level * 0.9 + technical * 0.1;
         }
     }
 
     fn update_suggestion_preferences(&mut self, event: &LearningEvent) {
         if let Some(model) = &event.context.model {
-            let task_type = event.context.project_type.clone().unwrap_or_else(|| "general".to_string());
-            let pref = self.model_preferences.entry(task_type).or_insert_with(ModelPreference::default);
-            
+            let task_type = event
+                .context
+                .project_type
+                .clone()
+                .unwrap_or_else(|| "general".to_string());
+            let pref = self
+                .model_preferences
+                .entry(task_type)
+                .or_insert_with(ModelPreference::default);
+
             if event.event_type == EventType::SuggestionAccepted {
                 pref.success_count += 1;
                 if pref.success_count > pref.best_success_count {
@@ -271,7 +290,7 @@ impl Default for CommunicationPreference {
 
 impl CommunicationPreference {
     fn has_preferences(&self) -> bool {
-        (self.message_length_preference - 0.5).abs() > 0.1 
+        (self.message_length_preference - 0.5).abs() > 0.1
             || (self.technical_level - 0.5).abs() > 0.1
     }
 }
@@ -306,7 +325,7 @@ impl ActivityPatterns {
     pub fn record_activity(&mut self, timestamp: chrono::DateTime<chrono::Utc>) {
         let hour = timestamp.hour() as usize;
         let day = timestamp.weekday().num_days_from_monday() as usize;
-        
+
         self.by_hour[hour] += 1;
         self.by_day[day] += 1;
         self.total_activities += 1;
@@ -317,7 +336,7 @@ impl ActivityPatterns {
         if self.total_activities == 0 {
             return Vec::new();
         }
-        
+
         let avg = self.total_activities as f64 / 24.0;
         self.by_hour
             .iter()
@@ -354,7 +373,7 @@ mod tests {
     fn test_activity_patterns() {
         let mut patterns = ActivityPatterns::default();
         let now = Utc::now();
-        
+
         patterns.record_activity(now);
         assert_eq!(patterns.total_activities, 1);
     }
@@ -367,7 +386,7 @@ mod tests {
             EventContext::default(),
             serde_json::json!({"tool": "shell"}),
         );
-        
+
         learner.process_event(&event);
         assert!(learner.tool_preferences.contains_key("shell"));
     }

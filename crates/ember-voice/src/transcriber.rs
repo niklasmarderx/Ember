@@ -191,10 +191,7 @@ impl Transcriber {
 
         if !response.status().is_success() {
             let error_text = response.text().await.unwrap_or_default();
-            return Err(VoiceError::Api(format!(
-                "OpenAI API error: {}",
-                error_text
-            )));
+            return Err(VoiceError::Api(format!("OpenAI API error: {}", error_text)));
         }
 
         let response_json: WhisperResponse = response
@@ -241,9 +238,11 @@ impl Transcriber {
             .as_ref()
             .ok_or_else(|| VoiceError::Config("Azure API key not configured".to_string()))?;
 
-        let endpoint = self.config.endpoint.as_deref().ok_or_else(|| {
-            VoiceError::Config("Azure endpoint not configured".to_string())
-        })?;
+        let endpoint = self
+            .config
+            .endpoint
+            .as_deref()
+            .ok_or_else(|| VoiceError::Config("Azure endpoint not configured".to_string()))?;
 
         let wav_data = audio.to_wav()?;
 
@@ -296,10 +295,8 @@ impl Transcriber {
             .ok_or_else(|| VoiceError::Config("Google API key not configured".to_string()))?;
 
         let wav_data = audio.to_wav()?;
-        let audio_content = base64::Engine::encode(
-            &base64::engine::general_purpose::STANDARD,
-            &wav_data,
-        );
+        let audio_content =
+            base64::Engine::encode(&base64::engine::general_purpose::STANDARD, &wav_data);
 
         let language = self.config.language.as_deref().unwrap_or("en-US");
 
@@ -321,19 +318,11 @@ impl Transcriber {
             api_key
         );
 
-        let response = self
-            .client
-            .post(&url)
-            .json(&request_body)
-            .send()
-            .await?;
+        let response = self.client.post(&url).json(&request_body).send().await?;
 
         if !response.status().is_success() {
             let error_text = response.text().await.unwrap_or_default();
-            return Err(VoiceError::Api(format!(
-                "Google API error: {}",
-                error_text
-            )));
+            return Err(VoiceError::Api(format!("Google API error: {}", error_text)));
         }
 
         let response_json: GoogleSpeechResponse = response
@@ -475,7 +464,7 @@ mod tests {
     #[test]
     fn test_stt_provider_variants() {
         assert_eq!(SttProvider::default(), SttProvider::OpenAiWhisper);
-        
+
         let providers = [
             SttProvider::OpenAiWhisper,
             SttProvider::LocalWhisper,
@@ -483,7 +472,7 @@ mod tests {
             SttProvider::GoogleSpeech,
             SttProvider::Mock,
         ];
-        
+
         assert_eq!(providers.len(), 5);
     }
 

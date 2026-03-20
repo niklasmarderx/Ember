@@ -358,10 +358,10 @@ impl FunctionBuilder {
 pub trait FunctionCallingCapable {
     /// Check if the provider supports function calling for a specific model
     fn supports_function_calling(&self, model: &str) -> bool;
-    
+
     /// Get the maximum number of functions/tools supported
     fn max_functions(&self, model: &str) -> Option<usize>;
-    
+
     /// Check if parallel function calls are supported
     fn supports_parallel_calls(&self, model: &str) -> bool;
 }
@@ -373,21 +373,11 @@ impl FunctionCallingModels {
     /// Check if a model supports function calling
     pub fn supports_function_calling(provider: &str, model: &str) -> bool {
         match provider.to_lowercase().as_str() {
-            "openai" => {
-                model.starts_with("gpt-4") || model.starts_with("gpt-3.5-turbo")
-            }
-            "anthropic" => {
-                model.contains("claude-3") || model.contains("claude-2")
-            }
-            "google" | "gemini" => {
-                model.contains("gemini")
-            }
-            "groq" => {
-                model.contains("llama") || model.contains("mixtral")
-            }
-            "mistral" => {
-                model.contains("mistral") && !model.contains("tiny")
-            }
+            "openai" => model.starts_with("gpt-4") || model.starts_with("gpt-3.5-turbo"),
+            "anthropic" => model.contains("claude-3") || model.contains("claude-2"),
+            "google" | "gemini" => model.contains("gemini"),
+            "groq" => model.contains("llama") || model.contains("mixtral"),
+            "mistral" => model.contains("mistral") && !model.contains("tiny"),
             "ollama" => {
                 // Most Ollama models support function calling
                 true
@@ -416,64 +406,61 @@ pub mod builtin {
 
     /// Get current weather function definition
     pub fn get_weather() -> FunctionDefinition {
-        FunctionBuilder::new(
-            "get_weather",
-            "Get the current weather in a given location",
-        )
-        .string_param("location", "The city and state, e.g. San Francisco, CA", true)
-        .enum_param(
-            "unit",
-            "The temperature unit",
-            vec!["celsius".to_string(), "fahrenheit".to_string()],
-            false,
-        )
-        .build()
+        FunctionBuilder::new("get_weather", "Get the current weather in a given location")
+            .string_param(
+                "location",
+                "The city and state, e.g. San Francisco, CA",
+                true,
+            )
+            .enum_param(
+                "unit",
+                "The temperature unit",
+                vec!["celsius".to_string(), "fahrenheit".to_string()],
+                false,
+            )
+            .build()
     }
 
     /// Search the web function definition
     pub fn web_search() -> FunctionDefinition {
-        FunctionBuilder::new(
-            "web_search",
-            "Search the web for information",
-        )
-        .string_param("query", "The search query", true)
-        .integer_param("num_results", "Number of results to return", false)
-        .build()
+        FunctionBuilder::new("web_search", "Search the web for information")
+            .string_param("query", "The search query", true)
+            .integer_param("num_results", "Number of results to return", false)
+            .build()
     }
 
     /// Execute shell command function definition
     pub fn execute_command() -> FunctionDefinition {
-        FunctionBuilder::new(
-            "execute_command",
-            "Execute a shell command on the system",
-        )
-        .string_param("command", "The shell command to execute", true)
-        .string_param("working_directory", "The directory to run the command in", false)
-        .integer_param("timeout", "Timeout in seconds", false)
-        .build()
+        FunctionBuilder::new("execute_command", "Execute a shell command on the system")
+            .string_param("command", "The shell command to execute", true)
+            .string_param(
+                "working_directory",
+                "The directory to run the command in",
+                false,
+            )
+            .integer_param("timeout", "Timeout in seconds", false)
+            .build()
     }
 
     /// Read file function definition
     pub fn read_file() -> FunctionDefinition {
-        FunctionBuilder::new(
-            "read_file",
-            "Read the contents of a file",
-        )
-        .string_param("path", "The path to the file to read", true)
-        .string_param("encoding", "The file encoding (default: utf-8)", false)
-        .build()
+        FunctionBuilder::new("read_file", "Read the contents of a file")
+            .string_param("path", "The path to the file to read", true)
+            .string_param("encoding", "The file encoding (default: utf-8)", false)
+            .build()
     }
 
     /// Write file function definition
     pub fn write_file() -> FunctionDefinition {
-        FunctionBuilder::new(
-            "write_file",
-            "Write content to a file",
-        )
-        .string_param("path", "The path to the file to write", true)
-        .string_param("content", "The content to write to the file", true)
-        .boolean_param("create_dirs", "Create parent directories if they don't exist", false)
-        .build()
+        FunctionBuilder::new("write_file", "Write content to a file")
+            .string_param("path", "The path to the file to write", true)
+            .string_param("content", "The content to write to the file", true)
+            .boolean_param(
+                "create_dirs",
+                "Create parent directories if they don't exist",
+                false,
+            )
+            .build()
     }
 }
 
@@ -519,8 +506,16 @@ mod tests {
 
     #[test]
     fn test_function_calling_support() {
-        assert!(FunctionCallingModels::supports_function_calling("openai", "gpt-4"));
-        assert!(FunctionCallingModels::supports_function_calling("anthropic", "claude-3-opus"));
-        assert!(FunctionCallingModels::supports_function_calling("gemini", "gemini-1.5-pro"));
+        assert!(FunctionCallingModels::supports_function_calling(
+            "openai", "gpt-4"
+        ));
+        assert!(FunctionCallingModels::supports_function_calling(
+            "anthropic",
+            "claude-3-opus"
+        ));
+        assert!(FunctionCallingModels::supports_function_calling(
+            "gemini",
+            "gemini-1.5-pro"
+        ));
     }
 }

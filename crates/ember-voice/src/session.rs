@@ -443,10 +443,7 @@ impl HandsFreeSession {
                             self.emit_event(SessionEvent::Error(e.to_string())).await;
 
                             if self.config.audio_feedback {
-                                let _ = self
-                                    .synthesizer
-                                    .play_feedback(FeedbackSound::Error)
-                                    .await;
+                                let _ = self.synthesizer.play_feedback(FeedbackSound::Error).await;
                             }
                         }
                     }

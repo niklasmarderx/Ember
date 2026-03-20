@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 /// Voice command types.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum VoiceCommand {
     /// Chat with AI.
     Chat { message: String },
@@ -45,13 +45,30 @@ pub enum VoiceCommand {
 /// File operations.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum FileOperation {
-    Open { path: String },
-    Create { path: String, content: Option<String> },
-    Delete { path: String },
-    Read { path: String },
-    Write { path: String, content: String },
-    Search { pattern: String, path: Option<String> },
-    List { path: Option<String> },
+    Open {
+        path: String,
+    },
+    Create {
+        path: String,
+        content: Option<String>,
+    },
+    Delete {
+        path: String,
+    },
+    Read {
+        path: String,
+    },
+    Write {
+        path: String,
+        content: String,
+    },
+    Search {
+        pattern: String,
+        path: Option<String>,
+    },
+    List {
+        path: Option<String>,
+    },
 }
 
 /// Git operations.
@@ -70,12 +87,25 @@ pub enum GitOperation {
 /// Code operations.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum CodeOperation {
-    Analyze { path: String },
-    Refactor { path: String, suggestion: Option<String> },
-    Test { path: String },
-    Run { command: String },
-    Debug { target: String },
-    Explain { code: String },
+    Analyze {
+        path: String,
+    },
+    Refactor {
+        path: String,
+        suggestion: Option<String>,
+    },
+    Test {
+        path: String,
+    },
+    Run {
+        command: String,
+    },
+    Debug {
+        target: String,
+    },
+    Explain {
+        code: String,
+    },
 }
 
 /// Navigation targets.
@@ -105,7 +135,7 @@ pub enum ControlAction {
 }
 
 /// Setting changes.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum SettingChange {
     SetModel { model: String },
     SetProvider { provider: String },
@@ -228,15 +258,20 @@ impl CommandPatterns {
 
             // File patterns
             open_file: Regex::new(r"(?i)^open\s+(?:file\s+)?(.+)").unwrap(),
-            create_file: Regex::new(r"(?i)^create\s+(?:a\s+)?(?:new\s+)?file\s+(?:called\s+)?(.+)").unwrap(),
+            create_file: Regex::new(r"(?i)^create\s+(?:a\s+)?(?:new\s+)?file\s+(?:called\s+)?(.+)")
+                .unwrap(),
             delete_file: Regex::new(r"(?i)^delete\s+(?:file\s+)?(.+)").unwrap(),
             read_file: Regex::new(r"(?i)^read\s+(?:file\s+)?(.+)").unwrap(),
-            search_files: Regex::new(r"(?i)^(?:search|find)\s+(?:for\s+)?(.+?)(?:\s+in\s+(.+))?$").unwrap(),
+            search_files: Regex::new(r"(?i)^(?:search|find)\s+(?:for\s+)?(.+?)(?:\s+in\s+(.+))?$")
+                .unwrap(),
             list_files: Regex::new(r"(?i)^list\s+(?:files(?:\s+in\s+)?)?(.*)$").unwrap(),
 
             // Git patterns
             git_status: Regex::new(r"(?i)^(?:git\s+)?status").unwrap(),
-            git_commit: Regex::new(r"(?i)^(?:git\s+)?commit(?:\s+(?:with\s+)?(?:message\s+)?(.+))?").unwrap(),
+            git_commit: Regex::new(
+                r"(?i)^(?:git\s+)?commit(?:\s+(?:with\s+)?(?:message\s+)?(.+))?",
+            )
+            .unwrap(),
             git_push: Regex::new(r"(?i)^(?:git\s+)?push(?:\s+(?:to\s+)?(.+))?").unwrap(),
             git_pull: Regex::new(r"(?i)^(?:git\s+)?pull(?:\s+(?:from\s+)?(.+))?").unwrap(),
             git_branch: Regex::new(r"(?i)^(?:git\s+)?(?:create\s+)?branch(?:\s+(.+))?").unwrap(),
@@ -254,7 +289,8 @@ impl CommandPatterns {
             // Navigation patterns
             go_to_line: Regex::new(r"(?i)^go\s+to\s+line\s+(\d+)").unwrap(),
             go_to_function: Regex::new(r"(?i)^go\s+to\s+(?:function\s+)?(.+)").unwrap(),
-            go_to_definition: Regex::new(r"(?i)^(?:go\s+to\s+)?definition\s+(?:of\s+)?(.+)").unwrap(),
+            go_to_definition: Regex::new(r"(?i)^(?:go\s+to\s+)?definition\s+(?:of\s+)?(.+)")
+                .unwrap(),
             go_back: Regex::new(r"(?i)^go\s+back").unwrap(),
 
             // Settings patterns
@@ -629,7 +665,7 @@ impl CommandParser {
         }
 
         if let Some(caps) = self.patterns.git_log.captures(text) {
-            let count = caps.get(1).and_then(|m| m.as_str().parse().ok());
+            let count: Option<u32> = caps.get(1).and_then(|m| m.as_str().parse().ok());
             if let Some(c) = count {
                 entities.insert("count".to_string(), c.to_string());
             }
@@ -873,14 +909,7 @@ impl CommandParser {
     /// Get supported command categories.
     pub fn supported_commands(&self) -> Vec<&'static str> {
         vec![
-            "chat",
-            "file",
-            "git",
-            "code",
-            "navigate",
-            "control",
-            "settings",
-            "help",
+            "chat", "file", "git", "code", "navigate", "control", "settings", "help",
         ]
     }
 

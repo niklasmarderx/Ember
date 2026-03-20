@@ -94,7 +94,7 @@ fn test_help_output_format() {
             "--config".to_string(),
         ],
     };
-    
+
     assert_yaml_snapshot!("help_output", help);
 }
 
@@ -107,7 +107,7 @@ fn test_user_message_format() {
         timestamp: Some("2024-01-15T10:30:00Z".to_string()),
         tokens: Some(8),
     };
-    
+
     assert_yaml_snapshot!("user_message", message);
 }
 
@@ -119,7 +119,7 @@ fn test_assistant_message_format() {
         timestamp: Some("2024-01-15T10:30:05Z".to_string()),
         tokens: Some(32),
     };
-    
+
     assert_yaml_snapshot!("assistant_message", message);
 }
 
@@ -127,11 +127,12 @@ fn test_assistant_message_format() {
 fn test_system_message_format() {
     let message = FormattedMessage {
         role: "system".to_string(),
-        content: "You are a helpful AI assistant. Be concise and accurate in your responses.".to_string(),
+        content: "You are a helpful AI assistant. Be concise and accurate in your responses."
+            .to_string(),
         timestamp: None,
         tokens: Some(15),
     };
-    
+
     assert_yaml_snapshot!("system_message", message);
 }
 
@@ -159,7 +160,7 @@ fn test_conversation_export_format() {
         total_tokens: 16,
         total_cost: 0.00048,
     };
-    
+
     assert_yaml_snapshot!("conversation_export", export);
 }
 
@@ -178,7 +179,7 @@ fn test_model_info_openai() {
             "vision".to_string(),
         ],
     };
-    
+
     assert_yaml_snapshot!("model_info_gpt4", model);
 }
 
@@ -196,7 +197,7 @@ fn test_model_info_anthropic() {
             "long_context".to_string(),
         ],
     };
-    
+
     assert_yaml_snapshot!("model_info_claude", model);
 }
 
@@ -208,12 +209,9 @@ fn test_model_info_ollama() {
         context_window: 8192,
         input_cost_per_1k: 0.0,
         output_cost_per_1k: 0.0,
-        capabilities: vec![
-            "chat".to_string(),
-            "local".to_string(),
-        ],
+        capabilities: vec!["chat".to_string(), "local".to_string()],
     };
-    
+
     assert_yaml_snapshot!("model_info_ollama", model);
 }
 
@@ -228,7 +226,7 @@ fn test_config_display() {
         max_tokens: Some(4096),
         stream: true,
     };
-    
+
     assert_yaml_snapshot!("config_display", config);
 }
 
@@ -242,7 +240,7 @@ fn test_config_display_minimal() {
         max_tokens: None,
         stream: false,
     };
-    
+
     assert_yaml_snapshot!("config_display_minimal", config);
 }
 
@@ -259,7 +257,7 @@ To fix this, either:
 
 For more information, see: https://docs.ember.ai/configuration
 "#;
-    
+
     assert_snapshot!("error_api_key", error);
 }
 
@@ -276,7 +274,7 @@ Possible causes:
 
 Try again later or check your network settings.
 "#;
-    
+
     assert_snapshot!("error_network", error);
 }
 
@@ -295,7 +293,7 @@ Consider:
   - Using a different API key
   - Upgrading your API plan
 "#;
-    
+
     assert_snapshot!("error_rate_limit", error);
 }
 
@@ -336,7 +334,7 @@ fn test_history_table() {
 | 3  | Email Draft          | gpt-3.5  | 800    | $0.0016 | 2024-01-15 11:30:00 |
 +----+----------------------+----------+--------+---------+---------------------+
 "#;
-    
+
     assert_snapshot!("history_table", table);
 }
 
@@ -351,7 +349,7 @@ fn test_plugins_table() {
 | slack            | 1.5.0    | Inactive| Slack msgs  |
 +------------------+----------+---------+-------------+
 "#;
-    
+
     assert_snapshot!("plugins_table", table);
 }
 
@@ -370,7 +368,7 @@ fn test_json_output_message() {
   },
   "finish_reason": "stop"
 }"#;
-    
+
     assert_snapshot!("json_output_message", json);
 }
 
@@ -385,7 +383,7 @@ Homepage: https://ember.ai
 Repository: https://github.com/ember-ai/ember
 License: MIT OR Apache-2.0
 "#;
-    
+
     assert_snapshot!("version_output", version);
 }
 
@@ -409,7 +407,7 @@ fn test_bash_completions_snippet() {
 }
 complete -F _ember ember
 "#;
-    
+
     assert_snapshot!("bash_completions", completions);
 }
 
@@ -440,7 +438,7 @@ fn test_tui_layout_main() {
 | Tokens: 150 | Cost: $0.0045 | Model: gpt-4    | Stream: On|
 +----------------------------------------------------------+
 "#;
-    
+
     assert_snapshot!("tui_layout_main", layout);
 }
 
@@ -467,6 +465,6 @@ fn test_tui_layout_settings() {
 |                     [Cancel]  [Save]                     |
 +----------------------------------------------------------+
 "#;
-    
+
     assert_snapshot!("tui_layout_settings", layout);
 }

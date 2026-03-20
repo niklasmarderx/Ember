@@ -12,22 +12,22 @@ use uuid::Uuid;
 pub struct TelemetryEvent {
     /// Unique event ID
     pub id: String,
-    
+
     /// Event timestamp (UTC)
     pub timestamp: DateTime<Utc>,
-    
+
     /// Event category
     pub category: EventCategory,
-    
+
     /// Event type name
     pub event_type: String,
-    
+
     /// Event data (varies by type)
     pub data: EventData,
-    
+
     /// Ember version
     pub version: String,
-    
+
     /// Platform (os type only, no details)
     pub platform: String,
 }
@@ -45,7 +45,7 @@ impl TelemetryEvent {
             platform: std::env::consts::OS.to_string(),
         }
     }
-    
+
     /// Create a command usage event
     pub fn command_used(command: &str) -> Self {
         Self::new(
@@ -56,7 +56,7 @@ impl TelemetryEvent {
             },
         )
     }
-    
+
     /// Create a provider usage event
     pub fn provider_used(provider: &str, model: &str) -> Self {
         Self::new(
@@ -68,7 +68,7 @@ impl TelemetryEvent {
             },
         )
     }
-    
+
     /// Create an error occurrence event
     pub fn error_occurred(error_type: &str, recoverable: bool) -> Self {
         Self::new(
@@ -80,7 +80,7 @@ impl TelemetryEvent {
             },
         )
     }
-    
+
     /// Create a latency metric event
     pub fn latency_recorded(operation: &str, latency_ms: u64) -> Self {
         Self::new(
@@ -92,7 +92,7 @@ impl TelemetryEvent {
             },
         )
     }
-    
+
     /// Create a feature usage event
     pub fn feature_used(feature: &str) -> Self {
         Self::new(
@@ -103,7 +103,7 @@ impl TelemetryEvent {
             },
         )
     }
-    
+
     /// Create a session started event
     pub fn session_started() -> Self {
         Self::new(
@@ -112,7 +112,7 @@ impl TelemetryEvent {
             EventData::SessionStarted,
         )
     }
-    
+
     /// Create a session ended event
     pub fn session_ended(duration_secs: u64) -> Self {
         Self::new(
@@ -130,37 +130,30 @@ impl TelemetryEvent {
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum EventData {
     /// Command was used
-    CommandUsed {
-        command: String,
-    },
-    
+    CommandUsed { command: String },
+
     /// Provider was used
-    ProviderUsed {
-        provider: String,
-        model: String,
-    },
-    
+    ProviderUsed { provider: String, model: String },
+
     /// Error occurred (type only, no message)
     ErrorOccurred {
         error_type: String,
         recoverable: bool,
     },
-    
+
     /// Latency was recorded
     LatencyRecorded {
         operation: String,
         /// Bucketed latency (e.g., "0-100ms", "100-500ms")
         latency_bucket: String,
     },
-    
+
     /// Feature was used
-    FeatureUsed {
-        feature: String,
-    },
-    
+    FeatureUsed { feature: String },
+
     /// Session started
     SessionStarted,
-    
+
     /// Session ended
     SessionEnded {
         /// Bucketed duration (e.g., "0-1min", "1-5min")
@@ -198,21 +191,32 @@ fn bucket_duration(duration_secs: u64) -> String {
 fn anonymize_model_name(model: &str) -> String {
     // Known model patterns - keep only the base model name
     let known_models = [
-        "gpt-4", "gpt-4-turbo", "gpt-4o", "gpt-3.5",
-        "claude-3", "claude-2", "claude-instant",
-        "gemini-pro", "gemini-ultra",
-        "llama", "mistral", "mixtral", "codellama",
-        "deepseek", "qwen", "phi",
+        "gpt-4",
+        "gpt-4-turbo",
+        "gpt-4o",
+        "gpt-3.5",
+        "claude-3",
+        "claude-2",
+        "claude-instant",
+        "gemini-pro",
+        "gemini-ultra",
+        "llama",
+        "mistral",
+        "mixtral",
+        "codellama",
+        "deepseek",
+        "qwen",
+        "phi",
     ];
-    
+
     let model_lower = model.to_lowercase();
-    
+
     for known in known_models {
         if model_lower.contains(known) {
             return known.to_string();
         }
     }
-    
+
     // For unknown models, just return "custom"
     "custom".to_string()
 }
@@ -220,7 +224,7 @@ fn anonymize_model_name(model: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn test_bucket_latency() {
         assert_eq!(bucket_latency(50), "0-100ms");
@@ -229,7 +233,7 @@ mod tests {
         assert_eq!(bucket_latency(3000), "1-5s");
         assert_eq!(bucket_latency(60000), ">30s");
     }
-    
+
     #[test]
     fn test_bucket_duration() {
         assert_eq!(bucket_duration(30), "0-1min");
@@ -237,7 +241,7 @@ mod tests {
         assert_eq!(bucket_duration(600), "5-15min");
         assert_eq!(bucket_duration(5000), "1-2h");
     }
-    
+
     #[test]
     fn test_anonymize_model_name() {
         assert_eq!(anonymize_model_name("gpt-4-turbo-preview"), "gpt-4-turbo");
@@ -245,13 +249,13 @@ mod tests {
         assert_eq!(anonymize_model_name("my-custom-finetuned-model"), "custom");
         assert_eq!(anonymize_model_name("llama-3-70b-chat"), "llama");
     }
-    
+
     #[test]
     fn test_event_creation() {
         let event = TelemetryEvent::command_used("chat");
         assert_eq!(event.category, EventCategory::Usage);
         assert_eq!(event.event_type, "command_used");
-        
+
         let event = TelemetryEvent::provider_used("openai", "gpt-4-turbo-preview");
         assert_eq!(event.category, EventCategory::Provider);
         if let EventData::ProviderUsed { model, .. } = event.data {

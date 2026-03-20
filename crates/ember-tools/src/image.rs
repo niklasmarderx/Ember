@@ -317,7 +317,9 @@ impl ImageTool {
         // Use ImageMagick identify if available
         if self.config.use_imagemagick {
             if let Ok(info) = self.identify_with_imagemagick(path).await {
-                return Ok(ToolOutput::success(serde_json::to_string(&info).unwrap_or_default()));
+                return Ok(ToolOutput::success(
+                    serde_json::to_string(&info).unwrap_or_default(),
+                ));
             }
         }
 
@@ -341,7 +343,9 @@ impl ImageTool {
             exif: None,
         };
 
-        Ok(ToolOutput::success(serde_json::to_string(&info).unwrap_or_default()))
+        Ok(ToolOutput::success(
+            serde_json::to_string(&info).unwrap_or_default(),
+        ))
     }
 
     async fn identify_with_imagemagick(&self, path: &Path) -> Result<ImageMetadata> {
@@ -364,9 +368,9 @@ impl ImageTool {
         let parts: Vec<&str> = info.trim().split(',').collect();
 
         if parts.len() >= 4 {
-            let metadata = fs::metadata(path).await.map_err(|e| {
-                Error::filesystem(format!("Cannot read file metadata: {}", e))
-            })?;
+            let metadata = fs::metadata(path)
+                .await
+                .map_err(|e| Error::filesystem(format!("Cannot read file metadata: {}", e)))?;
 
             Ok(ImageMetadata {
                 width: parts[0].parse().unwrap_or(0),
@@ -438,11 +442,14 @@ impl ImageTool {
             .map_err(|e| Error::execution_failed("image", format!("ImageMagick error: {}", e)))?;
 
         if output.status.success() {
-            Ok(ToolOutput::success(serde_json::to_string(&json!({
-                "status": "success",
-                "output": output_path.display().to_string(),
-                "geometry": geometry
-            })).unwrap_or_default()))
+            Ok(ToolOutput::success(
+                serde_json::to_string(&json!({
+                    "status": "success",
+                    "output": output_path.display().to_string(),
+                    "geometry": geometry
+                }))
+                .unwrap_or_default(),
+            ))
         } else {
             Err(Error::execution_failed(
                 "image",
@@ -487,11 +494,14 @@ impl ImageTool {
             .map_err(|e| Error::execution_failed("image", format!("ImageMagick error: {}", e)))?;
 
         if output_result.status.success() {
-            Ok(ToolOutput::success(serde_json::to_string(&json!({
-                "status": "success",
-                "output": output_path.display().to_string(),
-                "format": format.extension()
-            })).unwrap_or_default()))
+            Ok(ToolOutput::success(
+                serde_json::to_string(&json!({
+                    "status": "success",
+                    "output": output_path.display().to_string(),
+                    "format": format.extension()
+                }))
+                .unwrap_or_default(),
+            ))
         } else {
             Err(Error::execution_failed(
                 "image",
@@ -525,11 +535,14 @@ impl ImageTool {
             .map_err(|e| Error::execution_failed("image", format!("ImageMagick error: {}", e)))?;
 
         if output_result.status.success() {
-            Ok(ToolOutput::success(serde_json::to_string(&json!({
-                "status": "success",
-                "output": output_path.display().to_string(),
-                "rotation": degrees
-            })).unwrap_or_default()))
+            Ok(ToolOutput::success(
+                serde_json::to_string(&json!({
+                    "status": "success",
+                    "output": output_path.display().to_string(),
+                    "rotation": degrees
+                }))
+                .unwrap_or_default(),
+            ))
         } else {
             Err(Error::execution_failed(
                 "image",
@@ -538,7 +551,12 @@ impl ImageTool {
         }
     }
 
-    async fn flip(&self, source: &str, output: &str, direction: FlipDirection) -> Result<ToolOutput> {
+    async fn flip(
+        &self,
+        source: &str,
+        output: &str,
+        direction: FlipDirection,
+    ) -> Result<ToolOutput> {
         let source_path = Path::new(source);
         let output_path = Path::new(output);
 
@@ -560,11 +578,14 @@ impl ImageTool {
             .map_err(|e| Error::execution_failed("image", format!("ImageMagick error: {}", e)))?;
 
         if output_result.status.success() {
-            Ok(ToolOutput::success(serde_json::to_string(&json!({
-                "status": "success",
-                "output": output_path.display().to_string(),
-                "direction": format!("{:?}", direction)
-            })).unwrap_or_default()))
+            Ok(ToolOutput::success(
+                serde_json::to_string(&json!({
+                    "status": "success",
+                    "output": output_path.display().to_string(),
+                    "direction": format!("{:?}", direction)
+                }))
+                .unwrap_or_default(),
+            ))
         } else {
             Err(Error::execution_failed(
                 "image",
@@ -612,16 +633,19 @@ impl ImageTool {
             .map_err(|e| Error::execution_failed("image", format!("ImageMagick error: {}", e)))?;
 
         if output_result.status.success() {
-            Ok(ToolOutput::success(serde_json::to_string(&json!({
-                "status": "success",
-                "output": output_path.display().to_string(),
-                "crop": {
-                    "x": x,
-                    "y": y,
-                    "width": width,
-                    "height": height
-                }
-            })).unwrap_or_default()))
+            Ok(ToolOutput::success(
+                serde_json::to_string(&json!({
+                    "status": "success",
+                    "output": output_path.display().to_string(),
+                    "crop": {
+                        "x": x,
+                        "y": y,
+                        "width": width,
+                        "height": height
+                    }
+                }))
+                .unwrap_or_default(),
+            ))
         } else {
             Err(Error::execution_failed(
                 "image",
@@ -648,11 +672,14 @@ impl ImageTool {
             .map_err(|e| Error::execution_failed("image", format!("ImageMagick error: {}", e)))?;
 
         if output_result.status.success() {
-            Ok(ToolOutput::success(serde_json::to_string(&json!({
-                "status": "success",
-                "output": output_path.display().to_string(),
-                "max_size": size
-            })).unwrap_or_default()))
+            Ok(ToolOutput::success(
+                serde_json::to_string(&json!({
+                    "status": "success",
+                    "output": output_path.display().to_string(),
+                    "max_size": size
+                }))
+                .unwrap_or_default(),
+            ))
         } else {
             Err(Error::execution_failed(
                 "image",
@@ -750,10 +777,8 @@ impl ToolHandler for ImageTool {
     async fn execute(&self, arguments: Value) -> Result<ToolOutput> {
         debug!("Image tool called with: {:?}", arguments);
 
-        let operation: ImageOperation =
-            serde_json::from_value(arguments).map_err(|e| {
-                Error::invalid_arguments("image", format!("Invalid arguments: {}", e))
-            })?;
+        let operation: ImageOperation = serde_json::from_value(arguments)
+            .map_err(|e| Error::invalid_arguments("image", format!("Invalid arguments: {}", e)))?;
 
         self.execute_operation(operation).await
     }
@@ -772,18 +797,9 @@ mod tests {
 
     #[test]
     fn test_format_from_extension() {
-        assert_eq!(
-            ImageFormat::from_extension("png"),
-            Some(ImageFormat::Png)
-        );
-        assert_eq!(
-            ImageFormat::from_extension("jpg"),
-            Some(ImageFormat::Jpeg)
-        );
-        assert_eq!(
-            ImageFormat::from_extension("jpeg"),
-            Some(ImageFormat::Jpeg)
-        );
+        assert_eq!(ImageFormat::from_extension("png"), Some(ImageFormat::Png));
+        assert_eq!(ImageFormat::from_extension("jpg"), Some(ImageFormat::Jpeg));
+        assert_eq!(ImageFormat::from_extension("jpeg"), Some(ImageFormat::Jpeg));
         assert_eq!(ImageFormat::from_extension("unknown"), None);
     }
 

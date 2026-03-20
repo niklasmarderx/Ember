@@ -201,18 +201,27 @@ impl AuditEntry {
 
     /// Create a warning level entry
     pub fn warning(category: &str, action: &str, description: &str) -> Self {
-        Self::new(AuditLevel::Warning, category, action, description.to_string())
+        Self::new(
+            AuditLevel::Warning,
+            category,
+            action,
+            description.to_string(),
+        )
     }
 
     /// Create an error level entry
     pub fn error(category: &str, action: &str, description: &str) -> Self {
-        Self::new(AuditLevel::Error, category, action, description.to_string())
-            .with_success(false)
+        Self::new(AuditLevel::Error, category, action, description.to_string()).with_success(false)
     }
 
     /// Create a critical level entry
     pub fn critical(category: &str, action: &str, description: &str) -> Self {
-        Self::new(AuditLevel::Critical, category, action, description.to_string())
+        Self::new(
+            AuditLevel::Critical,
+            category,
+            action,
+            description.to_string(),
+        )
     }
 }
 
@@ -410,7 +419,9 @@ impl AuditLog {
     /// Create a new audit log
     pub fn new(config: AuditConfig) -> Result<Self> {
         let file_writer = if config.log_to_file {
-            let path = config.log_path.as_ref()
+            let path = config
+                .log_path
+                .as_ref()
                 .map(PathBuf::from)
                 .unwrap_or_else(|| {
                     dirs::data_local_dir()
@@ -421,15 +432,18 @@ impl AuditLog {
 
             // Create parent directories
             if let Some(parent) = path.parent() {
-                std::fs::create_dir_all(parent)
-                    .map_err(|e| EnterpriseError::AuditError(format!("Failed to create log directory: {}", e)))?;
+                std::fs::create_dir_all(parent).map_err(|e| {
+                    EnterpriseError::AuditError(format!("Failed to create log directory: {}", e))
+                })?;
             }
 
             let file = OpenOptions::new()
                 .create(true)
                 .append(true)
                 .open(&path)
-                .map_err(|e| EnterpriseError::AuditError(format!("Failed to open log file: {}", e)))?;
+                .map_err(|e| {
+                    EnterpriseError::AuditError(format!("Failed to open log file: {}", e))
+                })?;
 
             Some(Arc::new(RwLock::new(BufWriter::new(file))))
         } else {
@@ -465,13 +479,13 @@ impl AuditLog {
         // Write to file if configured
         if let Some(ref writer) = self.file_writer {
             let log_line = self.format_log_line(&entry);
-            let writer_clone = writer.clone();
-            
+
             // Write synchronously for simplicity
-            if let Ok(mut w) = writer_clone.try_write() {
+            // Clone and immediately try to acquire write lock in same statement
+            if let Ok(mut w) = writer.clone().try_write() {
                 let _ = writeln!(w, "{}", log_line);
                 let _ = w.flush();
-            }
+            };
         }
 
         // Store in memory
@@ -480,7 +494,7 @@ impl AuditLog {
         tokio::spawn(async move {
             let mut entries = entries.write().await;
             entries.push(entry_clone);
-            
+
             // Limit memory usage - keep last 10000 entries
             if entries.len() > 10000 {
                 entries.drain(0..1000);
@@ -489,11 +503,36 @@ impl AuditLog {
 
         // Log to tracing
         match entry.level {
-            AuditLevel::Debug => tracing::debug!("[AUDIT] {} - {}: {}", entry.category, entry.action, entry.description),
-            AuditLevel::Info => tracing::info!("[AUDIT] {} - {}: {}", entry.category, entry.action, entry.description),
-            AuditLevel::Warning => tracing::warn!("[AUDIT] {} - {}: {}", entry.category, entry.action, entry.description),
-            AuditLevel::Error => tracing::error!("[AUDIT] {} - {}: {}", entry.category, entry.action, entry.description),
-            AuditLevel::Critical => tracing::error!("[AUDIT-CRITICAL] {} - {}: {}", entry.category, entry.action, entry.description),
+            AuditLevel::Debug => tracing::debug!(
+                "[AUDIT] {} - {}: {}",
+                entry.category,
+                entry.action,
+                entry.description
+            ),
+            AuditLevel::Info => tracing::info!(
+                "[AUDIT] {} - {}: {}",
+                entry.category,
+                entry.action,
+                entry.description
+            ),
+            AuditLevel::Warning => tracing::warn!(
+                "[AUDIT] {} - {}: {}",
+                entry.category,
+                entry.action,
+                entry.description
+            ),
+            AuditLevel::Error => tracing::error!(
+                "[AUDIT] {} - {}: {}",
+                entry.category,
+                entry.action,
+                entry.description
+            ),
+            AuditLevel::Critical => tracing::error!(
+                "[AUDIT-CRITICAL] {} - {}: {}",
+                entry.category,
+                entry.action,
+                entry.description
+            ),
         }
 
         Ok(())
@@ -502,7 +541,7 @@ impl AuditLog {
     /// Query audit logs
     pub async fn query(&self, query: &AuditQuery) -> Result<Vec<AuditEntry>> {
         let entries = self.entries.read().await;
-        
+
         let mut results: Vec<AuditEntry> = entries
             .iter()
             .filter(|e| query.matches(e))
@@ -519,7 +558,7 @@ impl AuditLog {
         // Apply offset and limit
         let offset = query.offset.unwrap_or(0);
         let limit = query.limit.unwrap_or(1000);
-        
+
         Ok(results.into_iter().skip(offset).take(limit).collect())
     }
 
@@ -545,10 +584,10 @@ impl AuditLog {
     /// Export audit logs to CSV
     pub async fn export_csv(&self, query: &AuditQuery) -> Result<String> {
         let entries = self.query(query).await?;
-        
+
         let mut csv = String::new();
         csv.push_str("id,timestamp,level,category,action,description,user_id,session_id,success,error,ip_address\n");
-        
+
         for entry in entries {
             csv.push_str(&format!(
                 "{},{},{},{},{},{},{},{},{},{},{}\n",
@@ -565,7 +604,7 @@ impl AuditLog {
                 entry.ip_address.as_deref().unwrap_or(""),
             ));
         }
-        
+
         Ok(csv)
     }
 
@@ -573,10 +612,10 @@ impl AuditLog {
     pub async fn stats(&self, query: &AuditQuery) -> AuditStats {
         let entries = self.entries.read().await;
         let filtered: Vec<_> = entries.iter().filter(|e| query.matches(e)).collect();
-        
+
         let mut stats = AuditStats::default();
         stats.total = filtered.len();
-        
+
         for entry in &filtered {
             // Count by level
             match entry.level {
@@ -586,10 +625,10 @@ impl AuditLog {
                 AuditLevel::Error => stats.by_level.error += 1,
                 AuditLevel::Critical => stats.by_level.critical += 1,
             }
-            
+
             // Count by category
             *stats.by_category.entry(entry.category.clone()).or_insert(0) += 1;
-            
+
             // Count successes/failures
             if entry.success {
                 stats.successes += 1;
@@ -597,7 +636,7 @@ impl AuditLog {
                 stats.failures += 1;
             }
         }
-        
+
         stats
     }
 
@@ -625,25 +664,29 @@ impl AuditLog {
 
     fn mask_pii(&self, mut entry: AuditEntry) -> AuditEntry {
         // Mask email addresses in description
-        let email_regex = regex::Regex::new(r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}")
-            .unwrap();
-        entry.description = email_regex.replace_all(&entry.description, "[EMAIL]").to_string();
-        
+        let email_regex =
+            regex::Regex::new(r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}").unwrap();
+        entry.description = email_regex
+            .replace_all(&entry.description, "[EMAIL]")
+            .to_string();
+
         // Mask IP addresses (last octet)
         if let Some(ref ip) = entry.ip_address {
             if let Some(last_dot) = ip.rfind('.') {
                 entry.ip_address = Some(format!("{}.xxx", &ip[..last_dot]));
             }
         }
-        
+
         // Remove sensitive metadata keys
         let sensitive_keys = ["password", "token", "secret", "api_key", "credit_card"];
         for key in sensitive_keys {
             if entry.metadata.contains_key(key) {
-                entry.metadata.insert(key.to_string(), serde_json::json!("[REDACTED]"));
+                entry
+                    .metadata
+                    .insert(key.to_string(), serde_json::json!("[REDACTED]"));
             }
         }
-        
+
         entry
     }
 
@@ -655,7 +698,10 @@ impl AuditLog {
             entry.category,
             entry.action,
             entry.description,
-            entry.user_id.map(|u| u.to_string()).unwrap_or_else(|| "-".to_string()),
+            entry
+                .user_id
+                .map(|u| u.to_string())
+                .unwrap_or_else(|| "-".to_string()),
             entry.success,
             entry.ip_address.as_deref().unwrap_or("-"),
         )
@@ -721,14 +767,14 @@ pub mod actions {
     pub const MFA_DISABLED: &str = "mfa_disabled";
     pub const SESSION_CREATED: &str = "session_created";
     pub const SESSION_EXPIRED: &str = "session_expired";
-    
+
     // User actions
     pub const USER_CREATED: &str = "user_created";
     pub const USER_UPDATED: &str = "user_updated";
     pub const USER_DELETED: &str = "user_deleted";
     pub const USER_SUSPENDED: &str = "user_suspended";
     pub const USER_ACTIVATED: &str = "user_activated";
-    
+
     // Team actions
     pub const TEAM_CREATED: &str = "team_created";
     pub const TEAM_UPDATED: &str = "team_updated";
@@ -736,27 +782,27 @@ pub mod actions {
     pub const MEMBER_ADDED: &str = "member_added";
     pub const MEMBER_REMOVED: &str = "member_removed";
     pub const ROLE_CHANGED: &str = "role_changed";
-    
+
     // RBAC actions
     pub const PERMISSION_GRANTED: &str = "permission_granted";
     pub const PERMISSION_REVOKED: &str = "permission_revoked";
     pub const ROLE_ASSIGNED: &str = "role_assigned";
     pub const ROLE_UNASSIGNED: &str = "role_unassigned";
     pub const ACCESS_DENIED: &str = "access_denied";
-    
+
     // API actions
     pub const API_REQUEST: &str = "api_request";
     pub const API_ERROR: &str = "api_error";
     pub const RATE_LIMITED: &str = "rate_limited";
-    
+
     // Tool actions
     pub const TOOL_EXECUTED: &str = "tool_executed";
     pub const TOOL_FAILED: &str = "tool_failed";
-    
+
     // Config actions
     pub const CONFIG_CHANGED: &str = "config_changed";
     pub const SETTINGS_UPDATED: &str = "settings_updated";
-    
+
     // Security actions
     pub const SECURITY_ALERT: &str = "security_alert";
     pub const SUSPICIOUS_ACTIVITY: &str = "suspicious_activity";
@@ -782,7 +828,7 @@ mod tests {
             .with_user_id(user_id)
             .with_ip("192.168.1.1")
             .with_duration(100);
-        
+
         assert_eq!(entry.user_id, Some(user_id));
         assert_eq!(entry.ip_address, Some("192.168.1.1".to_string()));
         assert_eq!(entry.duration_ms, Some(100));
@@ -791,10 +837,10 @@ mod tests {
     #[test]
     fn test_audit_query_matches() {
         let entry = AuditEntry::info("auth", "login", "User logged in");
-        
+
         let query = AuditQuery::new().category("auth");
         assert!(query.matches(&entry));
-        
+
         let query = AuditQuery::new().category("api");
         assert!(!query.matches(&entry));
     }

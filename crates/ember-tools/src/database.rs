@@ -108,56 +108,62 @@ impl DatabaseTool {
     /// Check if a table is allowed
     fn is_table_allowed(&self, table: &str) -> bool {
         // If denied_tables contains the table, deny access
-        if self.config.denied_tables.iter().any(|t| t.eq_ignore_ascii_case(table)) {
+        if self
+            .config
+            .denied_tables
+            .iter()
+            .any(|t| t.eq_ignore_ascii_case(table))
+        {
             return false;
         }
-        
+
         // If allowed_tables is empty, allow all (except denied)
         if self.config.allowed_tables.is_empty() {
             return true;
         }
-        
+
         // Otherwise, check if table is in allowed list
-        self.config.allowed_tables.iter().any(|t| t.eq_ignore_ascii_case(table))
+        self.config
+            .allowed_tables
+            .iter()
+            .any(|t| t.eq_ignore_ascii_case(table))
     }
 
     /// Parse SQL to extract table names (basic implementation)
     fn extract_tables_from_sql(&self, sql: &str) -> Vec<String> {
         let sql_lower = sql.to_lowercase();
         let mut tables = Vec::new();
-        
+
         // Common patterns for table names
-        let patterns = [
-            "from ", "join ", "into ", "update ", "table ",
-        ];
-        
+        let patterns = ["from ", "join ", "into ", "update ", "table "];
+
         for pattern in patterns {
             if let Some(idx) = sql_lower.find(pattern) {
                 let start = idx + pattern.len();
                 let remaining = &sql[start..];
-                
+
                 // Extract the table name (first word after pattern)
                 let table: String = remaining
                     .chars()
                     .skip_while(|c| c.is_whitespace())
                     .take_while(|c| c.is_alphanumeric() || *c == '_')
                     .collect();
-                
+
                 if !table.is_empty() {
                     tables.push(table);
                 }
             }
         }
-        
+
         tables
     }
 
     /// Check if SQL is a read-only query
     fn is_read_only_query(&self, sql: &str) -> bool {
         let sql_trimmed = sql.trim().to_lowercase();
-        sql_trimmed.starts_with("select") || 
-        sql_trimmed.starts_with("pragma") ||
-        sql_trimmed.starts_with("explain")
+        sql_trimmed.starts_with("select")
+            || sql_trimmed.starts_with("pragma")
+            || sql_trimmed.starts_with("explain")
     }
 
     /// Validate the SQL query against configuration
@@ -165,20 +171,21 @@ impl DatabaseTool {
         // Check write access
         if !self.config.allow_write && !self.is_read_only_query(sql) {
             return Err(Error::PathNotAllowed(
-                "Write operations are not allowed. This database is read-only.".to_string()
+                "Write operations are not allowed. This database is read-only.".to_string(),
             ));
         }
-        
+
         // Check table access
         let tables = self.extract_tables_from_sql(sql);
         for table in tables {
             if !self.is_table_allowed(&table) {
-                return Err(Error::PathNotAllowed(
-                    format!("Access to table '{}' is not allowed.", table)
-                ));
+                return Err(Error::PathNotAllowed(format!(
+                    "Access to table '{}' is not allowed.",
+                    table
+                )));
             }
         }
-        
+
         Ok(())
     }
 
@@ -186,18 +193,21 @@ impl DatabaseTool {
     #[cfg(feature = "rusqlite")]
     async fn execute_sqlite(&self, sql: &str) -> Result<QueryResult> {
         use rusqlite::Connection;
-        
-        let conn = Connection::open(&self.config.connection)
-            .map_err(|e| Error::execution_failed("database", format!("Failed to open database: {}", e)))?;
-        
-        let mut stmt = conn.prepare(sql)
-            .map_err(|e| Error::execution_failed("database", format!("Failed to prepare statement: {}", e)))?;
-        
-        let column_names: Vec<String> = stmt.column_names()
+
+        let conn = Connection::open(&self.config.connection).map_err(|e| {
+            Error::execution_failed("database", format!("Failed to open database: {}", e))
+        })?;
+
+        let mut stmt = conn.prepare(sql).map_err(|e| {
+            Error::execution_failed("database", format!("Failed to prepare statement: {}", e))
+        })?;
+
+        let column_names: Vec<String> = stmt
+            .column_names()
             .into_iter()
             .map(|s| s.to_string())
             .collect();
-        
+
         let rows: Vec<HashMap<String, Value>> = stmt
             .query_map([], |row| {
                 let mut map = HashMap::new();
@@ -207,7 +217,9 @@ impl DatabaseTool {
                         Ok(rusqlite::types::ValueRef::Integer(i)) => json!(i),
                         Ok(rusqlite::types::ValueRef::Real(f)) => json!(f),
                         Ok(rusqlite::types::ValueRef::Text(s)) => json!(String::from_utf8_lossy(s)),
-                        Ok(rusqlite::types::ValueRef::Blob(b)) => json!(format!("<blob: {} bytes>", b.len())),
+                        Ok(rusqlite::types::ValueRef::Blob(b)) => {
+                            json!(format!("<blob: {} bytes>", b.len()))
+                        }
                         Err(_) => Value::Null,
                     };
                     map.insert(col_name.clone(), value);
@@ -218,7 +230,7 @@ impl DatabaseTool {
             .take(self.config.max_rows)
             .filter_map(|r| r.ok())
             .collect();
-        
+
         Ok(QueryResult {
             columns: column_names,
             rows,
@@ -230,7 +242,7 @@ impl DatabaseTool {
     #[cfg(not(feature = "rusqlite"))]
     async fn execute_sqlite(&self, _sql: &str) -> Result<QueryResult> {
         Err(Error::ToolDisabled(
-            "SQLite support is not compiled. Enable the 'sqlite' feature.".to_string()
+            "SQLite support is not compiled. Enable the 'sqlite' feature.".to_string(),
         ))
     }
 }
@@ -252,7 +264,7 @@ impl QueryResult {
         if self.columns.is_empty() || self.rows.is_empty() {
             return "No results".to_string();
         }
-        
+
         // Calculate column widths
         let mut widths: Vec<usize> = self.columns.iter().map(|c| c.len()).collect();
         for row in &self.rows {
@@ -265,27 +277,33 @@ impl QueryResult {
                 }
             }
         }
-        
+
         let mut result = String::new();
-        
+
         // Header
         for (i, col) in self.columns.iter().enumerate() {
-            if i > 0 { result.push_str(" | "); }
+            if i > 0 {
+                result.push_str(" | ");
+            }
             result.push_str(&format!("{:width$}", col, width = widths[i]));
         }
         result.push('\n');
-        
+
         // Separator
         for (i, width) in widths.iter().enumerate() {
-            if i > 0 { result.push_str("-+-"); }
+            if i > 0 {
+                result.push_str("-+-");
+            }
             result.push_str(&"-".repeat(*width));
         }
         result.push('\n');
-        
+
         // Data rows
         for row in &self.rows {
             for (i, col) in self.columns.iter().enumerate() {
-                if i > 0 { result.push_str(" | "); }
+                if i > 0 {
+                    result.push_str(" | ");
+                }
                 let value = row.get(col).map(|v| format!("{}", v)).unwrap_or_default();
                 let truncated = if value.len() > widths[i] {
                     format!("{}...", &value[..widths[i].saturating_sub(3)])
@@ -296,11 +314,14 @@ impl QueryResult {
             }
             result.push('\n');
         }
-        
+
         if self.truncated {
-            result.push_str(&format!("\n... results truncated (showing {} rows)\n", self.rows.len()));
+            result.push_str(&format!(
+                "\n... results truncated (showing {} rows)\n",
+                self.rows.len()
+            ));
         }
-        
+
         result
     }
 }
@@ -331,30 +352,33 @@ impl ToolHandler for DatabaseTool {
     }
 
     async fn execute(&self, args: Value) -> Result<ToolOutput> {
-        let operation = args.get("operation")
+        let operation = args
+            .get("operation")
             .and_then(|v| v.as_str())
             .ok_or_else(|| Error::invalid_arguments("database", "Missing 'operation' argument"))?;
 
         match operation {
             "query" => {
-                let sql = args.get("sql")
-                    .and_then(|v| v.as_str())
-                    .ok_or_else(|| Error::invalid_arguments("database", "Missing 'sql' argument"))?;
-                
+                let sql = args.get("sql").and_then(|v| v.as_str()).ok_or_else(|| {
+                    Error::invalid_arguments("database", "Missing 'sql' argument")
+                })?;
+
                 // Validate the query
                 self.validate_query(sql)?;
-                
+
                 // Execute based on database type
                 let result = match self.config.db_type {
                     DatabaseType::Sqlite => self.execute_sqlite(sql).await?,
                     DatabaseType::Postgres => {
-                        return Err(Error::ToolDisabled("PostgreSQL not yet implemented".to_string()));
+                        return Err(Error::ToolDisabled(
+                            "PostgreSQL not yet implemented".to_string(),
+                        ));
                     }
                     DatabaseType::Mysql => {
                         return Err(Error::ToolDisabled("MySQL not yet implemented".to_string()));
                     }
                 };
-                
+
                 Ok(ToolOutput::success_with_data(
                     result.to_table_string(),
                     json!({
@@ -363,55 +387,78 @@ impl ToolHandler for DatabaseTool {
                         "rows": result.rows,
                         "row_count": result.rows.len(),
                         "truncated": result.truncated
-                    })
+                    }),
                 ))
             }
             "tables" => {
                 // List all tables
                 let sql = match self.config.db_type {
-                    DatabaseType::Sqlite => "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name",
-                    DatabaseType::Postgres => "SELECT tablename FROM pg_tables WHERE schemaname = 'public'",
+                    DatabaseType::Sqlite => {
+                        "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name"
+                    }
+                    DatabaseType::Postgres => {
+                        "SELECT tablename FROM pg_tables WHERE schemaname = 'public'"
+                    }
                     DatabaseType::Mysql => "SHOW TABLES",
                 };
-                
+
                 let result = match self.config.db_type {
                     DatabaseType::Sqlite => self.execute_sqlite(sql).await?,
-                    _ => return Err(Error::ToolDisabled("Only SQLite is currently implemented".to_string())),
+                    _ => {
+                        return Err(Error::ToolDisabled(
+                            "Only SQLite is currently implemented".to_string(),
+                        ))
+                    }
                 };
-                
-                let tables: Vec<String> = result.rows
+
+                let tables: Vec<String> = result
+                    .rows
                     .iter()
-                    .filter_map(|row| row.values().next().and_then(|v| v.as_str().map(String::from)))
+                    .filter_map(|row| {
+                        row.values()
+                            .next()
+                            .and_then(|v| v.as_str().map(String::from))
+                    })
                     .filter(|t| self.is_table_allowed(t))
                     .collect();
-                
+
                 Ok(ToolOutput::success_with_data(
                     format!("Found {} tables", tables.len()),
-                    json!({ "tables": tables })
+                    json!({ "tables": tables }),
                 ))
             }
             "schema" => {
-                let table = args.get("table")
-                    .and_then(|v| v.as_str())
-                    .ok_or_else(|| Error::invalid_arguments("database", "Missing 'table' argument"))?;
-                
+                let table = args.get("table").and_then(|v| v.as_str()).ok_or_else(|| {
+                    Error::invalid_arguments("database", "Missing 'table' argument")
+                })?;
+
                 if !self.is_table_allowed(table) {
-                    return Err(Error::PathNotAllowed(format!("Access to table '{}' is not allowed", table)));
+                    return Err(Error::PathNotAllowed(format!(
+                        "Access to table '{}' is not allowed",
+                        table
+                    )));
                 }
-                
+
                 let sql = match self.config.db_type {
                     DatabaseType::Sqlite => format!("PRAGMA table_info({})", table),
-                    _ => return Err(Error::ToolDisabled("Only SQLite is currently implemented".to_string())),
+                    _ => {
+                        return Err(Error::ToolDisabled(
+                            "Only SQLite is currently implemented".to_string(),
+                        ))
+                    }
                 };
-                
+
                 let result = self.execute_sqlite(&sql).await?;
-                
+
                 Ok(ToolOutput::success_with_data(
                     format!("Schema for table '{}'", table),
-                    json!({ "table": table, "schema": result.rows })
+                    json!({ "table": table, "schema": result.rows }),
                 ))
             }
-            _ => Err(Error::invalid_arguments("database", format!("Unknown operation: {}", operation)))
+            _ => Err(Error::invalid_arguments(
+                "database",
+                format!("Unknown operation: {}", operation),
+            )),
         }
     }
 }
@@ -432,7 +479,7 @@ mod tests {
     fn test_table_allowed() {
         let tool = DatabaseTool::sqlite("test.db")
             .with_allowed_tables(vec!["users".to_string(), "posts".to_string()]);
-        
+
         assert!(tool.is_table_allowed("users"));
         assert!(tool.is_table_allowed("USERS")); // Case insensitive
         assert!(!tool.is_table_allowed("secrets"));
@@ -440,9 +487,8 @@ mod tests {
 
     #[test]
     fn test_table_denied() {
-        let tool = DatabaseTool::sqlite("test.db")
-            .with_denied_tables(vec!["secrets".to_string()]);
-        
+        let tool = DatabaseTool::sqlite("test.db").with_denied_tables(vec!["secrets".to_string()]);
+
         assert!(tool.is_table_allowed("users"));
         assert!(!tool.is_table_allowed("secrets"));
         assert!(!tool.is_table_allowed("SECRETS"));
@@ -451,7 +497,7 @@ mod tests {
     #[test]
     fn test_read_only_detection() {
         let tool = DatabaseTool::sqlite("test.db");
-        
+
         assert!(tool.is_read_only_query("SELECT * FROM users"));
         assert!(tool.is_read_only_query("  select id from users"));
         assert!(tool.is_read_only_query("PRAGMA table_info(users)"));
@@ -463,10 +509,10 @@ mod tests {
     #[test]
     fn test_query_validation() {
         let tool = DatabaseTool::sqlite_readonly("test.db");
-        
+
         // Read-only query should pass
         assert!(tool.validate_query("SELECT * FROM users").is_ok());
-        
+
         // Write query should fail on read-only
         assert!(tool.validate_query("INSERT INTO users VALUES (1)").is_err());
     }
@@ -491,7 +537,7 @@ mod tests {
             ],
             truncated: false,
         };
-        
+
         let table_str = result.to_table_string();
         assert!(table_str.contains("id"));
         assert!(table_str.contains("name"));

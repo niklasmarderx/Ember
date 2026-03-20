@@ -125,7 +125,11 @@ impl Locale {
 
     /// Get the text direction for this locale
     pub fn direction(&self) -> &'static str {
-        if self.is_rtl() { "rtl" } else { "ltr" }
+        if self.is_rtl() {
+            "rtl"
+        } else {
+            "ltr"
+        }
     }
 
     /// Get all supported locales
@@ -154,7 +158,7 @@ impl Locale {
     pub fn from_code(code: &str) -> Option<Locale> {
         let code_lower = code.to_lowercase();
         let code_part = code_lower.split('-').next().unwrap_or(&code_lower);
-        
+
         match code_part {
             "en" => Some(Locale::English),
             "de" => Some(Locale::German),
@@ -181,7 +185,7 @@ impl std::fmt::Display for Locale {
 impl std::str::FromStr for Locale {
     type Err = I18nError;
 
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
         Locale::from_code(s).ok_or_else(|| I18nError::UnsupportedLocale(s.to_string()))
     }
 }
@@ -212,9 +216,8 @@ pub enum I18nError {
 pub type Result<T> = std::result::Result<T, I18nError>;
 
 /// Global locale state
-static CURRENT_LOCALE: Lazy<RwLock<Locale>> = Lazy::new(|| {
-    RwLock::new(detect_system_locale().unwrap_or_default())
-});
+static CURRENT_LOCALE: Lazy<RwLock<Locale>> =
+    Lazy::new(|| RwLock::new(detect_system_locale().unwrap_or_default()));
 
 /// Set the current locale
 pub fn set_locale(locale: Locale) {
@@ -231,8 +234,7 @@ pub fn get_locale() -> Locale {
 
 /// Detect the system locale
 pub fn detect_system_locale() -> Option<Locale> {
-    sys_locale::get_locale()
-        .and_then(|locale_str| Locale::from_code(&locale_str))
+    sys_locale::get_locale().and_then(|locale_str| Locale::from_code(&locale_str))
 }
 
 /// Initialize i18n with automatic locale detection
@@ -548,7 +550,10 @@ mod tests {
         assert_eq!(Locale::from_code("de-DE"), Some(Locale::German));
         assert_eq!(Locale::from_code("en-US"), Some(Locale::English));
         assert_eq!(Locale::from_code("zh-CN"), Some(Locale::ChineseSimplified));
-        assert_eq!(Locale::from_code("pt-BR"), Some(Locale::PortugueseBrazilian));
+        assert_eq!(
+            Locale::from_code("pt-BR"),
+            Some(Locale::PortugueseBrazilian)
+        );
         assert_eq!(Locale::from_code("ko"), Some(Locale::Korean));
         assert_eq!(Locale::from_code("it"), Some(Locale::Italian));
         assert_eq!(Locale::from_code("ru"), Some(Locale::Russian));
@@ -593,7 +598,7 @@ mod tests {
     fn test_set_and_get_locale() {
         set_locale(Locale::German);
         assert_eq!(get_locale(), Locale::German);
-        
+
         set_locale(Locale::English);
         assert_eq!(get_locale(), Locale::English);
     }

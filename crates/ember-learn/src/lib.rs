@@ -3,15 +3,15 @@
 //! Adaptive learning that improves with usage.
 //! Learns user preferences, coding patterns, and workflow habits.
 
-pub mod preferences;
 pub mod patterns;
-pub mod suggestions;
+pub mod preferences;
 pub mod profile;
+pub mod suggestions;
 
-pub use preferences::*;
 pub use patterns::*;
-pub use suggestions::*;
+pub use preferences::*;
 pub use profile::*;
+pub use suggestions::*;
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -66,7 +66,7 @@ impl LearningEvent {
 }
 
 /// Types of learning events.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum EventType {
     /// User sent a message.
     MessageSent,
@@ -163,17 +163,17 @@ impl LearningSystem {
     /// Load from storage.
     pub fn load(path: &std::path::Path) -> Result<Self> {
         if path.exists() {
-            let content = std::fs::read_to_string(path)
-                .map_err(|e| LearningError::Storage(e.to_string()))?;
+            let content =
+                std::fs::read_to_string(path).map_err(|e| LearningError::Storage(e.to_string()))?;
             let data: LearningData = serde_json::from_str(&content)
                 .map_err(|e| LearningError::InvalidData(e.to_string()))?;
-            
+
             let mut system = Self::new();
             system.profile = data.profile;
             system.events = data.events;
             system.preferences = PreferenceLearner::from_profile(&system.profile);
             system.patterns = PatternRecognizer::from_events(&system.events);
-            
+
             Ok(system)
         } else {
             Ok(Self::new())
@@ -186,18 +186,16 @@ impl LearningSystem {
             profile: self.profile.clone(),
             events: self.events.clone(),
         };
-        
+
         let content = serde_json::to_string_pretty(&data)
             .map_err(|e| LearningError::Storage(e.to_string()))?;
-        
+
         if let Some(parent) = path.parent() {
-            std::fs::create_dir_all(parent)
-                .map_err(|e| LearningError::Storage(e.to_string()))?;
+            std::fs::create_dir_all(parent).map_err(|e| LearningError::Storage(e.to_string()))?;
         }
-        
-        std::fs::write(path, content)
-            .map_err(|e| LearningError::Storage(e.to_string()))?;
-        
+
+        std::fs::write(path, content).map_err(|e| LearningError::Storage(e.to_string()))?;
+
         Ok(())
     }
 
@@ -205,16 +203,16 @@ impl LearningSystem {
     pub fn record_event(&mut self, event: LearningEvent) {
         // Update preferences.
         self.preferences.process_event(&event);
-        
+
         // Update patterns.
         self.patterns.process_event(&event);
-        
+
         // Update profile.
         self.profile.update_from_event(&event);
-        
+
         // Store event.
         self.events.push(event);
-        
+
         // Limit history size.
         if self.events.len() > 10000 {
             self.events.drain(0..1000);
@@ -223,7 +221,8 @@ impl LearningSystem {
 
     /// Get suggestions for current context.
     pub fn get_suggestions(&self, context: &EventContext) -> Vec<Suggestion> {
-        self.suggestions.generate(&self.profile, &self.preferences, &self.patterns, context)
+        self.suggestions
+            .generate(&self.profile, &self.preferences, &self.patterns, context)
     }
 
     /// Get the user profile.
@@ -263,10 +262,14 @@ impl LearningSystem {
     }
 
     fn calculate_acceptance_rate(&self) -> f64 {
-        let accepted = self.events.iter()
+        let accepted = self
+            .events
+            .iter()
             .filter(|e| e.event_type == EventType::SuggestionAccepted)
             .count();
-        let rejected = self.events.iter()
+        let rejected = self
+            .events
+            .iter()
             .filter(|e| e.event_type == EventType::SuggestionRejected)
             .count();
         let total = accepted + rejected;

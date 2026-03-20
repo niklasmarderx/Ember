@@ -65,9 +65,13 @@ impl SuggestionEngine {
         suggestions
     }
 
-    fn suggest_model(&self, preferences: &PreferenceLearner, context: &EventContext) -> Option<Suggestion> {
+    fn suggest_model(
+        &self,
+        preferences: &PreferenceLearner,
+        context: &EventContext,
+    ) -> Option<Suggestion> {
         let task_type = context.project_type.as_deref().unwrap_or("general");
-        
+
         if let Some(model) = preferences.preferred_model(task_type) {
             if !model.is_empty() {
                 return Some(Suggestion {
@@ -87,9 +91,13 @@ impl SuggestionEngine {
         None
     }
 
-    fn suggest_tools(&self, preferences: &PreferenceLearner, context: &EventContext) -> Vec<Suggestion> {
+    fn suggest_tools(
+        &self,
+        preferences: &PreferenceLearner,
+        context: &EventContext,
+    ) -> Vec<Suggestion> {
         let mut suggestions = Vec::new();
-        
+
         let top_tools = preferences.top_tools(3);
         for (tool, score) in top_tools {
             // Only suggest if tool is relevant to context.
@@ -112,9 +120,13 @@ impl SuggestionEngine {
         suggestions
     }
 
-    fn suggest_workflows(&self, patterns: &PatternRecognizer, context: &EventContext) -> Vec<Suggestion> {
+    fn suggest_workflows(
+        &self,
+        patterns: &PatternRecognizer,
+        context: &EventContext,
+    ) -> Vec<Suggestion> {
         let mut suggestions = Vec::new();
-        
+
         for workflow in patterns.matching_workflows(context) {
             if workflow.confidence > 0.5 {
                 suggestions.push(Suggestion {
@@ -132,14 +144,17 @@ impl SuggestionEngine {
         suggestions
     }
 
-    fn suggest_code_patterns(&self, patterns: &PatternRecognizer, context: &EventContext) -> Vec<Suggestion> {
+    fn suggest_code_patterns(
+        &self,
+        patterns: &PatternRecognizer,
+        context: &EventContext,
+    ) -> Vec<Suggestion> {
         let mut suggestions = Vec::new();
 
         for pattern in &patterns.code_patterns {
             // Check if language matches.
-            let lang_match = pattern.language.is_none() 
-                || pattern.language == context.language;
-            
+            let lang_match = pattern.language.is_none() || pattern.language == context.language;
+
             if lang_match && pattern.acceptance_rate > 0.7 && pattern.usage_count >= 3 {
                 suggestions.push(Suggestion {
                     id: Uuid::new_v4(),
@@ -159,7 +174,11 @@ impl SuggestionEngine {
         suggestions
     }
 
-    fn suggest_tips(&self, profile: &UserProfile, preferences: &PreferenceLearner) -> Vec<Suggestion> {
+    fn suggest_tips(
+        &self,
+        profile: &UserProfile,
+        preferences: &PreferenceLearner,
+    ) -> Vec<Suggestion> {
         let mut tips = Vec::new();
 
         // Suggest keyboard shortcuts if user types a lot.
@@ -199,7 +218,8 @@ impl SuggestionEngine {
                 id: Uuid::new_v4(),
                 suggestion_type: SuggestionType::Tip,
                 title: "Explore different models".to_string(),
-                description: "Try Claude for reasoning, GPT-4 for code, Gemini for long context.".to_string(),
+                description: "Try Claude for reasoning, GPT-4 for code, Gemini for long context."
+                    .to_string(),
                 action: SuggestionAction::ShowHelp("models".to_string()),
                 relevance: 0.35,
                 confidence: 0.9,
@@ -214,8 +234,14 @@ impl SuggestionEngine {
             "shell" => true,
             "filesystem" => true,
             "git" => context.project_type.is_some(),
-            "web" => context.tags.iter().any(|t| t.contains("web") || t.contains("api")),
-            "browser" => context.tags.iter().any(|t| t.contains("web") || t.contains("scrape")),
+            "web" => context
+                .tags
+                .iter()
+                .any(|t| t.contains("web") || t.contains("api")),
+            "browser" => context
+                .tags
+                .iter()
+                .any(|t| t.contains("web") || t.contains("scrape")),
             "code" => context.language.is_some(),
             _ => true,
         }

@@ -5,7 +5,7 @@
 use sha2::{Digest, Sha256};
 
 /// Anonymize a string by hashing it
-/// 
+///
 /// This creates a one-way hash that cannot be reversed to reveal the original value.
 /// Useful for creating anonymous session IDs.
 pub fn anonymize_string(value: &str) -> String {
@@ -25,7 +25,7 @@ pub fn anonymize_machine_id() -> String {
         // Add a random component that's stable per installation
         "ember-telemetry",
     ];
-    
+
     anonymize_string(&factors.join("-"))
 }
 
@@ -38,14 +38,14 @@ pub fn sanitize_string(value: &str) -> String {
         .last()
         .unwrap_or(value)
         .to_string();
-    
+
     // Remove potential email addresses
     let sanitized = if sanitized.contains('@') {
         "[email]".to_string()
     } else {
         sanitized
     };
-    
+
     // Limit length
     if sanitized.len() > 100 {
         sanitized[..100].to_string()
@@ -57,20 +57,20 @@ pub fn sanitize_string(value: &str) -> String {
 /// Check if a string might contain PII
 pub fn might_contain_pii(value: &str) -> bool {
     let lower = value.to_lowercase();
-    
+
     // Check for common PII patterns
     let pii_patterns = [
-        "@",           // Email
-        "password",    // Credentials
-        "secret",      // Secrets
-        "token",       // Tokens
-        "key",         // API keys
-        "Bearer",      // Auth headers
+        "@",        // Email
+        "password", // Credentials
+        "secret",   // Secrets
+        "token",    // Tokens
+        "key",      // API keys
+        "Bearer",   // Auth headers
         "Authorization",
         "api_key",
         "apikey",
     ];
-    
+
     pii_patterns.iter().any(|p| lower.contains(p))
 }
 
@@ -86,50 +86,50 @@ pub fn redact_pii(value: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn test_anonymize_string() {
         let result1 = anonymize_string("test");
         let result2 = anonymize_string("test");
         let result3 = anonymize_string("different");
-        
+
         // Same input produces same output
         assert_eq!(result1, result2);
-        
+
         // Different input produces different output
         assert_ne!(result1, result3);
-        
+
         // Output is 16 chars
         assert_eq!(result1.len(), 16);
     }
-    
+
     #[test]
     fn test_might_contain_pii() {
         assert!(might_contain_pii("user@example.com"));
         assert!(might_contain_pii("my_password123"));
         assert!(might_contain_pii("OPENAI_API_KEY"));
         assert!(might_contain_pii("Bearer sk-xxx"));
-        
+
         assert!(!might_contain_pii("gpt-4"));
         assert!(!might_contain_pii("chat"));
         assert!(!might_contain_pii("openai"));
     }
-    
+
     #[test]
     fn test_redact_pii() {
         assert_eq!(redact_pii("user@example.com"), "[REDACTED]");
         assert_eq!(redact_pii("api_key=xxx"), "[REDACTED]");
         assert_eq!(redact_pii("gpt-4"), "gpt-4");
     }
-    
+
     #[test]
     fn test_sanitize_string() {
         // File paths should be reduced to filename
         assert_eq!(sanitize_string("/home/user/file.txt"), "file.txt");
-        
+
         // Emails should be replaced
         assert_eq!(sanitize_string("user@example.com"), "[email]");
-        
+
         // Normal strings should pass through
         assert_eq!(sanitize_string("hello"), "hello");
     }

@@ -104,10 +104,14 @@ pub use code_execution::{
 pub use database::{DatabaseConfig, DatabaseTool, DatabaseType, QueryResult};
 
 #[cfg(feature = "image")]
-pub use image::{FlipDirection, ImageConfig, ImageFormat, ImageMetadata, ImageOperation, ImageTool};
+pub use image::{
+    FlipDirection, ImageConfig, ImageFormat, ImageMetadata, ImageOperation, ImageTool,
+};
 
 #[cfg(feature = "api")]
-pub use api::{ApiConfig, ApiRequest, ApiRequestBuilder, ApiResponse, ApiTool, AuthScheme, HttpMethod};
+pub use api::{
+    ApiConfig, ApiRequest, ApiRequestBuilder, ApiResponse, ApiTool, AuthScheme, HttpMethod,
+};
 
 /// Prelude for convenient imports.
 pub mod prelude {
@@ -138,8 +142,12 @@ pub mod prelude {
     pub use crate::{DatabaseConfig, DatabaseTool, DatabaseType, QueryResult};
 
     #[cfg(feature = "image")]
-    pub use crate::{FlipDirection, ImageConfig, ImageFormat, ImageMetadata, ImageOperation, ImageTool};
+    pub use crate::{
+        FlipDirection, ImageConfig, ImageFormat, ImageMetadata, ImageOperation, ImageTool,
+    };
 
     #[cfg(feature = "api")]
-    pub use crate::{ApiConfig, ApiRequest, ApiRequestBuilder, ApiResponse, ApiTool, AuthScheme, HttpMethod};
+    pub use crate::{
+        ApiConfig, ApiRequest, ApiRequestBuilder, ApiResponse, ApiTool, AuthScheme, HttpMethod,
+    };
 }

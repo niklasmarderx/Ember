@@ -201,7 +201,10 @@ impl TeamMember {
     }
 
     pub fn can_invite(&self) -> bool {
-        matches!(self.role, TeamRole::Owner | TeamRole::Admin | TeamRole::Moderator)
+        matches!(
+            self.role,
+            TeamRole::Owner | TeamRole::Admin | TeamRole::Moderator
+        )
     }
 }
 
@@ -286,7 +289,13 @@ pub struct TeamInvite {
 }
 
 impl TeamInvite {
-    pub fn new(team_id: Uuid, email: &str, role: TeamRole, invited_by: Uuid, expiration_days: u32) -> Self {
+    pub fn new(
+        team_id: Uuid,
+        email: &str,
+        role: TeamRole,
+        invited_by: Uuid,
+        expiration_days: u32,
+    ) -> Self {
         let now = Utc::now();
         Self {
             id: Uuid::new_v4(),
@@ -349,19 +358,27 @@ impl TeamManager {
     }
 
     /// Create a new team
-    pub async fn create_team(&self, name: &str, description: &str, creator_id: Uuid) -> Result<Team> {
+    pub async fn create_team(
+        &self,
+        name: &str,
+        description: &str,
+        creator_id: Uuid,
+    ) -> Result<Team> {
         // Check if user can create teams
         if !self.config.allow_self_service_creation {
             return Err(EnterpriseError::PermissionDenied(
-                "Team creation requires admin approval".to_string()
+                "Team creation requires admin approval".to_string(),
             ));
         }
 
         // Check user's team limit
         let user_team_count = self.get_user_teams(creator_id).await.len();
-        if self.config.max_teams_per_user > 0 && user_team_count >= self.config.max_teams_per_user as usize {
+        if self.config.max_teams_per_user > 0
+            && user_team_count >= self.config.max_teams_per_user as usize
+        {
             return Err(EnterpriseError::PermissionDenied(format!(
-                "Maximum teams per user ({}) reached", self.config.max_teams_per_user
+                "Maximum teams per user ({}) reached",
+                self.config.max_teams_per_user
             )));
         }
 
@@ -412,12 +429,14 @@ impl TeamManager {
     /// Delete a team
     pub async fn delete_team(&self, team_id: Uuid, requester_id: Uuid) -> Result<()> {
         // Check if requester is owner
-        let member = self.get_member(team_id, requester_id).await
+        let member = self
+            .get_member(team_id, requester_id)
+            .await
             .ok_or_else(|| EnterpriseError::PermissionDenied("Not a team member".to_string()))?;
 
         if !matches!(member.role, TeamRole::Owner) {
             return Err(EnterpriseError::PermissionDenied(
-                "Only team owner can delete the team".to_string()
+                "Only team owner can delete the team".to_string(),
             ));
         }
 
@@ -471,19 +490,21 @@ impl TeamManager {
         }
 
         // Check requester has permission
-        let requester = self.get_member(team_id, added_by).await
+        let requester = self
+            .get_member(team_id, added_by)
+            .await
             .ok_or_else(|| EnterpriseError::PermissionDenied("Not a team member".to_string()))?;
 
         if !requester.can_invite() {
             return Err(EnterpriseError::PermissionDenied(
-                "You don't have permission to add members".to_string()
+                "You don't have permission to add members".to_string(),
             ));
         }
 
         // Can't add role higher than own
         if !requester.role.can_manage(&role) && requester.role != role {
             return Err(EnterpriseError::PermissionDenied(
-                "Cannot add member with higher role".to_string()
+                "Cannot add member with higher role".to_string(),
             ));
         }
 
@@ -491,14 +512,15 @@ impl TeamManager {
         let team_size = self.get_team_members(team_id).await.len();
         if self.config.max_team_size > 0 && team_size >= self.config.max_team_size as usize {
             return Err(EnterpriseError::PermissionDenied(format!(
-                "Team size limit ({}) reached", self.config.max_team_size
+                "Team size limit ({}) reached",
+                self.config.max_team_size
             )));
         }
 
         // Check if already a member
         if self.get_member(team_id, user_id).await.is_some() {
             return Err(EnterpriseError::PermissionDenied(
-                "User is already a team member".to_string()
+                "User is already a team member".to_string(),
             ));
         }
 
@@ -513,32 +535,44 @@ impl TeamManager {
     }
 
     /// Remove a member from a team
-    pub async fn remove_member(&self, team_id: Uuid, user_id: Uuid, removed_by: Uuid) -> Result<()> {
+    pub async fn remove_member(
+        &self,
+        team_id: Uuid,
+        user_id: Uuid,
+        removed_by: Uuid,
+    ) -> Result<()> {
         // Check requester has permission
-        let requester = self.get_member(team_id, removed_by).await
+        let requester = self
+            .get_member(team_id, removed_by)
+            .await
             .ok_or_else(|| EnterpriseError::PermissionDenied("Not a team member".to_string()))?;
 
         // Check target member exists
-        let target = self.get_member(team_id, user_id).await
+        let target = self
+            .get_member(team_id, user_id)
+            .await
             .ok_or_else(|| EnterpriseError::UserNotFound(user_id.to_string()))?;
 
         // Can't remove owner unless self-leaving
         if target.role == TeamRole::Owner && user_id != removed_by {
             return Err(EnterpriseError::PermissionDenied(
-                "Cannot remove team owner".to_string()
+                "Cannot remove team owner".to_string(),
             ));
         }
 
         // Check if requester can remove target
         if user_id != removed_by && !requester.role.can_manage(&target.role) {
             return Err(EnterpriseError::PermissionDenied(
-                "Cannot remove member with same or higher role".to_string()
+                "Cannot remove member with same or higher role".to_string(),
             ));
         }
 
         // Update member status
         let mut members = self.members.write().await;
-        if let Some(member) = members.iter_mut().find(|m| m.team_id == team_id && m.user_id == user_id) {
+        if let Some(member) = members
+            .iter_mut()
+            .find(|m| m.team_id == team_id && m.user_id == user_id)
+        {
             member.status = if user_id == removed_by {
                 MemberStatus::Left
             } else {
@@ -558,37 +592,41 @@ impl TeamManager {
         updated_by: Uuid,
     ) -> Result<TeamMember> {
         // Check requester has permission
-        let requester = self.get_member(team_id, updated_by).await
+        let requester = self
+            .get_member(team_id, updated_by)
+            .await
             .ok_or_else(|| EnterpriseError::PermissionDenied("Not a team member".to_string()))?;
 
         if !requester.can_manage() {
             return Err(EnterpriseError::PermissionDenied(
-                "You don't have permission to change roles".to_string()
+                "You don't have permission to change roles".to_string(),
             ));
         }
 
         // Check target member exists
-        let target = self.get_member(team_id, user_id).await
+        let target = self
+            .get_member(team_id, user_id)
+            .await
             .ok_or_else(|| EnterpriseError::UserNotFound(user_id.to_string()))?;
 
         // Can't change owner role (must transfer ownership)
         if target.role == TeamRole::Owner && new_role != TeamRole::Owner {
             return Err(EnterpriseError::PermissionDenied(
-                "Cannot demote owner. Use transfer ownership instead.".to_string()
+                "Cannot demote owner. Use transfer ownership instead.".to_string(),
             ));
         }
 
         // Can't promote to owner
         if new_role == TeamRole::Owner && target.role != TeamRole::Owner {
             return Err(EnterpriseError::PermissionDenied(
-                "Cannot promote to owner. Use transfer ownership instead.".to_string()
+                "Cannot promote to owner. Use transfer ownership instead.".to_string(),
             ));
         }
 
         // Can't manage higher/equal role
         if !requester.role.can_manage(&target.role) && requester.user_id != user_id {
             return Err(EnterpriseError::PermissionDenied(
-                "Cannot change role of member with same or higher role".to_string()
+                "Cannot change role of member with same or higher role".to_string(),
             ));
         }
 
@@ -639,34 +677,45 @@ impl TeamManager {
         }
 
         // Check requester has permission
-        let requester = self.get_member(team_id, invited_by).await
+        let requester = self
+            .get_member(team_id, invited_by)
+            .await
             .ok_or_else(|| EnterpriseError::PermissionDenied("Not a team member".to_string()))?;
 
         if !requester.can_invite() {
             return Err(EnterpriseError::PermissionDenied(
-                "You don't have permission to invite members".to_string()
+                "You don't have permission to invite members".to_string(),
             ));
         }
 
         // Can't invite with role higher than own
         if !requester.role.can_manage(&role) && requester.role != role {
             return Err(EnterpriseError::PermissionDenied(
-                "Cannot invite with higher role".to_string()
+                "Cannot invite with higher role".to_string(),
             ));
         }
 
         // Check for existing pending invite
         {
             let invites = self.invites.read().await;
-            if invites.iter().any(|i| i.team_id == team_id && i.email == email && i.is_valid()) {
+            if invites
+                .iter()
+                .any(|i| i.team_id == team_id && i.email == email && i.is_valid())
+            {
                 return Err(EnterpriseError::PermissionDenied(
-                    "Pending invitation already exists for this email".to_string()
+                    "Pending invitation already exists for this email".to_string(),
                 ));
             }
         }
 
         // Create invite
-        let invite = TeamInvite::new(team_id, email, role, invited_by, self.config.invite_expiration_days);
+        let invite = TeamInvite::new(
+            team_id,
+            email,
+            role,
+            invited_by,
+            self.config.invite_expiration_days,
+        );
 
         let mut invites = self.invites.write().await;
         invites.push(invite.clone());
@@ -686,7 +735,9 @@ impl TeamManager {
             if invite.is_expired() {
                 invite.status = InviteStatus::Expired;
             }
-            return Err(EnterpriseError::InvalidToken("Invitation is no longer valid".to_string()));
+            return Err(EnterpriseError::InvalidToken(
+                "Invitation is no longer valid".to_string(),
+            ));
         }
 
         // Mark invite as accepted
@@ -729,12 +780,14 @@ impl TeamManager {
             .ok_or_else(|| EnterpriseError::InvalidToken("Invitation not found".to_string()))?;
 
         // Check permission
-        let requester = self.get_member(invite.team_id, revoked_by).await
+        let requester = self
+            .get_member(invite.team_id, revoked_by)
+            .await
             .ok_or_else(|| EnterpriseError::PermissionDenied("Not a team member".to_string()))?;
 
         if !requester.can_manage() {
             return Err(EnterpriseError::PermissionDenied(
-                "You don't have permission to revoke invitations".to_string()
+                "You don't have permission to revoke invitations".to_string(),
             ));
         }
 
@@ -750,35 +803,45 @@ impl TeamManager {
         current_owner_id: Uuid,
     ) -> Result<()> {
         // Check current owner
-        let current_owner = self.get_member(team_id, current_owner_id).await
+        let current_owner = self
+            .get_member(team_id, current_owner_id)
+            .await
             .ok_or_else(|| EnterpriseError::PermissionDenied("Not a team member".to_string()))?;
 
         if current_owner.role != TeamRole::Owner {
             return Err(EnterpriseError::PermissionDenied(
-                "Only the owner can transfer ownership".to_string()
+                "Only the owner can transfer ownership".to_string(),
             ));
         }
 
         // Check new owner is a member
-        let new_owner = self.get_member(team_id, new_owner_id).await
+        let new_owner = self
+            .get_member(team_id, new_owner_id)
+            .await
             .ok_or_else(|| EnterpriseError::UserNotFound(new_owner_id.to_string()))?;
 
         if !new_owner.is_active() {
             return Err(EnterpriseError::PermissionDenied(
-                "New owner must be an active member".to_string()
+                "New owner must be an active member".to_string(),
             ));
         }
 
         // Update roles
         let mut members = self.members.write().await;
-        
+
         // Demote current owner to admin
-        if let Some(member) = members.iter_mut().find(|m| m.team_id == team_id && m.user_id == current_owner_id) {
+        if let Some(member) = members
+            .iter_mut()
+            .find(|m| m.team_id == team_id && m.user_id == current_owner_id)
+        {
             member.role = TeamRole::Admin;
         }
 
         // Promote new owner
-        if let Some(member) = members.iter_mut().find(|m| m.team_id == team_id && m.user_id == new_owner_id) {
+        if let Some(member) = members
+            .iter_mut()
+            .find(|m| m.team_id == team_id && m.user_id == new_owner_id)
+        {
             member.role = TeamRole::Owner;
         }
 
@@ -802,7 +865,7 @@ mod tests {
     fn test_team_creation() {
         let creator_id = Uuid::new_v4();
         let team = Team::new("Test Team", "A test team", creator_id);
-        
+
         assert_eq!(team.name, "Test Team");
         assert!(team.is_active());
         assert_eq!(team.created_by, creator_id);
@@ -830,7 +893,7 @@ mod tests {
         let team_id = Uuid::new_v4();
         let user_id = Uuid::new_v4();
         let member = TeamMember::new(team_id, user_id, TeamRole::Member);
-        
+
         assert_eq!(member.team_id, team_id);
         assert_eq!(member.user_id, user_id);
         assert!(member.is_active());
@@ -842,7 +905,7 @@ mod tests {
         let team_id = Uuid::new_v4();
         let invited_by = Uuid::new_v4();
         let invite = TeamInvite::new(team_id, "test@example.com", TeamRole::Member, invited_by, 7);
-        
+
         assert_eq!(invite.email, "test@example.com");
         assert!(invite.is_valid());
         assert!(!invite.is_expired());
@@ -859,14 +922,17 @@ mod tests {
     async fn test_create_and_get_team() {
         let config = TeamConfig::default();
         let manager = TeamManager::new(config).unwrap();
-        
+
         let creator_id = Uuid::new_v4();
-        let team = manager.create_team("Test", "Test team", creator_id).await.unwrap();
-        
+        let team = manager
+            .create_team("Test", "Test team", creator_id)
+            .await
+            .unwrap();
+
         let retrieved = manager.get_team(team.id).await;
         assert!(retrieved.is_some());
         assert_eq!(retrieved.unwrap().name, "Test");
-        
+
         // Creator should be owner
         let member = manager.get_member(team.id, creator_id).await;
         assert!(member.is_some());

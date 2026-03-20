@@ -6,12 +6,12 @@
 //! - Audit logging with structured events
 //! - Security policies and rules engine
 
+use regex::Regex;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::sync::RwLock;
-use serde::{Deserialize, Serialize};
-use regex::Regex;
 
 // ============================================================================
 // Input Validation
@@ -60,23 +60,60 @@ impl Default for ValidationConfig {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum ValidationError {
     /// Input exceeds maximum length
-    InputTooLong { length: usize, max: usize },
+    InputTooLong {
+        /// Actual input length
+        length: usize,
+        /// Maximum allowed length
+        max: usize,
+    },
     /// Input has too many lines
-    TooManyLines { lines: usize, max: usize },
+    TooManyLines {
+        /// Actual line count
+        lines: usize,
+        /// Maximum allowed lines
+        max: usize,
+    },
     /// Blocked pattern found
-    BlockedPattern { pattern: String, position: usize },
+    BlockedPattern {
+        /// The pattern that was matched
+        pattern: String,
+        /// Position in input where pattern was found
+        position: usize,
+    },
     /// URL not allowed
-    UrlNotAllowed { url: String },
+    UrlNotAllowed {
+        /// The URL that was found
+        url: String,
+    },
     /// File path not allowed
-    FilePathNotAllowed { path: String },
+    FilePathNotAllowed {
+        /// The file path that was found
+        path: String,
+    },
     /// Invalid encoding
-    InvalidEncoding { details: String },
+    InvalidEncoding {
+        /// Details about the encoding error
+        details: String,
+    },
     /// Potential injection detected
-    PotentialInjection { injection_type: String, content: String },
+    PotentialInjection {
+        /// Type of injection detected
+        injection_type: String,
+        /// Content that triggered the detection
+        content: String,
+    },
     /// Nesting depth exceeded
-    NestingTooDeep { depth: usize, max: usize },
+    NestingTooDeep {
+        /// Actual nesting depth
+        depth: usize,
+        /// Maximum allowed depth
+        max: usize,
+    },
     /// Custom validation failed
-    CustomValidation { message: String },
+    CustomValidation {
+        /// Error message
+        message: String,
+    },
 }
 
 /// Result of input validation
@@ -133,14 +170,11 @@ impl InputValidator {
             .collect();
 
         // URL detection regex
-        let url_regex = Regex::new(
-            r"https?://[^\s<>\[\]{}|\\^`]+"
-        ).unwrap();
+        let url_regex = Regex::new(r"https?://[^\s<>\[\]{}|\\^`]+").unwrap();
 
         // File path detection regex (Unix and Windows)
-        let path_regex = Regex::new(
-            r#"(?:^|[\s"'])(?:/[\w.-]+)+|(?:[A-Za-z]:)?\\[\w.-\\]+"#
-        ).unwrap();
+        let path_regex =
+            Regex::new(r#"(?:^|[\s"'])(?:/[\w.-]+)+|(?:[A-Za-z]:)?\\[\w.-\\]+"#).unwrap();
 
         // Common injection patterns
         let injection_patterns = vec![
@@ -196,7 +230,10 @@ impl InputValidator {
         for (i, regex) in self.blocked_regexes.iter().enumerate() {
             if let Some(m) = regex.find(input) {
                 errors.push(ValidationError::BlockedPattern {
-                    pattern: self.config.blocked_patterns.get(i)
+                    pattern: self
+                        .config
+                        .blocked_patterns
+                        .get(i)
                         .cloned()
                         .unwrap_or_default(),
                     position: m.start(),
@@ -227,7 +264,8 @@ impl InputValidator {
             if let Some(m) = regex.find(input) {
                 warnings.push(format!(
                     "Potential {} detected at position {}",
-                    injection_type, m.start()
+                    injection_type,
+                    m.start()
                 ));
             }
         }
@@ -240,7 +278,8 @@ impl InputValidator {
         };
 
         let duration = start.elapsed();
-        let sanitized_length = sanitized_input.as_ref()
+        let sanitized_length = sanitized_input
+            .as_ref()
             .map(|s| s.len())
             .unwrap_or(original_length);
 
@@ -394,24 +433,26 @@ impl RateLimiter {
     /// Check if a request is allowed for a given key
     pub async fn check(&self, key: &str) -> RateLimitResult {
         let mut buckets = self.buckets.write().await;
-        
+
         let refill_rate = self.config.max_requests as f64 / self.config.window_seconds as f64;
         let max_tokens = (self.config.max_requests + self.config.burst_allowance) as f64;
-        
-        let bucket = buckets.entry(key.to_string()).or_insert_with(|| {
-            TokenBucket::new(max_tokens, refill_rate)
-        });
+
+        let bucket = buckets
+            .entry(key.to_string())
+            .or_insert_with(|| TokenBucket::new(max_tokens, refill_rate));
 
         // Check penalty
-        let in_penalty = bucket.penalty_until
+        let in_penalty = bucket
+            .penalty_until
             .map(|until| Instant::now() < until)
             .unwrap_or(false);
 
         if in_penalty {
-            let retry_after = bucket.penalty_until
+            let retry_after = bucket
+                .penalty_until
                 .map(|until| until.duration_since(Instant::now()).as_secs())
                 .unwrap_or(0);
-            
+
             return RateLimitResult {
                 allowed: false,
                 remaining: 0,
@@ -434,21 +475,25 @@ impl RateLimiter {
             remaining,
             reset_in_seconds,
             in_penalty: false,
-            retry_after: if allowed { None } else { Some(reset_in_seconds) },
+            retry_after: if allowed {
+                None
+            } else {
+                Some(reset_in_seconds)
+            },
         }
     }
 
     /// Record a request and apply penalty if limit exceeded
     pub async fn record(&self, key: &str) -> RateLimitResult {
         let result = self.check(key).await;
-        
+
         if !result.allowed && !result.in_penalty {
             let mut buckets = self.buckets.write().await;
             if let Some(bucket) = buckets.get_mut(key) {
                 bucket.apply_penalty(Duration::from_secs(self.config.penalty_seconds));
             }
         }
-        
+
         result
     }
 
@@ -461,14 +506,15 @@ impl RateLimiter {
     /// Get current status for a key without consuming
     pub async fn status(&self, key: &str) -> Option<RateLimitResult> {
         let buckets = self.buckets.read().await;
-        
+
         buckets.get(key).map(|bucket| {
-            let in_penalty = bucket.penalty_until
+            let in_penalty = bucket
+                .penalty_until
                 .map(|until| Instant::now() < until)
                 .unwrap_or(false);
-            
+
             let remaining = bucket.tokens.floor() as u32;
-            
+
             RateLimitResult {
                 allowed: !in_penalty && remaining > 0,
                 remaining,
@@ -483,10 +529,8 @@ impl RateLimiter {
     pub async fn cleanup(&self, max_age: Duration) {
         let mut buckets = self.buckets.write().await;
         let now = Instant::now();
-        
-        buckets.retain(|_, bucket| {
-            now.duration_since(bucket.last_refill) < max_age
-        });
+
+        buckets.retain(|_, bucket| now.duration_since(bucket.last_refill) < max_age);
     }
 }
 
@@ -567,9 +611,15 @@ pub enum AuditOutcome {
     /// Successful operation
     Success,
     /// Failed operation
-    Failure { reason: String },
+    Failure {
+        /// Reason for failure
+        reason: String,
+    },
     /// Denied operation
-    Denied { reason: String },
+    Denied {
+        /// Reason for denial
+        reason: String,
+    },
     /// Unknown/pending outcome
     Unknown,
 }
@@ -681,13 +731,20 @@ impl AuditLogger {
         action: &str,
         actor: &str,
     ) -> AuditEventBuilder {
-        AuditEventBuilder::new(self, severity, category, action.to_string(), actor.to_string())
+        AuditEventBuilder::new(
+            self,
+            severity,
+            category,
+            action.to_string(),
+            actor.to_string(),
+        )
     }
 
     /// Get events by category
     pub async fn get_events_by_category(&self, category: AuditCategory) -> Vec<AuditEvent> {
         let events = self.events.read().await;
-        events.iter()
+        events
+            .iter()
             .filter(|e| e.category == category)
             .cloned()
             .collect()
@@ -696,7 +753,8 @@ impl AuditLogger {
     /// Get events by severity
     pub async fn get_events_by_severity(&self, severity: AuditSeverity) -> Vec<AuditEvent> {
         let events = self.events.read().await;
-        events.iter()
+        events
+            .iter()
             .filter(|e| e.severity == severity)
             .cloned()
             .collect()
@@ -705,20 +763,14 @@ impl AuditLogger {
     /// Get recent events
     pub async fn get_recent_events(&self, count: usize) -> Vec<AuditEvent> {
         let events = self.events.read().await;
-        events.iter()
-            .rev()
-            .take(count)
-            .cloned()
-            .collect()
+        events.iter().rev().take(count).cloned().collect()
     }
 
     /// Search events
-    pub async fn search(
-        &self,
-        query: &AuditQuery,
-    ) -> Vec<AuditEvent> {
+    pub async fn search(&self, query: &AuditQuery) -> Vec<AuditEvent> {
         let events = self.events.read().await;
-        events.iter()
+        events
+            .iter()
             .filter(|e| self.matches_query(e, query))
             .cloned()
             .collect()
@@ -728,7 +780,10 @@ impl AuditLogger {
         match (self.config.min_severity, severity) {
             (AuditSeverity::Critical, AuditSeverity::Critical) => true,
             (AuditSeverity::Error, AuditSeverity::Critical | AuditSeverity::Error) => true,
-            (AuditSeverity::Warning, AuditSeverity::Critical | AuditSeverity::Error | AuditSeverity::Warning) => true,
+            (
+                AuditSeverity::Warning,
+                AuditSeverity::Critical | AuditSeverity::Error | AuditSeverity::Warning,
+            ) => true,
             (AuditSeverity::Info, _) => true,
             _ => false,
         }
@@ -743,7 +798,7 @@ impl AuditLogger {
                 event.source_ip = Some(format!("{}.{}.{}.xxx", parts[0], parts[1], parts[2]));
             }
         }
-        
+
         event
     }
 
@@ -855,13 +910,17 @@ impl<'a> AuditEventBuilder<'a> {
 
     /// Set failure outcome
     pub fn failure(mut self, reason: &str) -> Self {
-        self.event.outcome = AuditOutcome::Failure { reason: reason.to_string() };
+        self.event.outcome = AuditOutcome::Failure {
+            reason: reason.to_string(),
+        };
         self
     }
 
     /// Set denied outcome
     pub fn denied(mut self, reason: &str) -> Self {
-        self.event.outcome = AuditOutcome::Denied { reason: reason.to_string() };
+        self.event.outcome = AuditOutcome::Denied {
+            reason: reason.to_string(),
+        };
         self
     }
 
@@ -967,15 +1026,30 @@ pub enum RuleAction {
     /// Allow the request
     Allow,
     /// Deny the request
-    Deny { message: String },
+    Deny {
+        /// Denial message
+        message: String,
+    },
     /// Log and allow
-    LogAndAllow { level: AuditSeverity },
+    LogAndAllow {
+        /// Severity level for logging
+        level: AuditSeverity,
+    },
     /// Rate limit
-    RateLimit { config: RateLimitConfig },
+    RateLimit {
+        /// Rate limit configuration
+        config: RateLimitConfig,
+    },
     /// Require additional validation
-    RequireValidation { validation_type: String },
+    RequireValidation {
+        /// Type of validation required
+        validation_type: String,
+    },
     /// Transform the request
-    Transform { transformations: Vec<String> },
+    Transform {
+        /// List of transformations to apply
+        transformations: Vec<String>,
+    },
 }
 
 /// Security policy
@@ -1023,7 +1097,7 @@ impl PolicyEngine {
     /// Evaluate request against policies
     pub async fn evaluate(&self, context: &PolicyContext) -> PolicyResult {
         let policies = self.policies.read().await;
-        
+
         for policy in policies.iter().filter(|p| p.enabled) {
             for rule in policy.rules.iter().filter(|r| r.enabled) {
                 if self.matches_conditions(&rule.conditions, context) {
@@ -1035,7 +1109,7 @@ impl PolicyEngine {
                     };
                 }
             }
-            
+
             // If no rules matched, use default action
             return PolicyResult {
                 policy_id: policy.id.clone(),
@@ -1055,12 +1129,14 @@ impl PolicyEngine {
     }
 
     fn matches_conditions(&self, conditions: &[RuleCondition], context: &PolicyContext) -> bool {
-        conditions.iter().all(|cond| self.matches_condition(cond, context))
+        conditions
+            .iter()
+            .all(|cond| self.matches_condition(cond, context))
     }
 
     fn matches_condition(&self, condition: &RuleCondition, context: &PolicyContext) -> bool {
         let value = context.get_field(&condition.field);
-        
+
         match &condition.operator {
             ConditionOperator::Equals => value == Some(&condition.value),
             ConditionOperator::NotEquals => value != Some(&condition.value),
@@ -1078,14 +1154,20 @@ impl PolicyEngine {
                 }
             }
             ConditionOperator::GreaterThan => {
-                if let (Some(v), Ok(cond_num)) = (value.and_then(|v| v.parse::<f64>().ok()), condition.value.parse::<f64>()) {
+                if let (Some(v), Ok(cond_num)) = (
+                    value.and_then(|v| v.parse::<f64>().ok()),
+                    condition.value.parse::<f64>(),
+                ) {
                     v > cond_num
                 } else {
                     false
                 }
             }
             ConditionOperator::LessThan => {
-                if let (Some(v), Ok(cond_num)) = (value.and_then(|v| v.parse::<f64>().ok()), condition.value.parse::<f64>()) {
+                if let (Some(v), Ok(cond_num)) = (
+                    value.and_then(|v| v.parse::<f64>().ok()),
+                    condition.value.parse::<f64>(),
+                ) {
                     v < cond_num
                 } else {
                     false
@@ -1154,16 +1236,19 @@ mod tests {
     #[test]
     fn test_input_validation() {
         let validator = InputValidator::new(ValidationConfig::default());
-        
+
         // Valid input
         let result = validator.validate("Hello, world!");
         assert!(result.is_valid);
-        
+
         // Too long input
         let long_input = "x".repeat(200_000);
         let result = validator.validate(&long_input);
         assert!(!result.is_valid);
-        assert!(matches!(&result.errors[0], ValidationError::InputTooLong { .. }));
+        assert!(matches!(
+            &result.errors[0],
+            ValidationError::InputTooLong { .. }
+        ));
     }
 
     #[test]
@@ -1186,13 +1271,13 @@ mod tests {
         });
 
         let key = "test_user";
-        
+
         // First 3 requests should succeed
         for _ in 0..3 {
             let result = limiter.check(key).await;
             assert!(result.allowed);
         }
-        
+
         // 4th request should fail
         let result = limiter.check(key).await;
         assert!(!result.allowed);
@@ -1201,22 +1286,24 @@ mod tests {
     #[tokio::test]
     async fn test_audit_logging() {
         let logger = AuditLogger::new(AuditConfig::default());
-        
-        logger.log(AuditEvent {
-            id: "test-1".to_string(),
-            timestamp: chrono::Utc::now().to_rfc3339(),
-            severity: AuditSeverity::Info,
-            category: AuditCategory::Authentication,
-            action: "login".to_string(),
-            actor: "user@example.com".to_string(),
-            resource: None,
-            outcome: AuditOutcome::Success,
-            details: HashMap::new(),
-            source_ip: Some("192.168.1.100".to_string()),
-            user_agent: None,
-            session_id: None,
-            correlation_id: None,
-        }).await;
+
+        logger
+            .log(AuditEvent {
+                id: "test-1".to_string(),
+                timestamp: chrono::Utc::now().to_rfc3339(),
+                severity: AuditSeverity::Info,
+                category: AuditCategory::Authentication,
+                action: "login".to_string(),
+                actor: "user@example.com".to_string(),
+                resource: None,
+                outcome: AuditOutcome::Success,
+                details: HashMap::new(),
+                source_ip: Some("192.168.1.100".to_string()),
+                user_agent: None,
+                session_id: None,
+                correlation_id: None,
+            })
+            .await;
 
         let events = logger.get_recent_events(10).await;
         assert_eq!(events.len(), 1);
@@ -1226,52 +1313,52 @@ mod tests {
     #[tokio::test]
     async fn test_policy_engine() {
         let engine = PolicyEngine::new();
-        
+
         let policy = SecurityPolicy {
             id: "test-policy".to_string(),
             name: "Test Policy".to_string(),
             description: "Test security policy".to_string(),
             enabled: true,
-            rules: vec![
-                SecurityRule {
-                    id: "block-admin".to_string(),
-                    name: "Block Admin Access".to_string(),
-                    description: "Block admin access from unknown IPs".to_string(),
-                    enabled: true,
-                    priority: 1,
-                    conditions: vec![
-                        RuleCondition {
-                            field: "role".to_string(),
-                            operator: ConditionOperator::Equals,
-                            value: "admin".to_string(),
-                        },
-                        RuleCondition {
-                            field: "ip".to_string(),
-                            operator: ConditionOperator::NotIn,
-                            value: "10.0.0.1,10.0.0.2".to_string(),
-                        },
-                    ],
-                    action: RuleAction::Deny { message: "Admin access denied".to_string() },
+            rules: vec![SecurityRule {
+                id: "block-admin".to_string(),
+                name: "Block Admin Access".to_string(),
+                description: "Block admin access from unknown IPs".to_string(),
+                enabled: true,
+                priority: 1,
+                conditions: vec![
+                    RuleCondition {
+                        field: "role".to_string(),
+                        operator: ConditionOperator::Equals,
+                        value: "admin".to_string(),
+                    },
+                    RuleCondition {
+                        field: "ip".to_string(),
+                        operator: ConditionOperator::NotIn,
+                        value: "10.0.0.1,10.0.0.2".to_string(),
+                    },
+                ],
+                action: RuleAction::Deny {
+                    message: "Admin access denied".to_string(),
                 },
-            ],
+            }],
             default_action: RuleAction::Allow,
         };
-        
+
         engine.add_policy(policy).await;
-        
+
         // Test matching rule
         let context = PolicyContext::new()
             .with_field("role", "admin")
             .with_field("ip", "192.168.1.1");
-        
+
         let result = engine.evaluate(&context).await;
         assert!(matches!(result.action, RuleAction::Deny { .. }));
-        
+
         // Test non-matching (allowed)
         let context = PolicyContext::new()
             .with_field("role", "admin")
             .with_field("ip", "10.0.0.1");
-        
+
         let result = engine.evaluate(&context).await;
         assert!(matches!(result.action, RuleAction::Allow));
     }

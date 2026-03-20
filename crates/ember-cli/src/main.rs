@@ -31,7 +31,9 @@ mod error_display;
 #[cfg(feature = "tui")]
 mod tui;
 
-use commands::{chat, code, completions, config as config_cmd, export, git, history, plugin, serve};
+use commands::{
+    chat, code, completions, config as config_cmd, export, git, history, plugin, serve,
+};
 use config::AppConfig;
 
 /// Ember CLI - AI assistant for your terminal.
@@ -700,24 +702,69 @@ fn print_info() -> Result<()> {
     println!("{} {}", "Arch:".bright_blue(), std::env::consts::ARCH);
     println!();
     println!("{}", "Supported Providers:".bright_blue());
-    println!("  {} OpenAI       - GPT-4o, GPT-4o-mini, o1, o3-mini", "[x]".green());
-    println!("  {} Anthropic    - Claude 3.5 Sonnet/Haiku/Opus", "[x]".green());
-    println!("  {} Google       - Gemini 2.0 Flash, 1.5 Pro (2M context)", "[x]".green());
-    println!("  {} Ollama       - Local models (Llama, Qwen, DeepSeek)", "[x]".green());
-    println!("  {} Groq         - Ultra-fast inference (Llama 3.3 70B)", "[x]".green());
-    println!("  {} DeepSeek     - V3, R1 Reasoner (cost-effective)", "[x]".green());
-    println!("  {} Mistral      - Large, Codestral, Pixtral", "[x]".green());
-    println!("  {} OpenRouter   - 200+ models via single API", "[x]".green());
+    println!(
+        "  {} OpenAI       - GPT-4o, GPT-4o-mini, o1, o3-mini",
+        "[x]".green()
+    );
+    println!(
+        "  {} Anthropic    - Claude 3.5 Sonnet/Haiku/Opus",
+        "[x]".green()
+    );
+    println!(
+        "  {} Google       - Gemini 2.0 Flash, 1.5 Pro (2M context)",
+        "[x]".green()
+    );
+    println!(
+        "  {} Ollama       - Local models (Llama, Qwen, DeepSeek)",
+        "[x]".green()
+    );
+    println!(
+        "  {} Groq         - Ultra-fast inference (Llama 3.3 70B)",
+        "[x]".green()
+    );
+    println!(
+        "  {} DeepSeek     - V3, R1 Reasoner (cost-effective)",
+        "[x]".green()
+    );
+    println!(
+        "  {} Mistral      - Large, Codestral, Pixtral",
+        "[x]".green()
+    );
+    println!(
+        "  {} OpenRouter   - 200+ models via single API",
+        "[x]".green()
+    );
     println!("  {} xAI          - Grok 2, Grok Vision", "[x]".green());
-    println!("  {} AWS Bedrock  - Claude, Titan, Llama via AWS", "[x]".green());
+    println!(
+        "  {} AWS Bedrock  - Claude, Titan, Llama via AWS",
+        "[x]".green()
+    );
     println!();
     println!("{}", "Available Tools:".bright_blue());
-    println!("  {} Shell        - Execute terminal commands", "[x]".green());
-    println!("  {} Filesystem   - Read, write, search files", "[x]".green());
-    println!("  {} Git          - Clone, commit, push, branch", "[x]".green());
-    println!("  {} Web          - HTTP requests, web scraping", "[x]".green());
-    println!("  {} Browser      - Headless browser automation", "[x]".green());
-    println!("  {} Code         - Execute Python, JS, Rust", "[x]".green());
+    println!(
+        "  {} Shell        - Execute terminal commands",
+        "[x]".green()
+    );
+    println!(
+        "  {} Filesystem   - Read, write, search files",
+        "[x]".green()
+    );
+    println!(
+        "  {} Git          - Clone, commit, push, branch",
+        "[x]".green()
+    );
+    println!(
+        "  {} Web          - HTTP requests, web scraping",
+        "[x]".green()
+    );
+    println!(
+        "  {} Browser      - Headless browser automation",
+        "[x]".green()
+    );
+    println!(
+        "  {} Code         - Execute Python, JS, Rust",
+        "[x]".green()
+    );
     println!();
     println!("{}", "Features:".bright_blue());
     println!("  {} Streaming responses", "[x]".green());

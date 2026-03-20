@@ -124,7 +124,6 @@ pub enum AuthScheme {
     },
 }
 
-
 /// API request configuration.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ApiRequest {
@@ -218,9 +217,11 @@ impl ApiTool {
 
         // Check allowed hosts (if not empty)
         if !self.config.allowed_hosts.is_empty() {
-            let allowed = self.config.allowed_hosts.iter().any(|allowed| {
-                host == allowed || host.ends_with(&format!(".{}", allowed))
-            });
+            let allowed = self
+                .config
+                .allowed_hosts
+                .iter()
+                .any(|allowed| host == allowed || host.ends_with(&format!(".{}", allowed)));
 
             if !allowed {
                 return Err(Error::invalid_arguments(
@@ -255,8 +256,14 @@ impl ApiTool {
                     if retries >= self.config.max_retries {
                         return Err(e);
                     }
-                    warn!("API request failed, retrying ({}/{}): {}", retries, self.config.max_retries, e);
-                    tokio::time::sleep(Duration::from_millis(self.config.retry_delay_ms * u64::from(retries))).await;
+                    warn!(
+                        "API request failed, retrying ({}/{}): {}",
+                        retries, self.config.max_retries, e
+                    );
+                    tokio::time::sleep(Duration::from_millis(
+                        self.config.retry_delay_ms * u64::from(retries),
+                    ))
+                    .await;
                 }
             }
         }
@@ -392,10 +399,9 @@ impl ApiTool {
         }
 
         // Read body with size limit
-        let bytes = response
-            .bytes()
-            .await
-            .map_err(|e| Error::execution_failed("api", format!("Failed to read response: {}", e)))?;
+        let bytes = response.bytes().await.map_err(|e| {
+            Error::execution_failed("api", format!("Failed to read response: {}", e))
+        })?;
 
         if bytes.len() > self.config.max_response_size {
             return Err(Error::execution_failed(
@@ -411,7 +417,8 @@ impl ApiTool {
         // Parse body
         let body = if let Some(ct) = &content_type {
             if ct.contains("application/json") {
-                serde_json::from_slice(&bytes).unwrap_or(Value::String(String::from_utf8_lossy(&bytes).to_string()))
+                serde_json::from_slice(&bytes)
+                    .unwrap_or(Value::String(String::from_utf8_lossy(&bytes).to_string()))
             } else {
                 Value::String(String::from_utf8_lossy(&bytes).to_string())
             }
@@ -537,7 +544,9 @@ impl ToolHandler for ApiTool {
 
         let response = self.execute_request(request).await?;
 
-        Ok(ToolOutput::success(serde_json::to_string(&response).unwrap_or_default()))
+        Ok(ToolOutput::success(
+            serde_json::to_string(&response).unwrap_or_default(),
+        ))
     }
 }
 
@@ -698,7 +707,10 @@ mod tests {
 
         assert_eq!(request.method, HttpMethod::Get);
         assert_eq!(request.url, "https://api.example.com/users");
-        assert_eq!(request.headers.get("Accept"), Some(&"application/json".to_string()));
+        assert_eq!(
+            request.headers.get("Accept"),
+            Some(&"application/json".to_string())
+        );
         assert_eq!(request.query.get("page"), Some(&"1".to_string()));
         assert!(matches!(request.auth, AuthScheme::Bearer { .. }));
         assert_eq!(request.timeout, Some(10));
@@ -725,6 +737,8 @@ mod tests {
         assert!(tool.is_host_allowed("http://127.0.0.1/api").is_err());
 
         // External hosts should be allowed
-        assert!(tool.is_host_allowed("https://api.example.com/users").is_ok());
+        assert!(tool
+            .is_host_allowed("https://api.example.com/users")
+            .is_ok());
     }
 }

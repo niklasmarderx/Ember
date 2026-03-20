@@ -48,6 +48,9 @@ chrono = { workspace = true }
 # Logging
 tracing = { workspace = true }
 
+# Base64 encoding
+base64 = "0.22"
+
 # Channels
 crossbeam-channel = "0.5"
 

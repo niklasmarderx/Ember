@@ -155,13 +155,16 @@ impl UserProfile {
 
     /// Add or update a skill.
     pub fn update_skill(&mut self, topic: &str, level: f64) {
-        let skill = self.skills.entry(topic.to_string()).or_insert_with(|| SkillLevel {
-            topic: topic.to_string(),
-            level: 0.0,
-            last_used: Utc::now(),
-            usage_count: 0,
-        });
-        
+        let skill = self
+            .skills
+            .entry(topic.to_string())
+            .or_insert_with(|| SkillLevel {
+                topic: topic.to_string(),
+                level: 0.0,
+                last_used: Utc::now(),
+                usage_count: 0,
+            });
+
         // Exponential moving average for smoother updates.
         skill.level = skill.level * 0.8 + level * 0.2;
         skill.last_used = Utc::now();
@@ -179,7 +182,7 @@ impl UserProfile {
     fn update_primary_languages(&mut self) {
         let mut languages: Vec<_> = self.language_usage.iter().collect();
         languages.sort_by(|a, b| b.1.cmp(a.1));
-        
+
         self.primary_languages = languages
             .into_iter()
             .take(3)
@@ -193,8 +196,9 @@ impl UserProfile {
         let tasks_progress = (self.total_tasks_completed as f64 / 100.0).min(0.3);
         let code_progress = (self.total_code_generations as f64 / 500.0).min(0.2);
         let skill_progress = (self.skills.len() as f64 / 20.0).min(0.2);
-        
-        self.experience_level = (progress + tasks_progress + code_progress + skill_progress).min(1.0);
+
+        self.experience_level =
+            (progress + tasks_progress + code_progress + skill_progress).min(1.0);
     }
 
     fn check_achievements(&mut self) {
@@ -330,10 +334,10 @@ impl StreakInfo {
     /// Record an activity.
     pub fn record_activity(&mut self, timestamp: DateTime<Utc>) {
         let date = timestamp.date_naive();
-        
+
         if let Some(last_date) = self.last_activity_date {
             let days_diff = (date - last_date).num_days();
-            
+
             if days_diff == 1 {
                 // Consecutive day.
                 self.current_streak += 1;
@@ -342,7 +346,7 @@ impl StreakInfo {
                 self.current_streak = 1;
             }
             // Same day - no change.
-            
+
             if date != last_date {
                 self.total_active_days += 1;
             }
@@ -351,9 +355,9 @@ impl StreakInfo {
             self.current_streak = 1;
             self.total_active_days = 1;
         }
-        
+
         self.last_activity_date = Some(date);
-        
+
         if self.current_streak > self.longest_streak {
             self.longest_streak = self.current_streak;
         }
@@ -382,7 +386,7 @@ mod tests {
     fn test_skill_update() {
         let mut profile = UserProfile::new();
         profile.update_skill("rust", 0.8);
-        
+
         assert!(profile.skills.contains_key("rust"));
         assert!(profile.skills["rust"].level > 0.0);
     }
@@ -391,7 +395,7 @@ mod tests {
     fn test_streak_tracking() {
         let mut streak = StreakInfo::default();
         let now = Utc::now();
-        
+
         streak.record_activity(now);
         assert_eq!(streak.current_streak, 1);
         assert_eq!(streak.total_active_days, 1);
@@ -402,7 +406,7 @@ mod tests {
         let mut profile = UserProfile::new();
         profile.total_tasks_completed = 1;
         profile.check_achievements();
-        
+
         assert!(profile.has_achievement("first_task"));
     }
 }

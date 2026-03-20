@@ -406,10 +406,9 @@ async fn generate_commit(
     let files_output = Command::new("git")
         .args(["diff", "--cached", "--name-only"])
         .output()?;
-    let files: Vec<&str> = String::from_utf8_lossy(&files_output.stdout)
+    let files_str = String::from_utf8_lossy(&files_output.stdout);
+    let files: Vec<&str> = files_str
         .lines()
-        .collect::<Vec<_>>()
-        .into_iter()
         .take(10)
         .collect();
 
@@ -599,19 +598,13 @@ async fn suggest_branch(
 
         if status.success() {
             println!();
-            println!(
-                "{} Branch created and checked out!",
-                "[OK]".green()
-            );
+            println!("{} Branch created and checked out!", "[OK]".green());
         } else {
             println!("{} Failed to create branch", "[!]".red());
         }
     } else {
         println!();
-        println!(
-            "{} Use --create to create this branch",
-            "[i]".cyan()
-        );
+        println!("{} Use --create to create this branch", "[i]".cyan());
         println!("  Or run: git checkout -b {}", branch_name);
     }
 
@@ -640,11 +633,7 @@ async fn resolve_conflicts(
 
     let files: Vec<&str> = conflict_files.lines().collect();
     println!();
-    println!(
-        "{} {} files with conflicts:",
-        "[!]".yellow(),
-        files.len()
-    );
+    println!("{} {} files with conflicts:", "[!]".yellow(), files.len());
     for f in &files {
         println!("  {} {}", "-".red(), f);
     }
@@ -677,10 +666,7 @@ async fn resolve_conflicts(
         }
     } else {
         println!();
-        println!(
-            "{} Use --file to analyze a specific file",
-            "[i]".cyan()
-        );
+        println!("{} Use --file to analyze a specific file", "[i]".cyan());
     }
 
     Ok(())
@@ -700,9 +686,7 @@ async fn generate_review(
     );
 
     // Get diff
-    let diff_output = Command::new("git")
-        .args(["diff", &base])
-        .output()?;
+    let diff_output = Command::new("git").args(["diff", &base]).output()?;
     let diff = String::from_utf8_lossy(&diff_output.stdout);
 
     if diff.trim().is_empty() {
@@ -760,7 +744,11 @@ async fn generate_review(
                     comment.message
                 );
                 if let Some(ref suggestion) = comment.suggestion {
-                    println!("    {} {}", "Suggestion:".bright_blue(), suggestion.dimmed());
+                    println!(
+                        "    {} {}",
+                        "Suggestion:".bright_blue(),
+                        suggestion.dimmed()
+                    );
                 }
             }
 
@@ -832,9 +820,7 @@ async fn show_stats(
     }
 
     let log_output = Command::new("git").args(&args).output()?;
-    let commit_count = String::from_utf8_lossy(&log_output.stdout)
-        .lines()
-        .count();
+    let commit_count = String::from_utf8_lossy(&log_output.stdout).lines().count();
 
     // Get contributor stats
     let shortlog = Command::new("git")
@@ -850,12 +836,8 @@ async fn show_stats(
     println!("  {} {}", "Contributors:".bright_blue(), contributor_count);
 
     if show_files {
-        let ls_output = Command::new("git")
-            .args(["ls-files"])
-            .output()?;
-        let file_count = String::from_utf8_lossy(&ls_output.stdout)
-            .lines()
-            .count();
+        let ls_output = Command::new("git").args(["ls-files"]).output()?;
+        let file_count = String::from_utf8_lossy(&ls_output.stdout).lines().count();
         println!("  {} {}", "Tracked files:".bright_blue(), file_count);
     }
 
@@ -892,10 +874,9 @@ async fn generate_changelog(
             "--pretty=format:%s",
         ])
         .output()?;
-    let commits: Vec<&str> = String::from_utf8_lossy(&log_output.stdout)
+    let commits_str = String::from_utf8_lossy(&log_output.stdout);
+    let commits: Vec<&str> = commits_str
         .lines()
-        .collect::<Vec<_>>()
-        .into_iter()
         .collect();
 
     if commits.is_empty() || (commits.len() == 1 && commits[0].is_empty()) {
@@ -1046,10 +1027,7 @@ fn infer_emoji(files: &[&str]) -> &'static str {
 fn generate_pr_title(branch: &str) -> String {
     let parts: Vec<&str> = branch.split('/').collect();
     if parts.len() >= 2 {
-        let desc = parts[1..]
-            .join(" ")
-            .replace('-', " ")
-            .replace('_', " ");
+        let desc = parts[1..].join(" ").replace('-', " ").replace('_', " ");
         let first_char = desc.chars().next().unwrap_or(' ').to_uppercase();
         format!("{}{}", first_char, &desc[1..])
     } else {

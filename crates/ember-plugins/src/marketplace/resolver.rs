@@ -2,8 +2,8 @@
 //!
 //! Resolves plugin dependencies using a SAT-solver-like approach.
 
-use super::types::*;
 use super::registry::{RegistryClient, RegistryError};
+use super::types::*;
 use std::collections::{HashMap, HashSet, VecDeque};
 
 /// Dependency resolution error
@@ -114,14 +114,18 @@ impl DependencyResolver {
     }
 
     /// Resolve dependencies for a plugin
-    pub async fn resolve(&mut self, plugin_id: &str, version_req: Option<&str>) -> Result<Resolution, ResolverError> {
+    pub async fn resolve(
+        &mut self,
+        plugin_id: &str,
+        version_req: Option<&str>,
+    ) -> Result<Resolution, ResolverError> {
         let requirement = match version_req {
-            Some(v) => VersionRequirement::parse(v).map_err(|_| {
-                ResolverError::NoCompatibleVersion {
+            Some(v) => {
+                VersionRequirement::parse(v).map_err(|_| ResolverError::NoCompatibleVersion {
                     plugin: plugin_id.to_string(),
                     requirement: v.to_string(),
-                }
-            })?,
+                })?
+            }
             None => VersionRequirement::Any,
         };
 
@@ -129,13 +133,16 @@ impl DependencyResolver {
     }
 
     /// Resolve dependencies for multiple plugins
-    pub async fn resolve_many(&mut self, plugins: &[(String, Option<String>)]) -> Result<Resolution, ResolverError> {
+    pub async fn resolve_many(
+        &mut self,
+        plugins: &[(String, Option<String>)],
+    ) -> Result<Resolution, ResolverError> {
         let mut all_deps: Vec<ResolvedDependency> = Vec::new();
         let mut seen: HashSet<String> = HashSet::new();
 
         for (plugin_id, version_req) in plugins {
             let resolution = self.resolve(plugin_id, version_req.as_deref()).await?;
-            
+
             for dep in resolution.dependencies {
                 if !seen.contains(&dep.plugin.id) {
                     seen.insert(dep.plugin.id.clone());
@@ -170,7 +177,12 @@ impl DependencyResolver {
         let mut queue: VecDeque<(String, VersionRequirement, String, u32)> = VecDeque::new();
 
         // Start with the root dependency
-        queue.push_back((plugin_id.to_string(), requirement.clone(), "root".to_string(), 0));
+        queue.push_back((
+            plugin_id.to_string(),
+            requirement.clone(),
+            "root".to_string(),
+            0,
+        ));
 
         while let Some((current_id, req, required_by, depth)) = queue.pop_front() {
             if depth > self.config.max_depth {
@@ -256,7 +268,10 @@ impl DependencyResolver {
     }
 
     /// Get plugin metadata (with caching)
-    async fn get_plugin_metadata(&mut self, plugin_id: &str) -> Result<PluginMetadata, ResolverError> {
+    async fn get_plugin_metadata(
+        &mut self,
+        plugin_id: &str,
+    ) -> Result<PluginMetadata, ResolverError> {
         if let Some(metadata) = self.cache.get(plugin_id) {
             return Ok(metadata.clone());
         }
@@ -281,7 +296,10 @@ impl DependencyResolver {
             .filter(|v| {
                 !v.deprecated
                     && v.version.is_compatible_with(requirement)
-                    && self.config.ember_version.is_compatible_with(&v.ember_version)
+                    && self
+                        .config
+                        .ember_version
+                        .is_compatible_with(&v.ember_version)
             })
             .collect();
 
@@ -306,7 +324,10 @@ impl DependencyResolver {
     }
 
     /// Topological sort of dependencies
-    fn topological_sort(&self, deps: &[ResolvedDependency]) -> Result<Vec<ResolvedDependency>, ResolverError> {
+    fn topological_sort(
+        &self,
+        deps: &[ResolvedDependency],
+    ) -> Result<Vec<ResolvedDependency>, ResolverError> {
         let mut result = Vec::new();
         let mut visited: HashSet<String> = HashSet::new();
         let mut visiting: HashSet<String> = HashSet::new();
@@ -345,7 +366,13 @@ impl DependencyResolver {
         }
 
         for dep in deps {
-            visit(&dep.plugin.id, &dep_map, &mut visited, &mut visiting, &mut result)?;
+            visit(
+                &dep.plugin.id,
+                &dep_map,
+                &mut visited,
+                &mut visiting,
+                &mut result,
+            )?;
         }
 
         Ok(result)
@@ -357,7 +384,11 @@ impl DependencyResolver {
             .filter_map(|d| {
                 self.installed.get(&d.plugin.id).and_then(|installed| {
                     if installed < &d.version.version {
-                        Some((d.plugin.id.clone(), installed.clone(), d.version.version.clone()))
+                        Some((
+                            d.plugin.id.clone(),
+                            installed.clone(),
+                            d.version.version.clone(),
+                        ))
                     } else {
                         None
                     }

@@ -3,9 +3,9 @@
 //! This module provides support for image inputs and multimodal content
 //! across different LLM providers that support vision capabilities.
 
+use base64::{engine::general_purpose::STANDARD as BASE64, Engine as _};
 use serde::{Deserialize, Serialize};
 use std::path::Path;
-use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
 
 /// Image input for vision-capable models
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -145,7 +145,9 @@ impl MultimodalContent {
 
     /// Check if the content has any images
     pub fn has_images(&self) -> bool {
-        self.parts.iter().any(|p| matches!(p, ContentPart::Image(_)))
+        self.parts
+            .iter()
+            .any(|p| matches!(p, ContentPart::Image(_)))
     }
 
     /// Get all text parts concatenated
@@ -193,16 +195,13 @@ impl ImageInput {
     pub fn from_file(path: impl AsRef<Path>) -> std::io::Result<Self> {
         let path = path.as_ref();
         let bytes = std::fs::read(path)?;
-        
+
         let media_type = path
             .extension()
             .and_then(|e| e.to_str())
             .and_then(MediaType::from_extension)
             .ok_or_else(|| {
-                std::io::Error::new(
-                    std::io::ErrorKind::InvalidInput,
-                    "Unsupported image format",
-                )
+                std::io::Error::new(std::io::ErrorKind::InvalidInput, "Unsupported image format")
             })?;
 
         Ok(Self::from_bytes(&bytes, media_type))
@@ -235,10 +234,10 @@ impl ImageInput {
 pub trait VisionCapable {
     /// Check if the provider supports vision for a specific model
     fn supports_vision(&self, model: &str) -> bool;
-    
+
     /// Get the maximum image size in bytes for a model
     fn max_image_size(&self, model: &str) -> Option<usize>;
-    
+
     /// Get the maximum number of images per request
     fn max_images_per_request(&self, model: &str) -> Option<usize>;
 }
@@ -251,21 +250,21 @@ impl VisionModels {
     pub fn is_vision_model(provider: &str, model: &str) -> bool {
         match provider.to_lowercase().as_str() {
             "openai" => {
-                model.contains("gpt-4") && (model.contains("vision") || model.contains("turbo") || model.contains("o"))
+                model.contains("gpt-4")
+                    && (model.contains("vision") || model.contains("turbo") || model.contains("o"))
                     || model.starts_with("gpt-4o")
             }
-            "anthropic" => {
-                model.contains("claude-3") || model.contains("claude-4")
-            }
+            "anthropic" => model.contains("claude-3") || model.contains("claude-4"),
             "google" | "gemini" => {
-                model.contains("gemini") && (model.contains("pro") || model.contains("ultra") || model.contains("flash"))
+                model.contains("gemini")
+                    && (model.contains("pro") || model.contains("ultra") || model.contains("flash"))
             }
             "ollama" => {
                 model.contains("llava") || model.contains("bakllava") || model.contains("vision")
             }
             "openrouter" => {
                 // OpenRouter supports many vision models
-                model.contains("vision") 
+                model.contains("vision")
                     || model.contains("gpt-4o")
                     || model.contains("claude-3")
                     || model.contains("gemini")
@@ -278,7 +277,11 @@ impl VisionModels {
     pub fn recommended_vision_models(provider: &str) -> Vec<&'static str> {
         match provider.to_lowercase().as_str() {
             "openai" => vec!["gpt-4o", "gpt-4o-mini", "gpt-4-turbo"],
-            "anthropic" => vec!["claude-3-5-sonnet-20241022", "claude-3-opus-20240229", "claude-3-haiku-20240307"],
+            "anthropic" => vec![
+                "claude-3-5-sonnet-20241022",
+                "claude-3-opus-20240229",
+                "claude-3-haiku-20240307",
+            ],
             "google" | "gemini" => vec!["gemini-1.5-pro", "gemini-1.5-flash", "gemini-pro-vision"],
             "ollama" => vec!["llava", "llava:13b", "bakllava"],
             _ => vec![],
@@ -309,7 +312,7 @@ mod tests {
     fn test_multimodal_content() {
         let content = MultimodalContent::text("Hello")
             .add_image(ImageInput::from_url("https://example.com/img.png"));
-        
+
         assert!(content.has_images());
         assert_eq!(content.text_content(), "Hello");
         assert_eq!(content.parts.len(), 2);
@@ -318,7 +321,10 @@ mod tests {
     #[test]
     fn test_vision_models_detection() {
         assert!(VisionModels::is_vision_model("openai", "gpt-4o"));
-        assert!(VisionModels::is_vision_model("anthropic", "claude-3-5-sonnet"));
+        assert!(VisionModels::is_vision_model(
+            "anthropic",
+            "claude-3-5-sonnet"
+        ));
         assert!(VisionModels::is_vision_model("google", "gemini-1.5-pro"));
         assert!(!VisionModels::is_vision_model("openai", "gpt-3.5-turbo"));
     }

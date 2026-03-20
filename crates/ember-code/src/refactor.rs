@@ -187,7 +187,7 @@ impl Default for RefactoringConfig {
 }
 
 /// Formatting style preferences
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FormattingStyle {
     /// Indentation (spaces)
     pub indent_size: usize,
@@ -262,8 +262,11 @@ impl RefactoringEngine {
 
         // Sort by confidence and impact
         suggestions.sort_by(|a, b| {
-            b.confidence.cmp(&a.confidence)
-                .then(b.impact.maintainability_improvement.cmp(&a.impact.maintainability_improvement))
+            b.confidence.cmp(&a.confidence).then(
+                b.impact
+                    .maintainability_improvement
+                    .cmp(&a.impact.maintainability_improvement),
+            )
         });
 
         // Limit per file
@@ -282,96 +285,89 @@ impl RefactoringEngine {
         let original_code = self.get_code_range(lines, smell.line, smell.end_line);
 
         match smell.smell_type {
-            crate::analyzer::CodeSmellType::LongFunction => {
-                Some(RefactoringSuggestion {
-                    kind: RefactoringKind::SplitFunction,
-                    confidence: Confidence::High,
-                    description: "Split long function into smaller, focused functions".to_string(),
-                    rationale: smell.message.clone(),
-                    file: smell.file.clone(),
-                    start_line: smell.line,
-                    end_line: smell.end_line,
-                    original_code: original_code.clone(),
-                    suggested_code: self.generate_split_function(&original_code, language),
-                    impact: RefactoringImpact {
-                        complexity_change: -5,
-                        readability_improvement: 40,
-                        maintainability_improvement: 35,
-                        test_impact: TestImpact::NewTestsNeeded,
-                        loc_change: 10,
-                    },
-                    prerequisites: vec![],
-                    breaking_changes: vec![],
-                })
-            }
-            crate::analyzer::CodeSmellType::DeepNesting => {
-                Some(RefactoringSuggestion {
-                    kind: RefactoringKind::EarlyReturn,
-                    confidence: Confidence::High,
-                    description: "Apply early return pattern to reduce nesting".to_string(),
-                    rationale: smell.message.clone(),
-                    file: smell.file.clone(),
-                    start_line: smell.line,
-                    end_line: smell.end_line,
-                    original_code: original_code.clone(),
-                    suggested_code: self.generate_early_return(&original_code, language),
-                    impact: RefactoringImpact {
-                        complexity_change: -3,
-                        readability_improvement: 50,
-                        maintainability_improvement: 30,
-                        test_impact: TestImpact::None,
-                        loc_change: 0,
-                    },
-                    prerequisites: vec![],
-                    breaking_changes: vec![],
-                })
-            }
-            crate::analyzer::CodeSmellType::MagicNumbers => {
-                Some(RefactoringSuggestion {
-                    kind: RefactoringKind::ReplaceMagicNumber,
-                    confidence: Confidence::VeryHigh,
-                    description: "Replace magic number with named constant".to_string(),
-                    rationale: smell.message.clone(),
-                    file: smell.file.clone(),
-                    start_line: smell.line,
-                    end_line: smell.end_line,
-                    original_code: smell.snippet.clone().unwrap_or_default(),
-                    suggested_code: self.generate_constant_replacement(&original_code, language),
-                    impact: RefactoringImpact {
-                        complexity_change: 0,
-                        readability_improvement: 30,
-                        maintainability_improvement: 40,
-                        test_impact: TestImpact::None,
-                        loc_change: 2,
-                    },
-                    prerequisites: vec![],
-                    breaking_changes: vec![],
-                })
-            }
-            crate::analyzer::CodeSmellType::MissingDocumentation => {
-                Some(RefactoringSuggestion {
-                    kind: RefactoringKind::AddTypeAnnotations,
-                    confidence: Confidence::Medium,
-                    description: "Add documentation to public function".to_string(),
-                    rationale: smell.message.clone(),
-                    file: smell.file.clone(),
-                    start_line: smell.line,
-                    end_line: smell.line,
-                    original_code: lines.get((smell.line - 1) as usize)
-                        .map(|s| s.to_string())
-                        .unwrap_or_default(),
-                    suggested_code: self.generate_documentation(&original_code, language),
-                    impact: RefactoringImpact {
-                        complexity_change: 0,
-                        readability_improvement: 20,
-                        maintainability_improvement: 25,
-                        test_impact: TestImpact::None,
-                        loc_change: 5,
-                    },
-                    prerequisites: vec![],
-                    breaking_changes: vec![],
-                })
-            }
+            crate::analyzer::CodeSmellType::LongFunction => Some(RefactoringSuggestion {
+                kind: RefactoringKind::SplitFunction,
+                confidence: Confidence::High,
+                description: "Split long function into smaller, focused functions".to_string(),
+                rationale: smell.message.clone(),
+                file: smell.file.clone(),
+                start_line: smell.line,
+                end_line: smell.end_line,
+                original_code: original_code.clone(),
+                suggested_code: self.generate_split_function(&original_code, language),
+                impact: RefactoringImpact {
+                    complexity_change: -5,
+                    readability_improvement: 40,
+                    maintainability_improvement: 35,
+                    test_impact: TestImpact::NewTestsNeeded,
+                    loc_change: 10,
+                },
+                prerequisites: vec![],
+                breaking_changes: vec![],
+            }),
+            crate::analyzer::CodeSmellType::DeepNesting => Some(RefactoringSuggestion {
+                kind: RefactoringKind::EarlyReturn,
+                confidence: Confidence::High,
+                description: "Apply early return pattern to reduce nesting".to_string(),
+                rationale: smell.message.clone(),
+                file: smell.file.clone(),
+                start_line: smell.line,
+                end_line: smell.end_line,
+                original_code: original_code.clone(),
+                suggested_code: self.generate_early_return(&original_code, language),
+                impact: RefactoringImpact {
+                    complexity_change: -3,
+                    readability_improvement: 50,
+                    maintainability_improvement: 30,
+                    test_impact: TestImpact::None,
+                    loc_change: 0,
+                },
+                prerequisites: vec![],
+                breaking_changes: vec![],
+            }),
+            crate::analyzer::CodeSmellType::MagicNumbers => Some(RefactoringSuggestion {
+                kind: RefactoringKind::ReplaceMagicNumber,
+                confidence: Confidence::VeryHigh,
+                description: "Replace magic number with named constant".to_string(),
+                rationale: smell.message.clone(),
+                file: smell.file.clone(),
+                start_line: smell.line,
+                end_line: smell.end_line,
+                original_code: smell.snippet.clone().unwrap_or_default(),
+                suggested_code: self.generate_constant_replacement(&original_code, language),
+                impact: RefactoringImpact {
+                    complexity_change: 0,
+                    readability_improvement: 30,
+                    maintainability_improvement: 40,
+                    test_impact: TestImpact::None,
+                    loc_change: 2,
+                },
+                prerequisites: vec![],
+                breaking_changes: vec![],
+            }),
+            crate::analyzer::CodeSmellType::MissingDocumentation => Some(RefactoringSuggestion {
+                kind: RefactoringKind::AddTypeAnnotations,
+                confidence: Confidence::Medium,
+                description: "Add documentation to public function".to_string(),
+                rationale: smell.message.clone(),
+                file: smell.file.clone(),
+                start_line: smell.line,
+                end_line: smell.line,
+                original_code: lines
+                    .get((smell.line - 1) as usize)
+                    .map(|s| s.to_string())
+                    .unwrap_or_default(),
+                suggested_code: self.generate_documentation(&original_code, language),
+                impact: RefactoringImpact {
+                    complexity_change: 0,
+                    readability_improvement: 20,
+                    maintainability_improvement: 25,
+                    test_impact: TestImpact::None,
+                    loc_change: 5,
+                },
+                prerequisites: vec![],
+                breaking_changes: vec![],
+            }),
             _ => None,
         }
     }
@@ -417,14 +413,17 @@ impl RefactoringEngine {
         for (i, line) in lines.iter().enumerate() {
             if self.is_imperative_loop(line, analysis.language) {
                 let (loop_start, loop_end) = self.find_loop_bounds(lines, i);
-                let loop_code = self.get_code_range(lines, loop_start as u32 + 1, loop_end as u32 + 1);
-                
-                if let Some(functional) = self.convert_to_functional(&loop_code, analysis.language) {
+                let loop_code =
+                    self.get_code_range(lines, loop_start as u32 + 1, loop_end as u32 + 1);
+
+                if let Some(functional) = self.convert_to_functional(&loop_code, analysis.language)
+                {
                     suggestions.push(RefactoringSuggestion {
                         kind: RefactoringKind::ConvertToFunctional,
                         confidence: Confidence::Medium,
                         description: "Convert imperative loop to functional style".to_string(),
-                        rationale: "Functional style is often more readable and less error-prone".to_string(),
+                        rationale: "Functional style is often more readable and less error-prone"
+                            .to_string(),
                         file: analysis.path.clone(),
                         start_line: loop_start as u32 + 1,
                         end_line: loop_end as u32 + 1,
@@ -494,7 +493,8 @@ impl RefactoringEngine {
                     kind: RefactoringKind::ConvertToAsync,
                     confidence: Confidence::Medium,
                     description: format!("Convert '{}' to async function", symbol.name),
-                    rationale: "This function performs I/O operations that could be async".to_string(),
+                    rationale: "This function performs I/O operations that could be async"
+                        .to_string(),
                     file: PathBuf::new(),
                     start_line: symbol.start_line,
                     end_line: symbol.end_line,
@@ -520,7 +520,7 @@ impl RefactoringEngine {
     fn get_code_range(&self, lines: &[&str], start: u32, end: u32) -> String {
         let start_idx = (start.saturating_sub(1)) as usize;
         let end_idx = (end as usize).min(lines.len());
-        
+
         lines[start_idx..end_idx].join("\n")
     }
 
@@ -541,22 +541,18 @@ impl RefactoringEngine {
                      // }}"
                 )
             }
-            Language::Python => {
-                "# Consider splitting into:\n\
+            Language::Python => "# Consider splitting into:\n\
                  # def process_input(...): ...\n\
                  # def validate_data(...): ...\n\
                  # def transform_output(...): ...\n\n\
                  # Original function would call these helpers"
-                    .to_string()
-            }
-            Language::JavaScript | Language::TypeScript => {
-                "// Consider splitting into:\n\
+                .to_string(),
+            Language::JavaScript | Language::TypeScript => "// Consider splitting into:\n\
                  // function processInput(...) { ... }\n\
                  // function validateData(...) { ... }\n\
                  // function transformOutput(...) { ... }\n\n\
                  // Original function would orchestrate these"
-                    .to_string()
-            }
+                .to_string(),
             _ => "// Consider splitting this function into smaller, focused functions".to_string(),
         }
     }
@@ -565,8 +561,7 @@ impl RefactoringEngine {
     fn generate_early_return(&self, code: &str, language: Language) -> String {
         // Simplified - in real implementation would parse and transform AST
         match language {
-            Language::Rust => {
-                "// Instead of:\n\
+            Language::Rust => "// Instead of:\n\
                  // if condition {\n\
                  //     if another {\n\
                  //         // deeply nested\n\
@@ -576,10 +571,8 @@ impl RefactoringEngine {
                  // if !condition { return early_value; }\n\
                  // if !another { return early_value; }\n\
                  // // main logic here"
-                    .to_string()
-            }
-            Language::Python => {
-                "# Instead of:\n\
+                .to_string(),
+            Language::Python => "# Instead of:\n\
                  # if condition:\n\
                  #     if another:\n\
                  #         # deeply nested\n\n\
@@ -589,8 +582,7 @@ impl RefactoringEngine {
                  # if not another:\n\
                  #     return early_value\n\
                  # # main logic here"
-                    .to_string()
-            }
+                .to_string(),
             _ => "// Apply early return pattern to reduce nesting".to_string(),
         }
     }
@@ -598,19 +590,29 @@ impl RefactoringEngine {
     /// Generate constant replacement
     fn generate_constant_replacement(&self, code: &str, language: Language) -> String {
         // Extract the magic number from code (simplified)
-        let number = code.split_whitespace()
+        let number = code
+            .split_whitespace()
             .find(|s| s.parse::<i64>().is_ok())
             .unwrap_or("42");
-        
+
         match language {
             Language::Rust => {
-                format!("const MEANINGFUL_NAME: i32 = {};\n// Then use MEANINGFUL_NAME instead", number)
+                format!(
+                    "const MEANINGFUL_NAME: i32 = {};\n// Then use MEANINGFUL_NAME instead",
+                    number
+                )
             }
             Language::Python => {
-                format!("MEANINGFUL_NAME = {}\n# Then use MEANINGFUL_NAME instead", number)
+                format!(
+                    "MEANINGFUL_NAME = {}\n# Then use MEANINGFUL_NAME instead",
+                    number
+                )
             }
             Language::JavaScript | Language::TypeScript => {
-                format!("const MEANINGFUL_NAME = {};\n// Then use MEANINGFUL_NAME instead", number)
+                format!(
+                    "const MEANINGFUL_NAME = {};\n// Then use MEANINGFUL_NAME instead",
+                    number
+                )
             }
             _ => format!("// Define constant for {}", number),
         }
@@ -636,7 +638,8 @@ impl RefactoringEngine {
                      /// ```\n\
                      /// // Example usage\n\
                      /// ```\n\
-                     {}", code
+                     {}",
+                    code
                 )
             }
             Language::Python => {
@@ -653,7 +656,8 @@ impl RefactoringEngine {
                      Examples:\n\
                          >>> example_usage()\n\
                      \"\"\"\n\
-                     {}", code
+                     {}",
+                    code
                 )
             }
             Language::JavaScript | Language::TypeScript => {
@@ -667,7 +671,8 @@ impl RefactoringEngine {
                      * @example\n\
                      * // Example usage\n\
                      */\n\
-                     {}", code
+                     {}",
+                    code
                 )
             }
             _ => format!("// Add documentation\n{}", code),
@@ -680,18 +685,18 @@ impl RefactoringEngine {
         // In real implementation, would use more sophisticated algorithms
         let min_lines = 5;
         let mut duplicates = Vec::new();
-        
+
         for i in 0..lines.len().saturating_sub(min_lines) {
             for j in (i + min_lines)..lines.len().saturating_sub(min_lines) {
                 let mut matching = 0;
-                while i + matching < j 
+                while i + matching < j
                     && j + matching < lines.len()
                     && lines[i + matching].trim() == lines[j + matching].trim()
                     && !lines[i + matching].trim().is_empty()
                 {
                     matching += 1;
                 }
-                
+
                 if matching >= min_lines {
                     duplicates.push((
                         (i + 1) as u32,
@@ -702,7 +707,7 @@ impl RefactoringEngine {
                 }
             }
         }
-        
+
         if duplicates.is_empty() {
             None
         } else {
@@ -727,7 +732,7 @@ impl RefactoringEngine {
     fn find_loop_bounds(&self, lines: &[&str], start: usize) -> (usize, usize) {
         let mut brace_count = 0;
         let mut found_start = false;
-        
+
         for (i, line) in lines.iter().enumerate().skip(start) {
             for ch in line.chars() {
                 match ch {
@@ -745,7 +750,7 @@ impl RefactoringEngine {
                 }
             }
         }
-        
+
         (start, lines.len() - 1)
     }
 
@@ -755,9 +760,15 @@ impl RefactoringEngine {
         match language {
             Language::Rust => {
                 if code.contains(".push(") {
-                    Some("// Consider: collection.iter().map(|item| transform(item)).collect()".to_string())
+                    Some(
+                        "// Consider: collection.iter().map(|item| transform(item)).collect()"
+                            .to_string(),
+                    )
                 } else if code.contains("if ") {
-                    Some("// Consider: collection.iter().filter(|item| condition(item)).collect()".to_string())
+                    Some(
+                        "// Consider: collection.iter().filter(|item| condition(item)).collect()"
+                            .to_string(),
+                    )
                 } else {
                     None
                 }
@@ -788,14 +799,17 @@ impl RefactoringEngine {
     fn find_unused_imports(&self, lines: &[&str], analysis: &FileAnalysis) -> Vec<String> {
         let mut unused = Vec::new();
         let content = lines.join("\n");
-        
+
         for import in &analysis.imports {
             // Check if the imported module/items are used
             let mut is_used = false;
-            
+
             if import.items.is_empty() {
                 // Module import - check if module name is used
-                let module_name = import.module.split("::").last()
+                let module_name = import
+                    .module
+                    .split("::")
+                    .last()
                     .or_else(|| import.module.split('.').last())
                     .unwrap_or(&import.module);
                 is_used = content.matches(module_name).count() > 1; // More than just the import
@@ -809,94 +823,98 @@ impl RefactoringEngine {
                     }
                 }
             }
-            
+
             if !is_used {
                 unused.push(format!("{} (line {})", import.module, import.line));
             }
         }
-        
+
         unused
     }
 
     /// Check naming conventions
-    fn check_naming_convention(&self, symbol: &CodeSymbol, language: Language) -> Option<RefactoringSuggestion> {
+    fn check_naming_convention(
+        &self,
+        symbol: &CodeSymbol,
+        language: Language,
+    ) -> Option<RefactoringSuggestion> {
         let name = &symbol.name;
-        
+
         let suggestion = match language {
-            Language::Rust => {
-                match symbol.kind {
-                    SymbolKind::Function | SymbolKind::Method => {
-                        if !self.is_snake_case(name) {
-                            Some(format!("Rename to '{}'", self.to_snake_case(name)))
-                        } else {
-                            None
-                        }
+            Language::Rust => match symbol.kind {
+                SymbolKind::Function | SymbolKind::Method => {
+                    if !self.is_snake_case(name) {
+                        Some(format!("Rename to '{}'", self.to_snake_case(name)))
+                    } else {
+                        None
                     }
-                    SymbolKind::Struct | SymbolKind::Enum | SymbolKind::Trait => {
-                        if !self.is_pascal_case(name) {
-                            Some(format!("Rename to '{}'", self.to_pascal_case(name)))
-                        } else {
-                            None
-                        }
-                    }
-                    SymbolKind::Constant => {
-                        if !self.is_screaming_snake_case(name) {
-                            Some(format!("Rename to '{}'", self.to_screaming_snake_case(name)))
-                        } else {
-                            None
-                        }
-                    }
-                    _ => None,
                 }
-            }
-            Language::JavaScript | Language::TypeScript => {
-                match symbol.kind {
-                    SymbolKind::Function | SymbolKind::Method | SymbolKind::Variable => {
-                        if !self.is_camel_case(name) && !name.starts_with('_') {
-                            Some(format!("Rename to '{}'", self.to_camel_case(name)))
-                        } else {
-                            None
-                        }
+                SymbolKind::Struct | SymbolKind::Enum | SymbolKind::Trait => {
+                    if !self.is_pascal_case(name) {
+                        Some(format!("Rename to '{}'", self.to_pascal_case(name)))
+                    } else {
+                        None
                     }
-                    SymbolKind::Class | SymbolKind::Interface => {
-                        if !self.is_pascal_case(name) {
-                            Some(format!("Rename to '{}'", self.to_pascal_case(name)))
-                        } else {
-                            None
-                        }
-                    }
-                    _ => None,
                 }
-            }
-            Language::Python => {
-                match symbol.kind {
-                    SymbolKind::Function | SymbolKind::Method | SymbolKind::Variable => {
-                        if !self.is_snake_case(name) && !name.startswith('_') {
-                            Some(format!("Rename to '{}'", self.to_snake_case(name)))
-                        } else {
-                            None
-                        }
+                SymbolKind::Constant => {
+                    if !self.is_screaming_snake_case(name) {
+                        Some(format!(
+                            "Rename to '{}'",
+                            self.to_screaming_snake_case(name)
+                        ))
+                    } else {
+                        None
                     }
-                    SymbolKind::Class => {
-                        if !self.is_pascal_case(name) {
-                            Some(format!("Rename to '{}'", self.to_pascal_case(name)))
-                        } else {
-                            None
-                        }
-                    }
-                    SymbolKind::Constant => {
-                        if !self.is_screaming_snake_case(name) {
-                            Some(format!("Rename to '{}'", self.to_screaming_snake_case(name)))
-                        } else {
-                            None
-                        }
-                    }
-                    _ => None,
                 }
-            }
+                _ => None,
+            },
+            Language::JavaScript | Language::TypeScript => match symbol.kind {
+                SymbolKind::Function | SymbolKind::Method | SymbolKind::Variable => {
+                    if !self.is_camel_case(name) && !name.starts_with('_') {
+                        Some(format!("Rename to '{}'", self.to_camel_case(name)))
+                    } else {
+                        None
+                    }
+                }
+                SymbolKind::Class | SymbolKind::Interface => {
+                    if !self.is_pascal_case(name) {
+                        Some(format!("Rename to '{}'", self.to_pascal_case(name)))
+                    } else {
+                        None
+                    }
+                }
+                _ => None,
+            },
+            Language::Python => match symbol.kind {
+                SymbolKind::Function | SymbolKind::Method | SymbolKind::Variable => {
+                    if !self.is_snake_case(name) && !name.starts_with('_') {
+                        Some(format!("Rename to '{}'", self.to_snake_case(name)))
+                    } else {
+                        None
+                    }
+                }
+                SymbolKind::Class => {
+                    if !self.is_pascal_case(name) {
+                        Some(format!("Rename to '{}'", self.to_pascal_case(name)))
+                    } else {
+                        None
+                    }
+                }
+                SymbolKind::Constant => {
+                    if !self.is_screaming_snake_case(name) {
+                        Some(format!(
+                            "Rename to '{}'",
+                            self.to_screaming_snake_case(name)
+                        ))
+                    } else {
+                        None
+                    }
+                }
+                _ => None,
+            },
             _ => None,
         };
-        
+
         suggestion.map(|desc| RefactoringSuggestion {
             kind: RefactoringKind::Rename,
             confidence: Confidence::High,
@@ -932,21 +950,22 @@ impl RefactoringEngine {
     fn could_be_async(&self, code: &str, language: Language) -> bool {
         let io_patterns = match language {
             Language::Rust => vec!["std::fs::", "std::net::", "reqwest::", "tokio::fs::"],
-            Language::JavaScript | Language::TypeScript => vec!["fetch(", "axios.", "fs.read", "http."],
+            Language::JavaScript | Language::TypeScript => {
+                vec!["fetch(", "axios.", "fs.read", "http."]
+            }
             Language::Python => vec!["open(", "requests.", "urllib.", "socket."],
             _ => vec![],
         };
-        
+
         io_patterns.iter().any(|pattern| code.contains(pattern))
     }
 
     /// Generate async version of function
     fn generate_async_version(&self, code: &str, language: Language) -> String {
         match language {
-            Language::Rust => {
-                code.replace("fn ", "async fn ")
-                    .replace("std::fs::", "tokio::fs::")
-            }
+            Language::Rust => code
+                .replace("fn ", "async fn ")
+                .replace("std::fs::", "tokio::fs::"),
             Language::JavaScript => {
                 if code.contains("function ") {
                     code.replace("function ", "async function ")
@@ -954,33 +973,29 @@ impl RefactoringEngine {
                     format!("async {}", code)
                 }
             }
-            Language::TypeScript => {
-                code.replace("function ", "async function ")
-            }
-            Language::Python => {
-                code.replace("def ", "async def ")
-            }
+            Language::TypeScript => code.replace("function ", "async function "),
+            Language::Python => code.replace("def ", "async def "),
             _ => code.to_string(),
         }
     }
 
     // Naming convention helpers
     fn is_snake_case(&self, s: &str) -> bool {
-        s.chars().all(|c| c.is_lowercase() || c.is_numeric() || c == '_')
+        s.chars()
+            .all(|c| c.is_lowercase() || c.is_numeric() || c == '_')
     }
 
     fn is_camel_case(&self, s: &str) -> bool {
-        !s.is_empty() && s.chars().next().unwrap().is_lowercase()
-            && !s.contains('_')
+        !s.is_empty() && s.chars().next().unwrap().is_lowercase() && !s.contains('_')
     }
 
     fn is_pascal_case(&self, s: &str) -> bool {
-        !s.is_empty() && s.chars().next().unwrap().is_uppercase()
-            && !s.contains('_')
+        !s.is_empty() && s.chars().next().unwrap().is_uppercase() && !s.contains('_')
     }
 
     fn is_screaming_snake_case(&self, s: &str) -> bool {
-        s.chars().all(|c| c.is_uppercase() || c.is_numeric() || c == '_')
+        s.chars()
+            .all(|c| c.is_uppercase() || c.is_numeric() || c == '_')
     }
 
     fn to_snake_case(&self, s: &str) -> String {
@@ -1056,16 +1071,16 @@ mod tests {
     #[test]
     fn test_naming_conventions() {
         let engine = RefactoringEngine::new();
-        
+
         assert!(engine.is_snake_case("my_function"));
         assert!(!engine.is_snake_case("myFunction"));
-        
+
         assert!(engine.is_camel_case("myFunction"));
         assert!(!engine.is_camel_case("MyFunction"));
-        
+
         assert!(engine.is_pascal_case("MyClass"));
         assert!(!engine.is_pascal_case("myClass"));
-        
+
         assert!(engine.is_screaming_snake_case("MY_CONSTANT"));
         assert!(!engine.is_screaming_snake_case("my_constant"));
     }
@@ -1073,7 +1088,7 @@ mod tests {
     #[test]
     fn test_case_conversion() {
         let engine = RefactoringEngine::new();
-        
+
         assert_eq!(engine.to_snake_case("myFunction"), "my_function");
         assert_eq!(engine.to_camel_case("my_function"), "myFunction");
         assert_eq!(engine.to_pascal_case("my_function"), "MyFunction");
@@ -1098,7 +1113,7 @@ mod tests {
             "    println!(\"{}\", z);",
             "}",
         ];
-        
+
         let duplicates = engine.find_duplicates(&lines);
         assert!(duplicates.is_some());
     }

@@ -40,7 +40,7 @@ impl Default for StreamConfig {
     fn default() -> Self {
         Self {
             max_buffer_size: 1024 * 1024, // 1MB
-            chunk_size: 4096,              // 4KB
+            chunk_size: 4096,             // 4KB
             max_concurrent_streams: 100,
             idle_timeout: Duration::from_secs(30),
             backpressure_enabled: true,
@@ -75,7 +75,8 @@ impl StreamMetrics {
 
     /// Record bytes streamed
     pub fn record_bytes(&self, bytes: usize) {
-        self.bytes_streamed.fetch_add(bytes as u64, Ordering::Relaxed);
+        self.bytes_streamed
+            .fetch_add(bytes as u64, Ordering::Relaxed);
     }
 
     /// Record chunk processed
@@ -182,13 +183,15 @@ where
     /// Add to buffer size
     pub fn add_to_buffer(&self, bytes: usize) {
         self.buffer_size.fetch_add(bytes, Ordering::Relaxed);
-        self.metrics.update_buffer(self.buffer_size.load(Ordering::Relaxed));
+        self.metrics
+            .update_buffer(self.buffer_size.load(Ordering::Relaxed));
     }
 
     /// Remove from buffer size
     pub fn remove_from_buffer(&self, bytes: usize) {
         self.buffer_size.fetch_sub(bytes, Ordering::Relaxed);
-        self.metrics.update_buffer(self.buffer_size.load(Ordering::Relaxed));
+        self.metrics
+            .update_buffer(self.buffer_size.load(Ordering::Relaxed));
     }
 }
 
@@ -437,7 +440,7 @@ where
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         let now = Instant::now();
-        
+
         // Refill tokens based on elapsed time
         if let Some(last) = self.last_emit {
             let elapsed = now.duration_since(last).as_secs_f64();
@@ -479,11 +482,11 @@ mod tests {
     #[tokio::test]
     async fn test_stream_metrics() {
         let metrics = StreamMetrics::new();
-        
+
         metrics.record_bytes(100);
         metrics.record_chunk();
         metrics.stream_started();
-        
+
         let snapshot = metrics.snapshot();
         assert_eq!(snapshot.bytes_streamed, 100);
         assert_eq!(snapshot.chunks_processed, 1);
@@ -493,11 +496,11 @@ mod tests {
     #[tokio::test]
     async fn test_chunked_buffer() {
         let mut buffer = ChunkedBuffer::new(10, 100);
-        
+
         assert!(buffer.push(b"hello"));
         assert!(buffer.push(b"world"));
         assert_eq!(buffer.len(), 10);
-        
+
         let data = buffer.drain();
         assert_eq!(data, b"helloworld");
         assert!(buffer.is_empty());
@@ -506,7 +509,7 @@ mod tests {
     #[tokio::test]
     async fn test_chunked_buffer_max_size() {
         let mut buffer = ChunkedBuffer::new(10, 20);
-        
+
         assert!(buffer.push(b"12345678901234567890")); // 20 bytes
         assert!(!buffer.push(b"extra")); // Should fail
         assert_eq!(buffer.len(), 20);
@@ -516,26 +519,21 @@ mod tests {
     async fn test_stream_manager() {
         let config = StreamConfig::default();
         let manager = StreamManager::new(config);
-        
+
         let permit = manager.try_acquire_permit();
         assert!(permit.is_some());
-        
+
         let metrics = manager.metrics_snapshot();
         assert_eq!(metrics.active_streams, 0);
     }
 
     #[tokio::test]
     async fn test_stream_aggregator() {
-        let stream1 = stream::iter(vec![
-            Ok(make_chunk("a")),
-            Ok(make_chunk("b")),
-        ]);
-        let stream2 = stream::iter(vec![
-            Ok(make_chunk("c")),
-        ]);
-        
+        let stream1 = stream::iter(vec![Ok(make_chunk("a")), Ok(make_chunk("b"))]);
+        let stream2 = stream::iter(vec![Ok(make_chunk("c"))]);
+
         let mut aggregator = StreamAggregator::new(vec![stream1, stream2]);
-        
+
         let mut results = vec![];
         use futures::StreamExt;
         while let Some(Ok(chunk)) = aggregator.next().await {
@@ -543,7 +541,7 @@ mod tests {
                 results.push(content);
             }
         }
-        
+
         assert_eq!(results, vec!["a", "b", "c"]);
     }
 }

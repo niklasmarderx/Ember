@@ -64,6 +64,9 @@ ipnetwork = "0.20"
 # Regex for patterns
 regex = { workspace = true }
 
+# Directory paths
+dirs = "5.0"
+
 [dev-dependencies]
 tokio-test = "0.4"
 mockall = { workspace = true }

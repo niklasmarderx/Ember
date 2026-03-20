@@ -273,7 +273,19 @@ pub async fn execute(args: CodeArgs) -> Result<()> {
             kind,
             apply,
             yes,
-        } => suggest_refactoring(path, language, format, output, min_confidence, kind, apply, yes).await,
+        } => {
+            suggest_refactoring(
+                path,
+                language,
+                format,
+                output,
+                min_confidence,
+                kind,
+                apply,
+                yes,
+            )
+            .await
+        }
         CodeAction::Testgen {
             path,
             language,
@@ -498,10 +510,7 @@ async fn analyze_code(
             for file in &files {
                 let loc = estimate_loc(file).unwrap_or(0);
                 let complexity = (loc / 50).max(1).min(25);
-                let smell_count = smells_found
-                    .iter()
-                    .filter(|(f, _, _)| f == file)
-                    .count();
+                let smell_count = smells_found.iter().filter(|(f, _, _)| f == file).count();
                 csv.push_str(&format!(
                     "{},{},{},{}\n",
                     file.display(),
@@ -642,14 +651,8 @@ async fn suggest_refactoring(
             if apply {
                 println!();
                 if yes {
-                    println!(
-                        "{} Auto-applying refactorings...",
-                        "[!]".yellow()
-                    );
-                    println!(
-                        "{} Refactorings applied successfully!",
-                        "[OK]".green()
-                    );
+                    println!("{} Auto-applying refactorings...", "[!]".yellow());
+                    println!("{} Refactorings applied successfully!", "[OK]".green());
                 } else {
                     println!(
                         "{} Use --yes to confirm automatic application",

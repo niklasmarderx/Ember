@@ -146,7 +146,8 @@ impl<K: Hash + Eq + Clone, V> LruCache<K, V> {
         }
 
         // Insert new entry
-        self.entries.insert(key.clone(), CacheEntry::new(value, size));
+        self.entries
+            .insert(key.clone(), CacheEntry::new(value, size));
         self.order.push_back(key);
         self.current_size.fetch_add(size, Ordering::Relaxed);
 
@@ -160,19 +161,19 @@ impl<K: Hash + Eq + Clone, V> LruCache<K, V> {
     /// Get an item from the cache
     pub async fn get(&mut self, key: &K) -> Option<&V> {
         let mut stats = self.stats.lock().await;
-        
+
         if let Some(entry) = self.entries.get_mut(key) {
             if entry.is_expired(self.config.cache_ttl) {
                 stats.cache_misses += 1;
                 return None;
             }
-            
+
             entry.touch();
-            
+
             // Move to back of order
             self.order.retain(|k| k != key);
             self.order.push_back(key.clone());
-            
+
             stats.cache_hits += 1;
             Some(&entry.value)
         } else {
@@ -186,11 +187,11 @@ impl<K: Hash + Eq + Clone, V> LruCache<K, V> {
         if let Some(entry) = self.entries.remove(key) {
             self.current_size.fetch_sub(entry.size, Ordering::Relaxed);
             self.order.retain(|k| k != key);
-            
+
             let mut stats = self.stats.lock().await;
             stats.current_usage = self.current_size.load(Ordering::Relaxed);
             stats.cached_items = self.entries.len();
-            
+
             Some(entry.value)
         } else {
             None
@@ -209,12 +210,12 @@ impl<K: Hash + Eq + Clone, V> LruCache<K, V> {
         if let Some(key) = self.order.pop_front() {
             if let Some(entry) = self.entries.remove(&key) {
                 self.current_size.fetch_sub(entry.size, Ordering::Relaxed);
-                
+
                 let mut stats = self.stats.lock().await;
                 stats.evictions += 1;
                 stats.current_usage = self.current_size.load(Ordering::Relaxed);
                 stats.cached_items = self.entries.len();
-                
+
                 return true;
             }
         }
@@ -260,7 +261,7 @@ impl<K: Hash + Eq + Clone, V> LruCache<K, V> {
         self.entries.clear();
         self.order.clear();
         self.current_size.store(0, Ordering::Relaxed);
-        
+
         let mut stats = self.stats.lock().await;
         stats.current_usage = 0;
         stats.cached_items = 0;
@@ -340,12 +341,7 @@ pub struct PageResponse<T> {
 
 impl<T> PageResponse<T> {
     /// Create a new page response
-    pub fn new(
-        items: Vec<T>,
-        total_items: usize,
-        page: usize,
-        page_size: usize,
-    ) -> Self {
+    pub fn new(items: Vec<T>, total_items: usize, page: usize, page_size: usize) -> Self {
         let total_pages = (total_items + page_size - 1) / page_size;
         Self {
             items,
@@ -457,8 +453,9 @@ impl MemoryPressureDetector {
     pub async fn update(&self, current_usage: usize) {
         let max = self.config.max_memory_bytes;
         let pressure = ((current_usage as f64 / max as f64) * 100.0) as usize;
-        self.pressure_level.store(pressure.min(100), Ordering::Relaxed);
-        
+        self.pressure_level
+            .store(pressure.min(100), Ordering::Relaxed);
+
         let mut last_check = self.last_check.lock().await;
         *last_check = Instant::now();
     }
@@ -511,12 +508,19 @@ mod tests {
             ..Default::default()
         };
         let mut cache: LruCache<String, String> = LruCache::new(config);
-        
-        cache.insert("a".to_string(), "value_a".to_string(), 10).await;
-        cache.insert("b".to_string(), "value_b".to_string(), 10).await;
-        
+
+        cache
+            .insert("a".to_string(), "value_a".to_string(), 10)
+            .await;
+        cache
+            .insert("b".to_string(), "value_b".to_string(), 10)
+            .await;
+
         assert_eq!(cache.len(), 2);
-        assert_eq!(cache.get(&"a".to_string()).await, Some(&"value_a".to_string()));
+        assert_eq!(
+            cache.get(&"a".to_string()).await,
+            Some(&"value_a".to_string())
+        );
     }
 
     #[tokio::test]
@@ -527,11 +531,17 @@ mod tests {
             ..Default::default()
         };
         let mut cache: LruCache<String, String> = LruCache::new(config);
-        
-        cache.insert("a".to_string(), "value_a".to_string(), 10).await;
-        cache.insert("b".to_string(), "value_b".to_string(), 10).await;
-        cache.insert("c".to_string(), "value_c".to_string(), 10).await;
-        
+
+        cache
+            .insert("a".to_string(), "value_a".to_string(), 10)
+            .await;
+        cache
+            .insert("b".to_string(), "value_b".to_string(), 10)
+            .await;
+        cache
+            .insert("c".to_string(), "value_c".to_string(), 10)
+            .await;
+
         // "a" should be evicted
         assert_eq!(cache.len(), 2);
         assert!(cache.get(&"a".to_string()).await.is_none());
@@ -547,7 +557,7 @@ mod tests {
     async fn test_page_response() {
         let items = vec![1, 2, 3, 4, 5];
         let response = PageResponse::new(items, 25, 1, 5);
-        
+
         assert_eq!(response.total_pages, 5);
         assert!(response.has_next);
         assert!(response.has_previous);
@@ -561,12 +571,12 @@ mod tests {
             ..Default::default()
         };
         let detector = MemoryPressureDetector::new(config);
-        
+
         detector.update(50).await;
         assert_eq!(detector.pressure_level(), 50);
         assert!(!detector.is_under_pressure());
         assert_eq!(detector.state(), PressureState::Normal);
-        
+
         detector.update(90).await;
         assert!(detector.is_under_pressure());
         assert_eq!(detector.state(), PressureState::High);
@@ -576,11 +586,11 @@ mod tests {
     async fn test_cache_stats() {
         let config = MemoryConfig::default();
         let mut cache: LruCache<String, String> = LruCache::new(config);
-        
+
         cache.insert("a".to_string(), "value".to_string(), 10).await;
         let _ = cache.get(&"a".to_string()).await;
         let _ = cache.get(&"b".to_string()).await;
-        
+
         let stats = cache.stats().await;
         assert_eq!(stats.cache_hits, 1);
         assert_eq!(stats.cache_misses, 1);
@@ -591,18 +601,20 @@ mod tests {
     async fn test_lazy_loader() {
         let config = MemoryConfig::default();
         let loader: LazyConversationLoader<String> = LazyConversationLoader::new(config);
-        
-        let result = loader.load("test", |id| async move {
-            Some(format!("loaded_{}", id))
-        }).await;
-        
+
+        let result = loader
+            .load("test", |id| async move { Some(format!("loaded_{}", id)) })
+            .await;
+
         assert_eq!(result, Some("loaded_test".to_string()));
-        
+
         // Second load should come from cache
-        let result2 = loader.load("test", |_| async move {
-            panic!("Should not be called");
-        }).await;
-        
+        let result2 = loader
+            .load("test", |_| async move {
+                panic!("Should not be called");
+            })
+            .await;
+
         assert_eq!(result2, Some("loaded_test".to_string()));
     }
 }

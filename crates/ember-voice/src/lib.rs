@@ -375,9 +375,7 @@ impl VoiceInterface {
         let text = self.transcribe(&audio).await?;
 
         if text.trim().is_empty() {
-            return Err(VoiceError::Transcription(
-                "No speech detected".to_string(),
-            ));
+            return Err(VoiceError::Transcription("No speech detected".to_string()));
         }
 
         tracing::info!("Transcribed: {}", text);
@@ -542,10 +540,7 @@ mod tests {
 
     #[test]
     fn test_confirmation_mode() {
-        assert_eq!(
-            ConfirmationMode::default(),
-            ConfirmationMode::DangerousOnly
-        );
+        assert_eq!(ConfirmationMode::default(), ConfirmationMode::DangerousOnly);
     }
 
     #[test]

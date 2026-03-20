@@ -54,23 +54,27 @@ impl PatternRecognizer {
         // Detect patterns.
         self.detect_workflow_patterns();
         self.detect_sequence_patterns();
-        
+
         // Update error patterns.
         if event.event_type == EventType::ErrorOccurred {
             self.record_error_pattern(event);
         }
 
         // Update code patterns.
-        if matches!(event.event_type, 
-            EventType::CodeGenerated | EventType::CodeAccepted | EventType::CodeModified) {
+        if matches!(
+            event.event_type,
+            EventType::CodeGenerated | EventType::CodeAccepted | EventType::CodeModified
+        ) {
             self.update_code_patterns(event);
         }
     }
 
     /// Get count of recognized patterns.
     pub fn count(&self) -> usize {
-        self.workflows.len() + self.code_patterns.len() + 
-        self.error_patterns.len() + self.sequences.len()
+        self.workflows.len()
+            + self.code_patterns.len()
+            + self.error_patterns.len()
+            + self.sequences.len()
     }
 
     /// Get workflow patterns matching context.
@@ -105,7 +109,8 @@ impl PatternRecognizer {
         }
 
         // Look for repeated action sequences.
-        let recent: Vec<EventType> = self.action_buffer
+        let recent: Vec<EventType> = self
+            .action_buffer
             .iter()
             .rev()
             .take(10)
@@ -116,18 +121,23 @@ impl PatternRecognizer {
         // E.g., MessageSent -> CodeGenerated -> CodeAccepted
         if recent.len() >= 3 {
             let last_three = &recent[0..3];
-            
+
+            // Clone action_buffer to avoid borrow checker issues
+            let actions_clone = self.action_buffer.clone();
+
             // Code generation workflow.
-            if last_three[2] == EventType::MessageSent 
+            if last_three[2] == EventType::MessageSent
                 && last_three[1] == EventType::CodeGenerated
-                && last_three[0] == EventType::CodeAccepted {
-                self.record_workflow("code_generation", &self.action_buffer);
+                && last_three[0] == EventType::CodeAccepted
+            {
+                self.record_workflow("code_generation", &actions_clone);
             }
 
             // File editing workflow.
-            if last_three.contains(&EventType::FileEdited) 
-                && last_three.contains(&EventType::CommandExecuted) {
-                self.record_workflow("file_edit_and_run", &self.action_buffer);
+            if last_three.contains(&EventType::FileEdited)
+                && last_three.contains(&EventType::CommandExecuted)
+            {
+                self.record_workflow("file_edit_and_run", &actions_clone);
             }
         }
     }
@@ -139,7 +149,7 @@ impl PatternRecognizer {
 
         // Build frequency map for action pairs.
         let mut pair_counts: HashMap<(EventType, EventType), usize> = HashMap::new();
-        
+
         for window in self.action_buffer.windows(2) {
             let pair = (window[0].event_type, window[1].event_type);
             *pair_counts.entry(pair).or_insert(0) += 1;
@@ -149,10 +159,9 @@ impl PatternRecognizer {
         for ((first, second), count) in pair_counts {
             if count >= 3 {
                 let confidence = count as f64 / self.action_buffer.len() as f64;
-                
+
                 // Update or add sequence pattern.
-                if let Some(seq) = self.sequences.iter_mut()
-                    .find(|s| s.actions == vec![first]) {
+                if let Some(seq) = self.sequences.iter_mut().find(|s| s.actions == vec![first]) {
                     seq.confidence = (seq.confidence + confidence) / 2.0;
                     seq.next_action = Some(second);
                 } else if confidence > 0.1 {
@@ -168,7 +177,8 @@ impl PatternRecognizer {
 
         // Limit sequences.
         if self.sequences.len() > 50 {
-            self.sequences.sort_by(|a, b| b.confidence.partial_cmp(&a.confidence).unwrap());
+            self.sequences
+                .sort_by(|a, b| b.confidence.partial_cmp(&a.confidence).unwrap());
             self.sequences.truncate(30);
         }
     }
@@ -179,7 +189,10 @@ impl PatternRecognizer {
             workflow.occurrence_count += 1;
             workflow.confidence = (workflow.confidence + 0.1).min(1.0);
         } else {
-            let context = actions.last().map(|a| a.context.clone()).unwrap_or_default();
+            let context = actions
+                .last()
+                .map(|a| a.context.clone())
+                .unwrap_or_default();
             self.workflows.push(WorkflowPattern {
                 name: name.to_string(),
                 description: describe_workflow(name),
@@ -192,13 +205,18 @@ impl PatternRecognizer {
     }
 
     fn record_error_pattern(&mut self, event: &LearningEvent) {
-        let error_type = event.data.get("error_type")
+        let error_type = event
+            .data
+            .get("error_type")
             .and_then(|v| v.as_str())
             .unwrap_or("unknown")
             .to_string();
 
-        if let Some(pattern) = self.error_patterns.iter_mut()
-            .find(|p| p.error_type == error_type) {
+        if let Some(pattern) = self
+            .error_patterns
+            .iter_mut()
+            .find(|p| p.error_type == error_type)
+        {
             pattern.occurrence_count += 1;
         } else {
             self.error_patterns.push(ErrorPattern {
@@ -213,20 +231,27 @@ impl PatternRecognizer {
 
     fn update_code_patterns(&mut self, event: &LearningEvent) {
         if let Some(pattern_type) = event.data.get("pattern").and_then(|v| v.as_str()) {
-            if let Some(pattern) = self.code_patterns.iter_mut()
-                .find(|p| p.pattern_type == pattern_type) {
+            if let Some(pattern) = self
+                .code_patterns
+                .iter_mut()
+                .find(|p| p.pattern_type == pattern_type)
+            {
                 pattern.usage_count += 1;
                 if event.event_type == EventType::CodeAccepted {
-                    pattern.acceptance_rate = 
-                        (pattern.acceptance_rate * (pattern.usage_count - 1) as f64 + 1.0) 
-                        / pattern.usage_count as f64;
+                    pattern.acceptance_rate =
+                        (pattern.acceptance_rate * (pattern.usage_count - 1) as f64 + 1.0)
+                            / pattern.usage_count as f64;
                 }
             } else {
                 self.code_patterns.push(CodePattern {
                     pattern_type: pattern_type.to_string(),
                     language: event.context.language.clone(),
                     usage_count: 1,
-                    acceptance_rate: if event.event_type == EventType::CodeAccepted { 1.0 } else { 0.0 },
+                    acceptance_rate: if event.event_type == EventType::CodeAccepted {
+                        1.0
+                    } else {
+                        0.0
+                    },
                     examples: vec![],
                 });
             }
@@ -255,11 +280,10 @@ impl WorkflowPattern {
     /// Check if pattern matches context.
     pub fn matches_context(&self, context: &EventContext) -> bool {
         for trigger in &self.context_triggers {
-            let lang_match = trigger.language.is_none() 
-                || trigger.language == context.language;
-            let project_match = trigger.project_type.is_none() 
-                || trigger.project_type == context.project_type;
-            
+            let lang_match = trigger.language.is_none() || trigger.language == context.language;
+            let project_match =
+                trigger.project_type.is_none() || trigger.project_type == context.project_type;
+
             if lang_match && project_match {
                 return true;
             }
@@ -359,7 +383,7 @@ mod tests {
             EventContext::default(),
             serde_json::json!({}),
         );
-        
+
         recognizer.process_event(&event);
         assert_eq!(recognizer.action_buffer.len(), 1);
     }

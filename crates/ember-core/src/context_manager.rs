@@ -79,7 +79,7 @@ pub enum PruningStrategy {
 }
 
 /// Token estimation method.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum TokenEstimation {
     /// Approximate (4 chars = 1 token)
@@ -197,7 +197,8 @@ pub struct TokenCount {
 impl TokenCount {
     /// Get available tokens for messages.
     pub fn available(&self, config: &ContextConfig) -> usize {
-        let max_message_tokens = config.max_tokens
+        let max_message_tokens = config
+            .max_tokens
             .saturating_sub(config.reserved_response_tokens)
             .saturating_sub(config.reserved_system_tokens);
         max_message_tokens.saturating_sub(self.total)
@@ -369,7 +370,9 @@ impl ContextManager {
 
     /// Check if context needs pruning.
     pub fn needs_pruning(&self) -> bool {
-        let max_message_tokens = self.config.max_tokens
+        let max_message_tokens = self
+            .config
+            .max_tokens
             .saturating_sub(self.config.reserved_response_tokens)
             .saturating_sub(self.config.reserved_system_tokens);
         self.token_count.total > max_message_tokens
@@ -393,8 +396,11 @@ impl ContextManager {
         let skip_count = self.config.preserve_recent_count;
 
         if self.messages.len() <= skip_count {
-            warn!("Cannot prune: only {} messages, need to preserve {}", 
-                  self.messages.len(), skip_count);
+            warn!(
+                "Cannot prune: only {} messages, need to preserve {}",
+                self.messages.len(),
+                skip_count
+            );
             return;
         }
 
@@ -472,9 +478,7 @@ impl ContextManager {
         }
 
         // Collect messages to summarize
-        let to_summarize: Vec<_> = self.messages
-            .drain(0..messages_to_summarize / 2)
-            .collect();
+        let to_summarize: Vec<_> = self.messages.drain(0..messages_to_summarize / 2).collect();
 
         let total_tokens: usize = to_summarize.iter().map(|m| m.tokens).sum();
         let message_count = to_summarize.len();
@@ -531,9 +535,18 @@ impl ContextManager {
 
     /// Create a placeholder summary.
     fn create_summary_placeholder(&self, messages: &[ContextMessage]) -> String {
-        let user_count = messages.iter().filter(|m| m.role == MessageRole::User).count();
-        let assistant_count = messages.iter().filter(|m| m.role == MessageRole::Assistant).count();
-        let tool_count = messages.iter().filter(|m| m.role == MessageRole::Tool).count();
+        let user_count = messages
+            .iter()
+            .filter(|m| m.role == MessageRole::User)
+            .count();
+        let assistant_count = messages
+            .iter()
+            .filter(|m| m.role == MessageRole::Assistant)
+            .count();
+        let tool_count = messages
+            .iter()
+            .filter(|m| m.role == MessageRole::Tool)
+            .count();
 
         format!(
             "[Summary of previous conversation: {} user messages, {} assistant responses, {} tool interactions]",
@@ -563,10 +576,22 @@ impl ContextManager {
     /// Update priorities for all messages.
     fn update_priorities(&mut self) {
         let current_index = self.stats.messages_added;
+        let recency_multiplier = self.config.priority_weights.recency_multiplier;
+        let system_weight = self.config.priority_weights.system_message;
+        let user_weight = self.config.priority_weights.user_message;
+        let assistant_weight = self.config.priority_weights.assistant_message;
+        let tool_weight = self.config.priority_weights.tool_call;
+
         for msg in self.messages.iter_mut() {
             let recency = (current_index - msg.index) as f64;
-            let recency_factor = 1.0 / (1.0 + recency * self.config.priority_weights.recency_multiplier);
-            msg.priority = self.calculate_priority(msg.role, msg.index) * recency_factor;
+            let recency_factor = 1.0 / (1.0 + recency * recency_multiplier);
+            let base_priority = match msg.role {
+                MessageRole::System => system_weight,
+                MessageRole::User => user_weight,
+                MessageRole::Assistant => assistant_weight,
+                MessageRole::Tool => tool_weight,
+            };
+            msg.priority = base_priority * recency_factor;
         }
     }
 
@@ -580,7 +605,8 @@ impl ContextManager {
         };
 
         let recency = (self.stats.messages_added.saturating_sub(index)) as f64;
-        let recency_factor = 1.0 / (1.0 + recency * self.config.priority_weights.recency_multiplier);
+        let recency_factor =
+            1.0 / (1.0 + recency * self.config.priority_weights.recency_multiplier);
 
         base_priority * recency_factor
     }
@@ -775,7 +801,10 @@ mod tests {
             .build();
 
         assert_eq!(manager.config.max_tokens, 50000);
-        assert_eq!(manager.config.pruning_strategy, PruningStrategy::PriorityBased);
+        assert_eq!(
+            manager.config.pruning_strategy,
+            PruningStrategy::PriorityBased
+        );
         assert!(manager.system_prompt.is_some());
     }
 

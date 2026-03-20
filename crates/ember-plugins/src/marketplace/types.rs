@@ -69,7 +69,7 @@ impl SemVer {
 
     pub fn parse(version: &str) -> Result<Self, VersionParseError> {
         let version = version.trim_start_matches('v');
-        
+
         // Split off build metadata
         let (version, build) = match version.split_once('+') {
             Some((v, b)) => (v, Some(b.to_string())),
@@ -87,15 +87,15 @@ impl SemVer {
             return Err(VersionParseError::InvalidFormat(version.to_string()));
         }
 
-        let major = parts[0].parse().map_err(|_| {
-            VersionParseError::InvalidNumber("major".to_string())
-        })?;
-        let minor = parts[1].parse().map_err(|_| {
-            VersionParseError::InvalidNumber("minor".to_string())
-        })?;
-        let patch = parts[2].parse().map_err(|_| {
-            VersionParseError::InvalidNumber("patch".to_string())
-        })?;
+        let major = parts[0]
+            .parse()
+            .map_err(|_| VersionParseError::InvalidNumber("major".to_string()))?;
+        let minor = parts[1]
+            .parse()
+            .map_err(|_| VersionParseError::InvalidNumber("minor".to_string()))?;
+        let patch = parts[2]
+            .parse()
+            .map_err(|_| VersionParseError::InvalidNumber("patch".to_string()))?;
 
         Ok(Self {
             major,
@@ -113,8 +113,9 @@ impl SemVer {
                 if v.major == 0 {
                     self.major == v.major && self.minor == v.minor && self.patch >= v.patch
                 } else {
-                    self.major == v.major && (self.minor > v.minor || 
-                        (self.minor == v.minor && self.patch >= v.patch))
+                    self.major == v.major
+                        && (self.minor > v.minor
+                            || (self.minor == v.minor && self.patch >= v.patch))
                 }
             }
             VersionRequirement::Tilde(v) => {
@@ -175,7 +176,7 @@ pub enum VersionRequirement {
 impl VersionRequirement {
     pub fn parse(spec: &str) -> Result<Self, VersionParseError> {
         let spec = spec.trim();
-        
+
         if spec == "*" || spec.is_empty() {
             return Ok(Self::Any);
         }
@@ -595,12 +596,12 @@ mod tests {
     #[test]
     fn test_version_requirement_caret() {
         let req = VersionRequirement::parse("^1.2.3").unwrap();
-        
+
         let v1 = SemVer::parse("1.2.3").unwrap();
         let v2 = SemVer::parse("1.3.0").unwrap();
         let v3 = SemVer::parse("2.0.0").unwrap();
         let v4 = SemVer::parse("1.2.0").unwrap();
-        
+
         assert!(v1.is_compatible_with(&req));
         assert!(v2.is_compatible_with(&req));
         assert!(!v3.is_compatible_with(&req));
@@ -610,11 +611,11 @@ mod tests {
     #[test]
     fn test_version_requirement_tilde() {
         let req = VersionRequirement::parse("~1.2.3").unwrap();
-        
+
         let v1 = SemVer::parse("1.2.3").unwrap();
         let v2 = SemVer::parse("1.2.5").unwrap();
         let v3 = SemVer::parse("1.3.0").unwrap();
-        
+
         assert!(v1.is_compatible_with(&req));
         assert!(v2.is_compatible_with(&req));
         assert!(!v3.is_compatible_with(&req));

@@ -192,7 +192,11 @@ impl Default for OidcConfig {
             token_endpoint: None,
             userinfo_endpoint: None,
             jwks_uri: None,
-            scopes: vec!["openid".to_string(), "profile".to_string(), "email".to_string()],
+            scopes: vec![
+                "openid".to_string(),
+                "profile".to_string(),
+                "email".to_string(),
+            ],
             response_type: "code".to_string(),
             redirect_uri: String::new(),
         }
@@ -433,16 +437,19 @@ impl SsoProvider for OidcProvider {
             endpoint.clone()
         } else {
             // Fetch from discovery
-            let discovery: serde_json::Value = self.client
+            let discovery: serde_json::Value = self
+                .client
                 .get(&self.config.discovery_url)
                 .send()
                 .await?
                 .json()
                 .await?;
-            
+
             discovery["authorization_endpoint"]
                 .as_str()
-                .ok_or_else(|| EnterpriseError::SsoError("Missing authorization_endpoint".to_string()))?
+                .ok_or_else(|| {
+                    EnterpriseError::SsoError("Missing authorization_endpoint".to_string())
+                })?
                 .to_string()
         };
 
@@ -464,13 +471,14 @@ impl SsoProvider for OidcProvider {
         let token_endpoint = if let Some(ref endpoint) = self.config.token_endpoint {
             endpoint.clone()
         } else {
-            let discovery: serde_json::Value = self.client
+            let discovery: serde_json::Value = self
+                .client
                 .get(&self.config.discovery_url)
                 .send()
                 .await?
                 .json()
                 .await?;
-            
+
             discovery["token_endpoint"]
                 .as_str()
                 .ok_or_else(|| EnterpriseError::SsoError("Missing token_endpoint".to_string()))?
@@ -485,7 +493,8 @@ impl SsoProvider for OidcProvider {
             ("client_secret", &self.config.client_secret),
         ];
 
-        let response: serde_json::Value = self.client
+        let response: serde_json::Value = self
+            .client
             .post(&token_endpoint)
             .form(&params)
             .send()
@@ -515,20 +524,22 @@ impl SsoProvider for OidcProvider {
         let userinfo_endpoint = if let Some(ref endpoint) = self.config.userinfo_endpoint {
             endpoint.clone()
         } else {
-            let discovery: serde_json::Value = self.client
+            let discovery: serde_json::Value = self
+                .client
                 .get(&self.config.discovery_url)
                 .send()
                 .await?
                 .json()
                 .await?;
-            
+
             discovery["userinfo_endpoint"]
                 .as_str()
                 .ok_or_else(|| EnterpriseError::SsoError("Missing userinfo_endpoint".to_string()))?
                 .to_string()
         };
 
-        let response: serde_json::Value = self.client
+        let response: serde_json::Value = self
+            .client
             .get(&userinfo_endpoint)
             .bearer_auth(&token.access_token)
             .send()
@@ -541,20 +552,14 @@ impl SsoProvider for OidcProvider {
             .ok_or_else(|| EnterpriseError::SsoError("Missing sub claim".to_string()))?
             .to_string();
 
-        let email = response["email"]
-            .as_str()
-            .unwrap_or("")
-            .to_string();
+        let email = response["email"].as_str().unwrap_or("").to_string();
 
         let username = response["preferred_username"]
             .as_str()
             .unwrap_or(&email)
             .to_string();
 
-        let display_name = response["name"]
-            .as_str()
-            .unwrap_or(&username)
-            .to_string();
+        let display_name = response["name"].as_str().unwrap_or(&username).to_string();
 
         Ok(SsoUserInfo {
             external_id,
@@ -565,10 +570,15 @@ impl SsoProvider for OidcProvider {
             last_name: response["family_name"].as_str().map(String::from),
             groups: response["groups"]
                 .as_array()
-                .map(|arr| arr.iter().filter_map(|v| v.as_str().map(String::from)).collect())
+                .map(|arr| {
+                    arr.iter()
+                        .filter_map(|v| v.as_str().map(String::from))
+                        .collect()
+                })
                 .unwrap_or_default(),
             avatar_url: response["picture"].as_str().map(String::from),
-            attributes: response.as_object()
+            attributes: response
+                .as_object()
                 .map(|obj| obj.iter().map(|(k, v)| (k.clone(), v.clone())).collect())
                 .unwrap_or_default(),
         })
@@ -578,13 +588,14 @@ impl SsoProvider for OidcProvider {
         let token_endpoint = if let Some(ref endpoint) = self.config.token_endpoint {
             endpoint.clone()
         } else {
-            let discovery: serde_json::Value = self.client
+            let discovery: serde_json::Value = self
+                .client
                 .get(&self.config.discovery_url)
                 .send()
                 .await?
                 .json()
                 .await?;
-            
+
             discovery["token_endpoint"]
                 .as_str()
                 .ok_or_else(|| EnterpriseError::SsoError("Missing token_endpoint".to_string()))?
@@ -598,7 +609,8 @@ impl SsoProvider for OidcProvider {
             ("client_secret", &self.config.client_secret),
         ];
 
-        let response: serde_json::Value = self.client
+        let response: serde_json::Value = self
+            .client
             .post(&token_endpoint)
             .form(&params)
             .send()
@@ -638,13 +650,13 @@ impl SsoProvider for OidcProvider {
 pub trait AuthProvider: Send + Sync {
     /// Authenticate with credentials
     async fn authenticate(&self, username: &str, password: &str) -> Result<User>;
-    
+
     /// Validate a session
     async fn validate_session(&self, session_id: Uuid) -> Result<AuthSession>;
-    
+
     /// Refresh a session
     async fn refresh_session(&self, session_id: Uuid) -> Result<AuthSession>;
-    
+
     /// Logout
     async fn logout(&self, session_id: Uuid) -> Result<()>;
 }
@@ -721,7 +733,7 @@ impl AuthManager {
         );
 
         let user_id = user.id;
-        
+
         // Store user
         {
             let mut users = self.users.write().await;
@@ -736,8 +748,9 @@ impl AuthManager {
 
     /// Authenticate via SSO provider
     pub async fn authenticate_sso(&self, provider_id: &str, code: &str) -> Result<AuthSession> {
-        let provider = self.sso_providers.get(provider_id)
-            .ok_or_else(|| EnterpriseError::SsoError(format!("Provider '{}' not found", provider_id)))?;
+        let provider = self.sso_providers.get(provider_id).ok_or_else(|| {
+            EnterpriseError::SsoError(format!("Provider '{}' not found", provider_id))
+        })?;
 
         // Exchange code for token
         let token = provider.exchange_code(code).await?;
@@ -746,18 +759,23 @@ impl AuthManager {
         let user_info = provider.get_user_info(&token).await?;
 
         // Find or create user
-        let user = self.find_or_create_sso_user(provider_id, &user_info).await?;
+        let user = self
+            .find_or_create_sso_user(provider_id, &user_info)
+            .await?;
 
         // Create session with SSO token
-        let session = self.create_session_with_token(user.id, provider_id, token).await?;
+        let session = self
+            .create_session_with_token(user.id, provider_id, token)
+            .await?;
 
         Ok(session)
     }
 
     /// Get authorization URL for SSO
     pub async fn get_sso_authorization_url(&self, provider_id: &str) -> Result<(String, String)> {
-        let provider = self.sso_providers.get(provider_id)
-            .ok_or_else(|| EnterpriseError::SsoError(format!("Provider '{}' not found", provider_id)))?;
+        let provider = self.sso_providers.get(provider_id).ok_or_else(|| {
+            EnterpriseError::SsoError(format!("Provider '{}' not found", provider_id))
+        })?;
 
         let state = generate_state();
         let url = provider.get_authorization_url(&state).await?;
@@ -768,7 +786,8 @@ impl AuthManager {
     /// Validate a session
     pub async fn validate_session(&self, session_id: Uuid) -> Result<AuthSession> {
         let sessions = self.sessions.read().await;
-        let session = sessions.get(&session_id)
+        let session = sessions
+            .get(&session_id)
             .ok_or(EnterpriseError::SessionExpired)?;
 
         if session.is_expired() {
@@ -781,7 +800,8 @@ impl AuthManager {
     /// Refresh a session
     pub async fn refresh_session(&self, session_id: Uuid) -> Result<AuthSession> {
         let mut sessions = self.sessions.write().await;
-        let session = sessions.get_mut(&session_id)
+        let session = sessions
+            .get_mut(&session_id)
             .ok_or(EnterpriseError::SessionExpired)?;
 
         if session.is_expired() {
@@ -809,7 +829,7 @@ impl AuthManager {
     /// Logout
     pub async fn logout(&self, session_id: Uuid) -> Result<()> {
         let mut sessions = self.sessions.write().await;
-        
+
         if let Some(session) = sessions.remove(&session_id) {
             // If SSO, call provider logout
             if session.provider != "local" {
@@ -825,7 +845,8 @@ impl AuthManager {
     /// Get user by ID
     pub async fn get_user(&self, user_id: Uuid) -> Result<User> {
         let users = self.users.read().await;
-        users.get(&user_id)
+        users
+            .get(&user_id)
             .cloned()
             .ok_or_else(|| EnterpriseError::UserNotFound(user_id.to_string()))
     }

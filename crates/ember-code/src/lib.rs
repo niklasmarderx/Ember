@@ -44,44 +44,18 @@ pub mod testgen;
 
 // Re-export main types for convenience
 pub use analyzer::{
-    AnalyzerConfig,
-    AnalyzerError,
-    CodeAnalyzer,
-    CodeSmell,
-    CodeSmellType,
-    CodeSymbol,
-    ComplexityMetrics,
-    ComplexityRating,
-    FileAnalysis,
-    ImportInfo,
-    Language,
-    LanguageStats,
-    ProjectAnalysis,
-    Severity,
-    SymbolKind,
-    Visibility,
+    AnalyzerConfig, AnalyzerError, CodeAnalyzer, CodeSmell, CodeSmellType, CodeSymbol,
+    ComplexityMetrics, ComplexityRating, FileAnalysis, ImportInfo, Language, LanguageStats,
+    ProjectAnalysis, Severity, SymbolKind, Visibility,
 };
 
 pub use refactor::{
-    CodeEdit,
-    Confidence,
-    FormattingStyle,
-    RefactoringConfig,
-    RefactoringEngine,
-    RefactoringImpact,
-    RefactoringKind,
-    RefactoringResult,
-    RefactoringSuggestion,
-    TestImpact,
+    CodeEdit, Confidence, FormattingStyle, RefactoringConfig, RefactoringEngine, RefactoringImpact,
+    RefactoringKind, RefactoringResult, RefactoringSuggestion, TestImpact,
 };
 
 pub use testgen::{
-    GeneratedTest,
-    GeneratedTestSuite,
-    TestFramework,
-    TestGenConfig,
-    TestGenerator,
-    TestType,
+    GeneratedTest, GeneratedTestSuite, TestFramework, TestGenConfig, TestGenerator, TestType,
 };
 
 /// Prelude module for convenient imports
@@ -120,13 +94,11 @@ pub fn add(a: i32, b: i32) -> i32 {
     a + b
 }
 "#;
-        
-        let result = analyzer.analyze_content(
-            PathBuf::from("test.rs"),
-            code,
-            Language::Rust,
-        ).unwrap();
-        
+
+        let result = analyzer
+            .analyze_content(PathBuf::from("test.rs"), code, Language::Rust)
+            .unwrap();
+
         assert_eq!(result.language, Language::Rust);
         assert!(!result.symbols.is_empty());
     }
@@ -135,19 +107,24 @@ pub fn add(a: i32, b: i32) -> i32 {
     fn test_refactoring_engine() {
         let engine = RefactoringEngine::new();
         // Basic creation test
-        assert!(engine.suggest_refactorings(
-            &FileAnalysis {
-                path: PathBuf::from("test.rs"),
-                language: Language::Rust,
-                metrics: ComplexityMetrics::default(),
-                symbols: vec![],
-                smells: vec![],
-                imports: vec![],
-                dependencies: vec![],
-                analyzed_at: chrono::Utc::now(),
-            },
-            ""
-        ).is_empty() || true); // Always passes - just testing instantiation
+        assert!(
+            engine
+                .suggest_refactorings(
+                    &FileAnalysis {
+                        path: PathBuf::from("test.rs"),
+                        language: Language::Rust,
+                        metrics: ComplexityMetrics::default(),
+                        symbols: vec![],
+                        smells: vec![],
+                        imports: vec![],
+                        dependencies: vec![],
+                        analyzed_at: chrono::Utc::now(),
+                    },
+                    ""
+                )
+                .is_empty()
+                || true
+        ); // Always passes - just testing instantiation
     }
 
     #[test]

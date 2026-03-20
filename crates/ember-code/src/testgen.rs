@@ -12,19 +12,19 @@ use std::path::PathBuf;
 pub enum TestFramework {
     // Rust
     RustBuiltin,
-    
+
     // Python
     Pytest,
     Unittest,
-    
+
     // JavaScript/TypeScript
     Jest,
     Mocha,
     Vitest,
-    
+
     // Go
     GoTest,
-    
+
     // Java
     JUnit5,
     JUnit4,
@@ -183,35 +183,33 @@ impl TestGenerator {
 
     /// Generate tests for a file
     pub fn generate_tests(&self, analysis: &FileAnalysis, content: &str) -> GeneratedTestSuite {
-        let framework = self.config.framework
+        let framework = self
+            .config
+            .framework
             .unwrap_or_else(|| TestFramework::default_for_language(analysis.language));
-        
+
         let lines: Vec<&str> = content.lines().collect();
         let mut tests = Vec::new();
-        
+
         // Generate tests for each testable symbol
         for symbol in &analysis.symbols {
             if self.should_test_symbol(symbol) {
-                let symbol_tests = self.generate_tests_for_symbol(
-                    symbol, 
-                    &lines, 
-                    analysis.language, 
-                    framework
-                );
+                let symbol_tests =
+                    self.generate_tests_for_symbol(symbol, &lines, analysis.language, framework);
                 tests.extend(symbol_tests);
             }
         }
-        
+
         // Generate imports
         let imports = self.generate_imports(&analysis.path, analysis.language, framework);
-        
+
         // Generate shared setup/teardown
         let shared_setup = self.generate_shared_setup(analysis.language, framework);
         let shared_teardown = self.generate_shared_teardown(analysis.language, framework);
-        
+
         // Calculate test file path
         let test_file = self.calculate_test_file_path(&analysis.path, analysis.language, framework);
-        
+
         // Generate complete file content
         let full_content = self.generate_full_test_file(
             &analysis.path,
@@ -222,9 +220,11 @@ impl TestGenerator {
             &shared_setup,
             &shared_teardown,
         );
-        
+
         GeneratedTestSuite {
-            name: analysis.path.file_stem()
+            name: analysis
+                .path
+                .file_stem()
                 .and_then(|s| s.to_str())
                 .unwrap_or("tests")
                 .to_string(),
@@ -246,7 +246,7 @@ impl TestGenerator {
         if symbol.kind != SymbolKind::Function && symbol.kind != SymbolKind::Method {
             return false;
         }
-        
+
         // Check visibility
         match (&symbol.visibility, &self.config.min_visibility) {
             (Visibility::Private, Visibility::Public) => false,
@@ -266,30 +266,30 @@ impl TestGenerator {
     ) -> Vec<GeneratedTest> {
         let mut tests = Vec::new();
         let func_code = self.get_function_code(lines, symbol);
-        
+
         // Basic happy path test
         tests.push(self.generate_happy_path_test(symbol, &func_code, language, framework));
-        
+
         // Edge case tests
         if self.config.include_edge_cases && tests.len() < self.config.max_tests_per_function {
             tests.extend(self.generate_edge_case_tests(symbol, &func_code, language, framework));
         }
-        
+
         // Error handling tests
         if self.config.include_error_tests && tests.len() < self.config.max_tests_per_function {
             tests.extend(self.generate_error_tests(symbol, &func_code, language, framework));
         }
-        
+
         // Property-based tests
         if self.config.include_property_tests && tests.len() < self.config.max_tests_per_function {
             if let Some(prop_test) = self.generate_property_test(symbol, language, framework) {
                 tests.push(prop_test);
             }
         }
-        
+
         // Limit tests
         tests.truncate(self.config.max_tests_per_function);
-        
+
         tests
     }
 
@@ -303,7 +303,7 @@ impl TestGenerator {
     ) -> GeneratedTest {
         let test_name = format!("test_{}_basic", self.to_snake_case(&symbol.name));
         let description = format!("Test basic functionality of {}", symbol.name);
-        
+
         let code = self.generate_test_code(
             &test_name,
             &symbol.name,
@@ -313,7 +313,7 @@ impl TestGenerator {
             &self.infer_test_inputs(func_code, language),
             &self.infer_expected_output(func_code, language),
         );
-        
+
         GeneratedTest {
             name: test_name,
             test_type: TestType::Unit,
@@ -336,14 +336,14 @@ impl TestGenerator {
         framework: TestFramework,
     ) -> Vec<GeneratedTest> {
         let mut tests = Vec::new();
-        
+
         // Detect parameter types and generate appropriate edge cases
         let edge_cases = self.detect_edge_cases(func_code, language);
-        
+
         for (i, (case_name, inputs, expected)) in edge_cases.into_iter().enumerate() {
             let test_name = format!("test_{}_{}", self.to_snake_case(&symbol.name), case_name);
             let description = format!("Test {} with edge case: {}", symbol.name, case_name);
-            
+
             let code = self.generate_test_code(
                 &test_name,
                 &symbol.name,
@@ -353,7 +353,7 @@ impl TestGenerator {
                 &inputs,
                 &expected,
             );
-            
+
             tests.push(GeneratedTest {
                 name: test_name,
                 test_type: TestType::EdgeCase,
@@ -365,12 +365,13 @@ impl TestGenerator {
                 tags: vec!["edge_case".to_string()],
                 confidence: 70,
             });
-            
-            if i >= 2 { // Limit edge case tests
+
+            if i >= 2 {
+                // Limit edge case tests
                 break;
             }
         }
-        
+
         tests
     }
 
@@ -383,7 +384,7 @@ impl TestGenerator {
         framework: TestFramework,
     ) -> Vec<GeneratedTest> {
         let mut tests = Vec::new();
-        
+
         // Check if function can return errors
         let can_error = match language {
             Language::Rust => func_code.contains("Result<") || func_code.contains("Option<"),
@@ -395,19 +396,14 @@ impl TestGenerator {
             Language::Java => func_code.contains("throws ") || func_code.contains("catch"),
             _ => false,
         };
-        
+
         if !can_error {
             return tests;
         }
-        
+
         let test_name = format!("test_{}_error_handling", self.to_snake_case(&symbol.name));
-        let code = self.generate_error_test_code(
-            &test_name,
-            &symbol.name,
-            language,
-            framework,
-        );
-        
+        let code = self.generate_error_test_code(&test_name, &symbol.name, language, framework);
+
         tests.push(GeneratedTest {
             name: test_name,
             test_type: TestType::ErrorHandling,
@@ -419,7 +415,7 @@ impl TestGenerator {
             tags: vec!["error".to_string()],
             confidence: 65,
         });
-        
+
         tests
     }
 
@@ -433,16 +429,16 @@ impl TestGenerator {
         // Property-based tests are only supported for certain frameworks
         let supported = matches!(
             (language, framework),
-            (Language::Rust, TestFramework::RustBuiltin) |
-            (Language::Python, TestFramework::Pytest)
+            (Language::Rust, TestFramework::RustBuiltin)
+                | (Language::Python, TestFramework::Pytest)
         );
-        
+
         if !supported {
             return None;
         }
-        
+
         let test_name = format!("test_{}_property", self.to_snake_case(&symbol.name));
-        
+
         let code = match language {
             Language::Rust => format!(
                 r#"#[cfg(test)]
@@ -474,7 +470,7 @@ def {}(input_val):
             ),
             _ => return None,
         };
-        
+
         Some(GeneratedTest {
             name: test_name,
             test_type: TestType::Property,
@@ -540,8 +536,8 @@ fn {}() {{
     self.assertEqual(result, {})"#,
                 test_name, func_name, inputs, func_name, expected
             ),
-            (Language::JavaScript, TestFramework::Jest) | 
-            (Language::TypeScript, TestFramework::Jest) => format!(
+            (Language::JavaScript, TestFramework::Jest)
+            | (Language::TypeScript, TestFramework::Jest) => format!(
                 r#"test('{}', () => {{
     // Arrange
     const input = {};
@@ -552,10 +548,13 @@ fn {}() {{
     // Assert
     expect(result).toBe({});
 }});"#,
-                test_name.replace('_', " "), inputs, func_name, expected
+                test_name.replace('_', " "),
+                inputs,
+                func_name,
+                expected
             ),
-            (Language::JavaScript, TestFramework::Vitest) |
-            (Language::TypeScript, TestFramework::Vitest) => format!(
+            (Language::JavaScript, TestFramework::Vitest)
+            | (Language::TypeScript, TestFramework::Vitest) => format!(
                 r#"test('{}', () => {{
     // Arrange
     const input = {};
@@ -566,7 +565,10 @@ fn {}() {{
     // Assert
     expect(result).toBe({});
 }});"#,
-                test_name.replace('_', " "), inputs, func_name, expected
+                test_name.replace('_', " "),
+                inputs,
+                func_name,
+                expected
             ),
             (Language::Go, TestFramework::GoTest) => format!(
                 r#"func {}(t *testing.T) {{
@@ -582,7 +584,11 @@ fn {}() {{
         t.Errorf("{} = %v, want %v", result, expected)
     }}
 }}"#,
-                self.to_pascal_case(test_name), inputs, expected, func_name, func_name
+                self.to_pascal_case(test_name),
+                inputs,
+                expected,
+                func_name,
+                func_name
             ),
             (Language::Java, TestFramework::JUnit5) => format!(
                 r#"@Test
@@ -599,7 +605,11 @@ void {}() {{
 }}"#,
                 test_name, inputs, expected, func_name
             ),
-            _ => format!("// TODO: Generate test for {} with {} framework", func_name, framework.test_file_suffix()),
+            _ => format!(
+                "// TODO: Generate test for {} with {} framework",
+                func_name,
+                framework.test_file_suffix()
+            ),
         }
     }
 
@@ -639,8 +649,8 @@ fn {}() {{
         {}(invalid_input)"#,
                 test_name, func_name, func_name
             ),
-            (Language::JavaScript, TestFramework::Jest) |
-            (Language::TypeScript, TestFramework::Jest) => format!(
+            (Language::JavaScript, TestFramework::Jest)
+            | (Language::TypeScript, TestFramework::Jest) => format!(
                 r#"test('{} throws error for invalid input', () => {{
     // Arrange - invalid input
     const invalidInput = null;
@@ -663,7 +673,8 @@ fn {}() {{
         t.Error("Expected error for invalid input, got nil")
     }}
 }}"#,
-                self.to_pascal_case(test_name), func_name
+                self.to_pascal_case(test_name),
+                func_name
             ),
             _ => format!("// TODO: Generate error test for {}", func_name),
         }
@@ -676,14 +687,13 @@ fn {}() {{
         language: Language,
         framework: TestFramework,
     ) -> Vec<String> {
-        let module_name = source_file.file_stem()
+        let module_name = source_file
+            .file_stem()
             .and_then(|s| s.to_str())
             .unwrap_or("module");
-        
+
         match (language, framework) {
-            (Language::Rust, TestFramework::RustBuiltin) => vec![
-                format!("use super::*;"),
-            ],
+            (Language::Rust, TestFramework::RustBuiltin) => vec![format!("use super::*;")],
             (Language::Python, TestFramework::Pytest) => vec![
                 format!("import pytest"),
                 format!("from {} import *", module_name),
@@ -692,17 +702,15 @@ fn {}() {{
                 format!("import unittest"),
                 format!("from {} import *", module_name),
             ],
-            (Language::JavaScript, TestFramework::Jest) => vec![
-                format!("const {{ ... }} = require('./{}');", module_name),
-            ],
-            (Language::TypeScript, TestFramework::Jest) |
-            (Language::TypeScript, TestFramework::Vitest) => vec![
+            (Language::JavaScript, TestFramework::Jest) => {
+                vec![format!("const {{ ... }} = require('./{}');", module_name)]
+            }
+            (Language::TypeScript, TestFramework::Jest)
+            | (Language::TypeScript, TestFramework::Vitest) => vec![
                 format!("import {{ describe, test, expect }} from 'vitest';"),
                 format!("import {{ ... }} from './{}';", module_name),
             ],
-            (Language::Go, TestFramework::GoTest) => vec![
-                "import \"testing\"".to_string(),
-            ],
+            (Language::Go, TestFramework::GoTest) => vec!["import \"testing\"".to_string()],
             (Language::Java, TestFramework::JUnit5) => vec![
                 "import org.junit.jupiter.api.Test;".to_string(),
                 "import static org.junit.jupiter.api.Assertions.*;".to_string(),
@@ -712,7 +720,11 @@ fn {}() {{
     }
 
     /// Generate shared setup code
-    fn generate_shared_setup(&self, language: Language, framework: TestFramework) -> Option<String> {
+    fn generate_shared_setup(
+        &self,
+        language: Language,
+        framework: TestFramework,
+    ) -> Option<String> {
         match (language, framework) {
             (Language::Python, TestFramework::Pytest) => Some(
                 r#"@pytest.fixture
@@ -720,17 +732,19 @@ def setup():
     """Shared test setup."""
     # Add setup code here
     yield
-    # Add teardown code here"#.to_string()
+    # Add teardown code here"#
+                    .to_string(),
             ),
-            (Language::JavaScript, TestFramework::Jest) |
-            (Language::TypeScript, TestFramework::Jest) => Some(
+            (Language::JavaScript, TestFramework::Jest)
+            | (Language::TypeScript, TestFramework::Jest) => Some(
                 r#"beforeEach(() => {
     // Setup before each test
 });
 
 afterEach(() => {
     // Cleanup after each test
-});"#.to_string()
+});"#
+                    .to_string(),
             ),
             (Language::Java, TestFramework::JUnit5) => Some(
                 r#"@BeforeEach
@@ -741,14 +755,19 @@ void setUp() {
 @AfterEach
 void tearDown() {
     // Cleanup after each test
-}"#.to_string()
+}"#
+                .to_string(),
             ),
             _ => None,
         }
     }
 
     /// Generate shared teardown code
-    fn generate_shared_teardown(&self, _language: Language, _framework: TestFramework) -> Option<String> {
+    fn generate_shared_teardown(
+        &self,
+        _language: Language,
+        _framework: TestFramework,
+    ) -> Option<String> {
         // Teardown is usually included in setup for most frameworks
         None
     }
@@ -760,39 +779,37 @@ void tearDown() {
         language: Language,
         framework: TestFramework,
     ) -> PathBuf {
-        let base_dir = self.config.output_dir.clone()
-            .unwrap_or_else(|| source_file.parent().unwrap_or(std::path::Path::new(".")).to_path_buf());
-        
-        let file_stem = source_file.file_stem()
+        let base_dir = self.config.output_dir.clone().unwrap_or_else(|| {
+            source_file
+                .parent()
+                .unwrap_or(std::path::Path::new("."))
+                .to_path_buf()
+        });
+
+        let file_stem = source_file
+            .file_stem()
             .and_then(|s| s.to_str())
             .unwrap_or("test");
-        
-        let extension = source_file.extension()
+
+        let extension = source_file
+            .extension()
             .and_then(|s| s.to_str())
             .unwrap_or("rs");
-        
+
         let suffix = framework.test_file_suffix();
-        
+
         match language {
             Language::Rust => {
                 // Rust tests go in the same file or tests/ directory
                 base_dir.join(format!("{}_test.{}", file_stem, extension))
             }
-            Language::Python => {
-                base_dir.join(format!("test_{}.{}", file_stem, extension))
-            }
+            Language::Python => base_dir.join(format!("test_{}.{}", file_stem, extension)),
             Language::JavaScript | Language::TypeScript => {
                 base_dir.join(format!("{}{}.{}", file_stem, suffix, extension))
             }
-            Language::Go => {
-                base_dir.join(format!("{}_test.go", file_stem))
-            }
-            Language::Java => {
-                base_dir.join(format!("{}Test.java", file_stem))
-            }
-            Language::Unknown => {
-                base_dir.join(format!("{}_test.txt", file_stem))
-            }
+            Language::Go => base_dir.join(format!("{}_test.go", file_stem)),
+            Language::Java => base_dir.join(format!("{}Test.java", file_stem)),
+            Language::Unknown => base_dir.join(format!("{}_test.txt", file_stem)),
         }
     }
 
@@ -808,35 +825,36 @@ void tearDown() {
         _shared_teardown: &Option<String>,
     ) -> String {
         let mut content = String::new();
-        
+
         // File header
-        let module_name = source_file.file_stem()
+        let module_name = source_file
+            .file_stem()
             .and_then(|s| s.to_str())
             .unwrap_or("module");
-        
+
         content.push_str(&self.generate_file_header(language, module_name));
         content.push('\n');
-        
+
         // Imports
         for import in imports {
             content.push_str(import);
             content.push('\n');
         }
         content.push('\n');
-        
+
         // Shared setup
         if let Some(setup) = shared_setup {
             content.push_str(setup);
             content.push_str("\n\n");
         }
-        
+
         // Test class/module wrapper (language specific)
         match (language, framework) {
             (Language::Rust, _) => {
                 content.push_str("#[cfg(test)]\n");
                 content.push_str("mod tests {\n");
                 content.push_str("    use super::*;\n\n");
-                
+
                 for test in tests {
                     // Indent each line
                     for line in test.code.lines() {
@@ -846,13 +864,15 @@ void tearDown() {
                     }
                     content.push('\n');
                 }
-                
+
                 content.push_str("}\n");
             }
             (Language::Python, TestFramework::Unittest) => {
-                content.push_str(&format!("class Test{}(unittest.TestCase):\n", 
-                    self.to_pascal_case(module_name)));
-                
+                content.push_str(&format!(
+                    "class Test{}(unittest.TestCase):\n",
+                    self.to_pascal_case(module_name)
+                ));
+
                 for test in tests {
                     for line in test.code.lines() {
                         content.push_str("    ");
@@ -861,15 +881,15 @@ void tearDown() {
                     }
                     content.push('\n');
                 }
-                
+
                 content.push_str("\nif __name__ == '__main__':\n");
                 content.push_str("    unittest.main()\n");
             }
-            (Language::JavaScript, TestFramework::Jest) |
-            (Language::TypeScript, TestFramework::Jest) |
-            (Language::TypeScript, TestFramework::Vitest) => {
+            (Language::JavaScript, TestFramework::Jest)
+            | (Language::TypeScript, TestFramework::Jest)
+            | (Language::TypeScript, TestFramework::Vitest) => {
                 content.push_str(&format!("describe('{}', () => {{\n", module_name));
-                
+
                 for test in tests {
                     for line in test.code.lines() {
                         content.push_str("    ");
@@ -878,7 +898,7 @@ void tearDown() {
                     }
                     content.push('\n');
                 }
-                
+
                 content.push_str("});\n");
             }
             _ => {
@@ -888,7 +908,7 @@ void tearDown() {
                 }
             }
         }
-        
+
         content
     }
 
@@ -996,39 +1016,61 @@ void tearDown() {
                 }
             }
             Language::Python => "None  # TODO: Add expected value".to_string(),
-            Language::JavaScript | Language::TypeScript => "undefined // TODO: Add expected value".to_string(),
+            Language::JavaScript | Language::TypeScript => {
+                "undefined // TODO: Add expected value".to_string()
+            }
             _ => "/* TODO: Add expected value */".to_string(),
         }
     }
 
     /// Detect edge cases based on function code
-    fn detect_edge_cases(&self, func_code: &str, language: Language) -> Vec<(String, String, String)> {
+    fn detect_edge_cases(
+        &self,
+        func_code: &str,
+        language: Language,
+    ) -> Vec<(String, String, String)> {
         let mut cases = Vec::new();
-        
+
         // String edge cases
         if func_code.contains("str") || func_code.contains("String") {
-            cases.push(("empty_string".to_string(), 
+            cases.push((
+                "empty_string".to_string(),
                 self.empty_string_value(language),
-                self.infer_expected_output(func_code, language)));
+                self.infer_expected_output(func_code, language),
+            ));
         }
-        
+
         // Numeric edge cases
-        if func_code.contains("i32") || func_code.contains("i64") || 
-           func_code.contains("int") || func_code.contains("number") {
-            cases.push(("zero".to_string(), "0".to_string(), 
-                self.infer_expected_output(func_code, language)));
-            cases.push(("negative".to_string(), "-1".to_string(),
-                self.infer_expected_output(func_code, language)));
+        if func_code.contains("i32")
+            || func_code.contains("i64")
+            || func_code.contains("int")
+            || func_code.contains("number")
+        {
+            cases.push((
+                "zero".to_string(),
+                "0".to_string(),
+                self.infer_expected_output(func_code, language),
+            ));
+            cases.push((
+                "negative".to_string(),
+                "-1".to_string(),
+                self.infer_expected_output(func_code, language),
+            ));
         }
-        
+
         // Collection edge cases
-        if func_code.contains("Vec<") || func_code.contains("list") || 
-           func_code.contains("Array") || func_code.contains("[]") {
-            cases.push(("empty_collection".to_string(),
+        if func_code.contains("Vec<")
+            || func_code.contains("list")
+            || func_code.contains("Array")
+            || func_code.contains("[]")
+        {
+            cases.push((
+                "empty_collection".to_string(),
                 self.empty_collection_value(language),
-                self.infer_expected_output(func_code, language)));
+                self.infer_expected_output(func_code, language),
+            ));
         }
-        
+
         cases
     }
 
@@ -1097,9 +1139,18 @@ mod tests {
 
     #[test]
     fn test_framework_default() {
-        assert_eq!(TestFramework::default_for_language(Language::Rust), TestFramework::RustBuiltin);
-        assert_eq!(TestFramework::default_for_language(Language::Python), TestFramework::Pytest);
-        assert_eq!(TestFramework::default_for_language(Language::TypeScript), TestFramework::Vitest);
+        assert_eq!(
+            TestFramework::default_for_language(Language::Rust),
+            TestFramework::RustBuiltin
+        );
+        assert_eq!(
+            TestFramework::default_for_language(Language::Python),
+            TestFramework::Pytest
+        );
+        assert_eq!(
+            TestFramework::default_for_language(Language::TypeScript),
+            TestFramework::Vitest
+        );
     }
 
     #[test]

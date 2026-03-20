@@ -52,7 +52,11 @@ impl Permission {
         Self {
             id: Uuid::new_v4(),
             name: format!("{}:{}", resource_type, actions.join(",")),
-            description: format!("Permission for {} actions on {}", actions.join(", "), resource_type),
+            description: format!(
+                "Permission for {} actions on {}",
+                actions.join(", "),
+                resource_type
+            ),
             resource_type: Some(resource_type.to_string()),
             actions: actions.iter().map(|s| s.to_string()).collect(),
             system: false,
@@ -316,29 +320,32 @@ impl RbacManager {
             return Err(EnterpriseError::RoleNotFound(role.id.to_string()));
         }
         roles.insert(role.id, role.clone());
-        
+
         // Invalidate cache for users with this role
         self.invalidate_cache_for_role(role.id).await;
-        
+
         Ok(role)
     }
 
     /// Delete a role
     pub async fn delete_role(&self, role_id: Uuid) -> Result<()> {
         let mut roles = self.roles.write().await;
-        let role = roles.get(&role_id)
+        let role = roles
+            .get(&role_id)
             .ok_or_else(|| EnterpriseError::RoleNotFound(role_id.to_string()))?;
-        
+
         if role.system {
-            return Err(EnterpriseError::PermissionDenied("Cannot delete system role".to_string()));
+            return Err(EnterpriseError::PermissionDenied(
+                "Cannot delete system role".to_string(),
+            ));
         }
-        
+
         roles.remove(&role_id);
-        
+
         // Remove assignments
         let mut assignments = self.assignments.write().await;
         assignments.retain(|a| a.role_id != role_id);
-        
+
         Ok(())
     }
 
@@ -359,13 +366,13 @@ impl RbacManager {
         }
 
         let assignment = RoleAssignment::new(user_id, role_id);
-        
+
         let mut assignments = self.assignments.write().await;
         assignments.push(assignment.clone());
-        
+
         // Invalidate user's permission cache
         self.invalidate_cache_for_user(user_id).await;
-        
+
         Ok(assignment)
     }
 
@@ -374,16 +381,17 @@ impl RbacManager {
         let mut assignments = self.assignments.write().await;
         let initial_len = assignments.len();
         assignments.retain(|a| !(a.user_id == user_id && a.role_id == role_id));
-        
+
         if assignments.len() == initial_len {
-            return Err(EnterpriseError::RoleNotFound(
-                format!("Role {} not assigned to user {}", role_id, user_id)
-            ));
+            return Err(EnterpriseError::RoleNotFound(format!(
+                "Role {} not assigned to user {}",
+                role_id, user_id
+            )));
         }
-        
+
         // Invalidate cache
         self.invalidate_cache_for_user(user_id).await;
-        
+
         Ok(())
     }
 
@@ -391,7 +399,7 @@ impl RbacManager {
     pub async fn get_user_roles(&self, user_id: Uuid) -> Vec<Role> {
         let assignments = self.assignments.read().await;
         let roles = self.roles.read().await;
-        
+
         assignments
             .iter()
             .filter(|a| a.user_id == user_id && a.is_valid())
@@ -411,13 +419,13 @@ impl RbacManager {
 
         // Compute permissions
         let permissions = self.compute_user_permissions(user_id).await;
-        
+
         // Cache if enabled
         if self.config.cache_permissions {
             let mut cache = self.permission_cache.write().await;
             cache.insert(user_id, permissions.clone());
         }
-        
+
         permissions
     }
 
@@ -465,7 +473,8 @@ impl RbacManager {
     pub async fn require_permission(&self, user_id: Uuid, permission: &str) -> Result<()> {
         if !self.check_permission(user_id, permission).await? {
             return Err(EnterpriseError::PermissionDenied(format!(
-                "Permission '{}' required", permission
+                "Permission '{}' required",
+                permission
             )));
         }
         Ok(())
@@ -475,7 +484,8 @@ impl RbacManager {
     pub async fn require_access(&self, user_id: Uuid, resource: &str, action: &str) -> Result<()> {
         if !self.check_access(user_id, resource, action).await? {
             return Err(EnterpriseError::PermissionDenied(format!(
-                "Access to {} (action: {}) denied", resource, action
+                "Access to {} (action: {}) denied",
+                resource, action
             )));
         }
         Ok(())
@@ -486,11 +496,11 @@ impl RbacManager {
     async fn compute_user_permissions(&self, user_id: Uuid) -> PermissionSet {
         let mut permissions = PermissionSet::new();
         let user_roles = self.get_user_roles(user_id).await;
-        
+
         for role in user_roles {
             // Add direct permissions
             permissions.merge(&role.permissions);
-            
+
             // Add inherited permissions
             for inherited_id in &role.inherits {
                 if let Some(inherited_role) = self.get_role(*inherited_id).await {
@@ -498,7 +508,7 @@ impl RbacManager {
                 }
             }
         }
-        
+
         permissions
     }
 
@@ -515,7 +525,7 @@ impl RbacManager {
             .filter(|a| a.role_id == role_id)
             .map(|a| a.user_id)
             .collect();
-        
+
         let mut cache = self.permission_cache.write().await;
         for user_id in user_ids {
             cache.remove(&user_id);
@@ -533,7 +543,6 @@ fn create_default_roles() -> Vec<Role> {
             role.add_permission("*");
             role
         },
-        
         // Admin - administrative access
         {
             let mut role = Role::new("admin", "Administrator with management access");
@@ -547,7 +556,6 @@ fn create_default_roles() -> Vec<Role> {
             role.add_permission("chat:*");
             role
         },
-        
         // User - standard user access
         {
             let mut role = Role::new("user", "Standard user with basic access");
@@ -558,7 +566,6 @@ fn create_default_roles() -> Vec<Role> {
             role.add_permission("history:read");
             role
         },
-        
         // Viewer - read-only access
         {
             let mut role = Role::new("viewer", "Read-only access");
@@ -568,7 +575,6 @@ fn create_default_roles() -> Vec<Role> {
             role.add_permission("profile:read");
             role
         },
-        
         // Developer - developer access
         {
             let mut role = Role::new("developer", "Developer with tool and code access");
@@ -592,40 +598,40 @@ pub mod permissions {
     pub const CHAT_READ: &str = "chat:read";
     pub const CHAT_WRITE: &str = "chat:write";
     pub const CHAT_DELETE: &str = "chat:delete";
-    
+
     // Tool permissions
     pub const TOOLS_EXECUTE: &str = "tools:execute";
     pub const TOOLS_MANAGE: &str = "tools:manage";
-    
+
     // Shell permissions
     pub const SHELL_EXECUTE: &str = "shell:execute";
     pub const SHELL_ADMIN: &str = "shell:admin";
-    
+
     // Filesystem permissions
     pub const FS_READ: &str = "filesystem:read";
     pub const FS_WRITE: &str = "filesystem:write";
     pub const FS_DELETE: &str = "filesystem:delete";
-    
+
     // User permissions
     pub const USERS_READ: &str = "users:read";
     pub const USERS_WRITE: &str = "users:write";
     pub const USERS_DELETE: &str = "users:delete";
     pub const USERS_ADMIN: &str = "users:admin";
-    
+
     // Team permissions
     pub const TEAMS_READ: &str = "teams:read";
     pub const TEAMS_WRITE: &str = "teams:write";
     pub const TEAMS_DELETE: &str = "teams:delete";
     pub const TEAMS_ADMIN: &str = "teams:admin";
-    
+
     // Config permissions
     pub const CONFIG_READ: &str = "config:read";
     pub const CONFIG_WRITE: &str = "config:write";
-    
+
     // Audit permissions
     pub const AUDIT_READ: &str = "audit:read";
     pub const AUDIT_EXPORT: &str = "audit:export";
-    
+
     // Role permissions
     pub const ROLES_READ: &str = "roles:read";
     pub const ROLES_WRITE: &str = "roles:write";
@@ -641,7 +647,7 @@ mod tests {
         let mut perms = PermissionSet::new();
         perms.add("users:read");
         perms.add("users:write");
-        
+
         assert!(perms.has("users:read"));
         assert!(perms.has("users:write"));
         assert!(!perms.has("users:delete"));
@@ -651,7 +657,7 @@ mod tests {
     fn test_wildcard_permission() {
         let mut perms = PermissionSet::new();
         perms.add("users:*");
-        
+
         assert!(perms.has("users:read"));
         assert!(perms.has("users:write"));
         assert!(perms.has("users:delete"));
@@ -662,7 +668,7 @@ mod tests {
     fn test_global_wildcard() {
         let mut perms = PermissionSet::new();
         perms.add("*");
-        
+
         assert!(perms.has("users:read"));
         assert!(perms.has("teams:write"));
         assert!(perms.has("anything:else"));
@@ -672,7 +678,7 @@ mod tests {
     fn test_permission_set_can() {
         let mut perms = PermissionSet::new();
         perms.add("users:read");
-        
+
         assert!(perms.can("users", "read"));
         assert!(!perms.can("users", "write"));
     }
@@ -681,7 +687,7 @@ mod tests {
     fn test_role_creation() {
         let mut role = Role::new("test", "Test role");
         role.add_permission("users:read");
-        
+
         assert_eq!(role.name, "test");
         assert!(role.permissions.has("users:read"));
     }
@@ -691,7 +697,7 @@ mod tests {
         let user_id = Uuid::new_v4();
         let role_id = Uuid::new_v4();
         let assignment = RoleAssignment::new(user_id, role_id);
-        
+
         assert_eq!(assignment.user_id, user_id);
         assert_eq!(assignment.role_id, role_id);
         assert!(assignment.is_valid());
@@ -701,7 +707,7 @@ mod tests {
     fn test_default_roles() {
         let roles = create_default_roles();
         assert!(roles.len() >= 4);
-        
+
         let super_admin = roles.iter().find(|r| r.name == "super_admin").unwrap();
         assert!(super_admin.permissions.has("*"));
         assert!(super_admin.system);

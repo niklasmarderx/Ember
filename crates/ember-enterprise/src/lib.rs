@@ -6,8 +6,8 @@
 //! - Role-Based Access Control (RBAC)
 //! - Team management and collaboration
 
-pub mod auth;
 pub mod audit;
+pub mod auth;
 pub mod rbac;
 pub mod teams;
 
@@ -17,12 +17,12 @@ use thiserror::Error;
 use uuid::Uuid;
 
 // Re-exports
+pub use audit::{AuditEntry, AuditLevel, AuditLog, AuditQuery};
 pub use auth::{
     AuthConfig, AuthProvider, AuthSession, AuthToken, OidcConfig, SamlConfig, SsoProvider,
 };
-pub use audit::{AuditEntry, AuditLevel, AuditLog, AuditQuery};
-pub use rbac::{Permission, PermissionSet, Role, RoleAssignment, RbacManager};
-pub use teams::{Team, TeamConfig, TeamInvite, TeamMember, TeamRole, TeamManager};
+pub use rbac::{Permission, PermissionSet, RbacManager, Role, RoleAssignment};
+pub use teams::{Team, TeamConfig, TeamInvite, TeamManager, TeamMember, TeamRole};
 
 /// Enterprise error types
 #[derive(Debug, Error)]
@@ -451,39 +451,37 @@ impl Enterprise {
     }
 
     /// Authenticate a user and create a session
-    pub async fn authenticate(
-        &mut self,
-        username: &str,
-        password: &str,
-    ) -> Result<AuthSession> {
+    pub async fn authenticate(&mut self, username: &str, password: &str) -> Result<AuthSession> {
         // Authenticate
         let session = self.auth_manager.authenticate(username, password).await?;
 
         // Log the authentication
-        self.audit_log.log(AuditEntry::new(
-            AuditLevel::Info,
-            "auth",
-            "user_login",
-            format!("User '{}' logged in", username),
-        ).with_user_id(session.user_id))?;
+        self.audit_log.log(
+            AuditEntry::new(
+                AuditLevel::Info,
+                "auth",
+                "user_login",
+                format!("User '{}' logged in", username),
+            )
+            .with_user_id(session.user_id),
+        )?;
 
         Ok(session)
     }
 
     /// Authenticate via SSO
-    pub async fn authenticate_sso(
-        &mut self,
-        provider: &str,
-        token: &str,
-    ) -> Result<AuthSession> {
+    pub async fn authenticate_sso(&mut self, provider: &str, token: &str) -> Result<AuthSession> {
         let session = self.auth_manager.authenticate_sso(provider, token).await?;
 
-        self.audit_log.log(AuditEntry::new(
-            AuditLevel::Info,
-            "auth",
-            "sso_login",
-            format!("User logged in via SSO provider '{}'", provider),
-        ).with_user_id(session.user_id))?;
+        self.audit_log.log(
+            AuditEntry::new(
+                AuditLevel::Info,
+                "auth",
+                "sso_login",
+                format!("User logged in via SSO provider '{}'", provider),
+            )
+            .with_user_id(session.user_id),
+        )?;
 
         Ok(session)
     }
@@ -494,12 +492,7 @@ impl Enterprise {
     }
 
     /// Check if a user can perform an action on a resource
-    pub fn can_access(
-        &self,
-        user_id: Uuid,
-        resource: &str,
-        action: &str,
-    ) -> Result<bool> {
+    pub fn can_access(&self, user_id: Uuid, resource: &str, action: &str) -> Result<bool> {
         self.rbac_manager.can_access(user_id, resource, action)
     }
 
@@ -595,9 +588,8 @@ mod tests {
 
     #[test]
     fn test_builder() {
-        let builder = EnterpriseBuilder::new()
-            .organization("Test Org");
-        
+        let builder = EnterpriseBuilder::new().organization("Test Org");
+
         assert_eq!(builder.config.organization, "Test Org");
     }
 }

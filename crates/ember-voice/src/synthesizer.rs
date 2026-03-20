@@ -319,9 +319,11 @@ impl Synthesizer {
             .as_ref()
             .ok_or_else(|| VoiceError::Config("Azure API key not configured".to_string()))?;
 
-        let endpoint = self.config.endpoint.as_deref().ok_or_else(|| {
-            VoiceError::Config("Azure endpoint not configured".to_string())
-        })?;
+        let endpoint = self
+            .config
+            .endpoint
+            .as_deref()
+            .ok_or_else(|| VoiceError::Config("Azure endpoint not configured".to_string()))?;
 
         let url = format!("{}/cognitiveservices/v1", endpoint);
 
@@ -439,11 +441,10 @@ impl Synthesizer {
 
     /// Synthesize using ElevenLabs.
     async fn synthesize_elevenlabs(&self, text: &str) -> Result<SynthesisResult> {
-        let api_key = self
-            .config
-            .api_key
-            .as_ref()
-            .ok_or_else(|| VoiceError::Config("ElevenLabs API key not configured".to_string()))?;
+        let api_key =
+            self.config.api_key.as_ref().ok_or_else(|| {
+                VoiceError::Config("ElevenLabs API key not configured".to_string())
+            })?;
 
         let url = format!(
             "https://api.elevenlabs.io/v1/text-to-speech/{}",

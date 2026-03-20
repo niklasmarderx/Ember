@@ -7,6 +7,7 @@
 //! - Object pooling for memory efficiency
 //! - Async task scheduling and throttling
 
+use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, VecDeque};
 use std::future::Future;
 use std::pin::Pin;
@@ -14,7 +15,6 @@ use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, AtomicUsize, Ordering}
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::sync::{oneshot, Mutex, RwLock, Semaphore};
-use serde::{Deserialize, Serialize};
 
 // ============================================================================
 // Connection Pool
@@ -43,8 +43,8 @@ impl Default for PoolConfig {
             min_size: 2,
             max_size: 10,
             connection_timeout_ms: 5_000,
-            idle_timeout_ms: 300_000,    // 5 minutes
-            max_lifetime_ms: 1_800_000,  // 30 minutes
+            idle_timeout_ms: 300_000,   // 5 minutes
+            max_lifetime_ms: 1_800_000, // 30 minutes
             validation_interval_ms: 30_000,
         }
     }
@@ -117,7 +117,7 @@ struct ConnectionPoolInner<T> {
 impl<T: Send + 'static> ConnectionPoolInner<T> {
     async fn return_connection(&self, conn: T, created_at: Instant) {
         self.active_count.fetch_sub(1, Ordering::SeqCst);
-        
+
         // Check if pool is closed or connection is too old
         let max_lifetime = Duration::from_millis(self.config.max_lifetime_ms);
         if self.closed.load(Ordering::SeqCst) || created_at.elapsed() > max_lifetime {
@@ -125,7 +125,7 @@ impl<T: Send + 'static> ConnectionPoolInner<T> {
             self.semaphore.add_permits(1);
             return;
         }
-        
+
         // Return to idle pool
         let mut idle = self.idle_connections.lock().await;
         idle.push_back((conn, Instant::now()));
@@ -150,7 +150,7 @@ where
     /// Create a new connection pool
     pub fn new(config: PoolConfig, factory: F) -> Self {
         let semaphore = Semaphore::new(config.max_size);
-        
+
         Self {
             inner: Arc::new(ConnectionPoolInner {
                 config,
@@ -171,60 +171,61 @@ where
     /// Acquire a connection from the pool
     pub async fn acquire(&self) -> Result<PooledConnection<T>, String> {
         let start = Instant::now();
-        
+
         // Try to acquire permit with timeout
         let timeout = Duration::from_millis(self.inner.config.connection_timeout_ms);
         let permit = tokio::time::timeout(timeout, self.inner.semaphore.acquire())
             .await
             .map_err(|_| {
-                self.inner.acquisition_timeouts.fetch_add(1, Ordering::SeqCst);
+                self.inner
+                    .acquisition_timeouts
+                    .fetch_add(1, Ordering::SeqCst);
                 "Connection pool acquisition timeout".to_string()
             })?
             .map_err(|_| "Pool closed".to_string())?;
-        
+
         // Don't drop permit - we manage it manually
         permit.forget();
-        
+
         self.inner.acquisitions.fetch_add(1, Ordering::SeqCst);
-        
+
         // Try to get an idle connection
         let idle_timeout = Duration::from_millis(self.inner.config.idle_timeout_ms);
         let mut idle = self.inner.idle_connections.lock().await;
-        
+
         while let Some((conn, last_used)) = idle.pop_front() {
             if last_used.elapsed() < idle_timeout {
                 drop(idle);
-                
+
                 let duration = start.elapsed();
-                self.inner.total_acquisition_time_us.fetch_add(
-                    duration.as_micros() as u64,
-                    Ordering::SeqCst,
-                );
+                self.inner
+                    .total_acquisition_time_us
+                    .fetch_add(duration.as_micros() as u64, Ordering::SeqCst);
                 self.inner.active_count.fetch_add(1, Ordering::SeqCst);
-                
+
                 return Ok(PooledConnection {
                     connection: Some(conn),
                     pool: self.inner.clone(),
                     acquired_at: Instant::now(),
-                    created_at: Instant::now() - Duration::from_millis(self.inner.config.max_lifetime_ms / 2),
+                    created_at: Instant::now()
+                        - Duration::from_millis(self.inner.config.max_lifetime_ms / 2),
                 });
             }
             // Connection too old, discard
             self.inner.total_closed.fetch_add(1, Ordering::SeqCst);
         }
         drop(idle);
-        
+
         // Create new connection
         let conn = (self.factory)().await?;
         self.inner.total_created.fetch_add(1, Ordering::SeqCst);
-        
+
         let duration = start.elapsed();
-        self.inner.total_acquisition_time_us.fetch_add(
-            duration.as_micros() as u64,
-            Ordering::SeqCst,
-        );
+        self.inner
+            .total_acquisition_time_us
+            .fetch_add(duration.as_micros() as u64, Ordering::SeqCst);
         self.inner.active_count.fetch_add(1, Ordering::SeqCst);
-        
+
         Ok(PooledConnection {
             connection: Some(conn),
             pool: self.inner.clone(),
@@ -237,7 +238,7 @@ where
     pub fn stats(&self) -> PoolStats {
         let acquisitions = self.inner.acquisitions.load(Ordering::SeqCst);
         let total_time = self.inner.total_acquisition_time_us.load(Ordering::SeqCst);
-        
+
         PoolStats {
             connections_created: self.inner.total_created.load(Ordering::SeqCst),
             connections_closed: self.inner.total_closed.load(Ordering::SeqCst),
@@ -245,7 +246,11 @@ where
             idle_connections: 0, // Would need async to get this
             acquisitions,
             acquisition_timeouts: self.inner.acquisition_timeouts.load(Ordering::SeqCst),
-            avg_acquisition_time_us: if acquisitions > 0 { total_time / acquisitions } else { 0 },
+            avg_acquisition_time_us: if acquisitions > 0 {
+                total_time / acquisitions
+            } else {
+                0
+            },
         }
     }
 
@@ -383,7 +388,10 @@ where
     T: Send + Clone + 'static,
     R: Send + 'static,
     E: Send + Clone + 'static,
-    F: Fn(Vec<T>) -> Pin<Box<dyn Future<Output = Vec<Result<R, E>>> + Send>> + Send + Sync + 'static,
+    F: Fn(Vec<T>) -> Pin<Box<dyn Future<Output = Vec<Result<R, E>>> + Send>>
+        + Send
+        + Sync
+        + 'static,
 {
     /// Create a new batch processor
     pub fn new(config: BatchConfig, processor: F) -> Self {
@@ -399,14 +407,14 @@ where
     /// Submit an item for processing
     pub async fn submit(&self, item: T) -> oneshot::Receiver<Result<R, E>> {
         let (tx, rx) = oneshot::channel();
-        
+
         let mut pending = self.pending.lock().await;
         pending.push((item, tx));
-        
+
         if pending.len() >= self.config.max_batch_size {
             self.flush_internal(&mut pending).await;
         }
-        
+
         rx
     }
 
@@ -420,15 +428,15 @@ where
         if pending.is_empty() {
             return;
         }
-        
+
         let batch: Vec<_> = pending.drain(..).collect();
         let items: Vec<T> = batch.iter().map(|(item, _)| item.clone()).collect();
         let senders: Vec<_> = batch.into_iter().map(|(_, tx)| tx).collect();
-        
+
         // Process batch
         let _permit = self.semaphore.acquire().await.unwrap();
         let results = (self.processor)(items).await;
-        
+
         // Send results
         for (result, tx) in results.into_iter().zip(senders) {
             let _ = tx.send(result);
@@ -467,7 +475,7 @@ impl<T: Send + 'static> ObjectPool<T> {
     /// Acquire an object from the pool
     pub async fn acquire(&self) -> PooledObject<T> {
         let mut objects = self.objects.lock().await;
-        
+
         let object = if let Some(obj) = objects.pop() {
             self.reused.fetch_add(1, Ordering::SeqCst);
             obj
@@ -475,7 +483,7 @@ impl<T: Send + 'static> ObjectPool<T> {
             self.created.fetch_add(1, Ordering::SeqCst);
             (self.factory)()
         };
-        
+
         PooledObject {
             object: Some(object),
             pool: self.objects.clone(),
@@ -619,21 +627,21 @@ impl TaskScheduler {
         F: Future<Output = ()> + Send + 'static,
     {
         let mut queue = self.queue.lock().await;
-        
+
         if queue.len() >= self.config.queue_size {
             return Err("Queue full".to_string());
         }
-        
+
         queue.push(ScheduledTask {
             id: id.to_string(),
             priority,
             task: Box::pin(task),
             created_at: Instant::now(),
         });
-        
+
         // Sort by priority (highest first)
         queue.sort_by(|a, b| b.priority.cmp(&a.priority));
-        
+
         Ok(())
     }
 
@@ -645,7 +653,7 @@ impl TaskScheduler {
                 let mut queue = self.queue.lock().await;
                 queue.pop()
             };
-            
+
             let task = match task {
                 Some(t) => t,
                 None => {
@@ -653,23 +661,23 @@ impl TaskScheduler {
                     continue;
                 }
             };
-            
+
             // Acquire semaphore
             let permit = match self.semaphore.clone().acquire_owned().await {
                 Ok(p) => p,
                 Err(_) => continue,
             };
-            
+
             self.active.fetch_add(1, Ordering::SeqCst);
-            
+
             let completed = self.completed.clone();
             let failed = self.failed.clone();
             let active = self.active.clone();
             let timeout = Duration::from_millis(self.config.task_timeout_ms);
-            
+
             tokio::spawn(async move {
                 let result = tokio::time::timeout(timeout, task.task).await;
-                
+
                 match result {
                     Ok(_) => {
                         completed.fetch_add(1, Ordering::SeqCst);
@@ -678,7 +686,7 @@ impl TaskScheduler {
                         failed.fetch_add(1, Ordering::SeqCst);
                     }
                 }
-                
+
                 active.fetch_sub(1, Ordering::SeqCst);
                 drop(permit);
             });
@@ -734,11 +742,11 @@ impl Throttler {
     pub async fn wait(&self) {
         let mut last = self.last_operation.lock().await;
         let elapsed = last.elapsed();
-        
+
         if elapsed < self.interval {
             tokio::time::sleep(self.interval - elapsed).await;
         }
-        
+
         *last = Instant::now();
     }
 
@@ -746,7 +754,7 @@ impl Throttler {
     pub async fn try_acquire(&self) -> bool {
         let mut last = self.last_operation.lock().await;
         let elapsed = last.elapsed();
-        
+
         if elapsed >= self.interval {
             *last = Instant::now();
             true
@@ -826,10 +834,10 @@ impl CircuitBreakerV2 {
         F: Future<Output = Result<T, E>>,
     {
         self.total_calls.fetch_add(1, Ordering::SeqCst);
-        
+
         // Check state
         let state = *self.state.read().await;
-        
+
         match state {
             BreakerState::Open => {
                 // Check if we should transition to half-open
@@ -849,11 +857,11 @@ impl CircuitBreakerV2 {
             }
             BreakerState::Closed | BreakerState::HalfOpen => {}
         }
-        
+
         // Execute with timeout
         let timeout = Duration::from_millis(self.config.call_timeout_ms);
         let result = tokio::time::timeout(timeout, f).await;
-        
+
         match result {
             Ok(Ok(value)) => {
                 self.on_success().await;
@@ -872,7 +880,7 @@ impl CircuitBreakerV2 {
 
     async fn on_success(&self) {
         let state = *self.state.read().await;
-        
+
         match state {
             BreakerState::HalfOpen => {
                 let count = self.success_count.fetch_add(1, Ordering::SeqCst) + 1;
@@ -890,9 +898,9 @@ impl CircuitBreakerV2 {
 
     async fn on_failure(&self) {
         self.total_failures.fetch_add(1, Ordering::SeqCst);
-        
+
         let state = *self.state.read().await;
-        
+
         match state {
             BreakerState::Closed => {
                 let count = self.failure_count.fetch_add(1, Ordering::SeqCst) + 1;
@@ -985,20 +993,20 @@ impl StringInterner {
                 return interned.clone();
             }
         }
-        
+
         // Intern new string
         let mut strings = self.strings.write().await;
-        
+
         // Double-check after acquiring write lock
         if let Some(interned) = strings.get(s) {
             self.total_hits.fetch_add(1, Ordering::SeqCst);
             return interned.clone();
         }
-        
+
         let interned: Arc<str> = Arc::from(s);
         strings.insert(s.to_string(), interned.clone());
         self.total_interned.fetch_add(1, Ordering::SeqCst);
-        
+
         interned
     }
 
@@ -1035,7 +1043,7 @@ mod tests {
     async fn test_object_pool() {
         let counter = Arc::new(AtomicU32::new(0));
         let counter_clone = counter.clone();
-        
+
         let pool = ObjectPool::new(
             move || {
                 counter_clone.fetch_add(1, Ordering::SeqCst);
@@ -1049,13 +1057,13 @@ mod tests {
             let obj = pool.acquire().await;
             assert_eq!(obj.get().len(), 1024);
         }
-        
+
         // Should reuse
         tokio::time::sleep(Duration::from_millis(10)).await;
         {
             let _obj = pool.acquire().await;
         }
-        
+
         let stats = pool.stats();
         assert_eq!(stats.created, 1);
     }
@@ -1063,13 +1071,13 @@ mod tests {
     #[tokio::test]
     async fn test_throttler() {
         let throttler = Throttler::new(10.0); // 10 ops/sec
-        
+
         let start = Instant::now();
         for _ in 0..3 {
             throttler.wait().await;
         }
         let elapsed = start.elapsed();
-        
+
         // Should take at least 200ms (2 intervals of 100ms)
         assert!(elapsed >= Duration::from_millis(180));
     }
@@ -1090,7 +1098,7 @@ mod tests {
         // Failures to open circuit
         let _: Result<i32, &str> = breaker.call(async { Err("error") }).await;
         let _: Result<i32, &str> = breaker.call(async { Err("error") }).await;
-        
+
         assert_eq!(breaker.state().await, BreakerState::Open);
 
         // Should fail fast
@@ -1099,26 +1107,26 @@ mod tests {
 
         // Wait for half-open
         tokio::time::sleep(Duration::from_millis(150)).await;
-        
+
         // Should allow one request
         let result: Result<i32, &str> = breaker.call(async { Ok(42) }).await;
         assert!(result.is_ok());
-        
+
         assert_eq!(breaker.state().await, BreakerState::Closed);
     }
 
     #[tokio::test]
     async fn test_string_interner() {
         let interner = StringInterner::new();
-        
+
         let s1 = interner.intern("hello").await;
         let s2 = interner.intern("hello").await;
         let s3 = interner.intern("world").await;
-        
+
         // Same pointer for same string
         assert!(Arc::ptr_eq(&s1, &s2));
         assert!(!Arc::ptr_eq(&s1, &s3));
-        
+
         let stats = interner.stats();
         assert_eq!(stats.total_interned, 2);
         assert_eq!(stats.total_hits, 1);
