@@ -1,9 +1,118 @@
 //! Error types for ember-llm
+//!
+//! Each error type has a unique error code for easy troubleshooting:
+//! - E001-E099: Authentication & API Key errors
+//! - E100-E199: Network & Connection errors
+//! - E200-E299: API Response errors
+//! - E300-E399: Model & Provider errors
+//! - E400-E499: Request & Input errors
+//! - E500-E599: Configuration errors
 
 use thiserror::Error;
 
 /// Result type alias for ember-llm operations
 pub type Result<T> = std::result::Result<T, Error>;
+
+/// Error code for troubleshooting
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ErrorCode {
+    // Authentication & API Key errors (E001-E099)
+    /// API key is missing
+    E001,
+    /// API key is invalid
+    E002,
+    /// API key has expired
+    E003,
+    
+    // Network & Connection errors (E100-E199)
+    /// Network request failed
+    E100,
+    /// Connection refused
+    E101,
+    /// Connection timeout
+    E102,
+    /// DNS resolution failed
+    E103,
+    /// SSL/TLS error
+    E104,
+    
+    // API Response errors (E200-E299)
+    /// API returned an error
+    E200,
+    /// Failed to parse response
+    E201,
+    /// Unexpected response format
+    E202,
+    /// Streaming error
+    E203,
+    
+    // Model & Provider errors (E300-E399)
+    /// Model not found
+    E300,
+    /// Provider unavailable
+    E301,
+    /// Rate limit exceeded
+    E302,
+    /// Context length exceeded
+    E303,
+    /// Tool calling not supported
+    E304,
+    
+    // Request & Input errors (E400-E499)
+    /// Invalid request
+    E400,
+    /// Invalid parameters
+    E401,
+    /// Request too large
+    E402,
+    
+    // Configuration errors (E500-E599)
+    /// Configuration error
+    E500,
+    /// Invalid configuration
+    E501,
+}
+
+impl ErrorCode {
+    /// Get the string representation of the error code
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::E001 => "E001",
+            Self::E002 => "E002",
+            Self::E003 => "E003",
+            Self::E100 => "E100",
+            Self::E101 => "E101",
+            Self::E102 => "E102",
+            Self::E103 => "E103",
+            Self::E104 => "E104",
+            Self::E200 => "E200",
+            Self::E201 => "E201",
+            Self::E202 => "E202",
+            Self::E203 => "E203",
+            Self::E300 => "E300",
+            Self::E301 => "E301",
+            Self::E302 => "E302",
+            Self::E303 => "E303",
+            Self::E304 => "E304",
+            Self::E400 => "E400",
+            Self::E401 => "E401",
+            Self::E402 => "E402",
+            Self::E500 => "E500",
+            Self::E501 => "E501",
+        }
+    }
+    
+    /// Get the documentation URL for this error code
+    pub fn doc_url(&self) -> String {
+        format!("https://docs.ember.dev/errors/{}", self.as_str().to_lowercase())
+    }
+}
+
+impl std::fmt::Display for ErrorCode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.as_str())
+    }
+}
 
 /// Errors that can occur during LLM operations
 #[derive(Debug, Error)]
@@ -434,6 +543,58 @@ impl Error {
             Self::HttpError(_) => Some(2),
             Self::ProviderUnavailable { .. } => Some(10),
             _ => None,
+        }
+    }
+
+    /// Get the error code for this error
+    pub fn error_code(&self) -> ErrorCode {
+        match self {
+            Self::ApiKeyMissing { .. } => ErrorCode::E001,
+            Self::HttpError(e) => {
+                if e.is_timeout() {
+                    ErrorCode::E102
+                } else if e.is_connect() {
+                    ErrorCode::E101
+                } else {
+                    ErrorCode::E100
+                }
+            }
+            Self::ApiError { status, .. } => {
+                match *status {
+                    401 => ErrorCode::E002,
+                    429 => ErrorCode::E302,
+                    _ => ErrorCode::E200,
+                }
+            }
+            Self::ParseError(_) => ErrorCode::E201,
+            Self::ModelNotFound { .. } => ErrorCode::E300,
+            Self::RateLimitExceeded { .. } => ErrorCode::E302,
+            Self::ContextLengthExceeded { .. } => ErrorCode::E303,
+            Self::InvalidRequest(_) => ErrorCode::E400,
+            Self::ProviderUnavailable { .. } => ErrorCode::E301,
+            Self::StreamError(_) => ErrorCode::E203,
+            Self::Timeout { .. } => ErrorCode::E102,
+            Self::ConfigError(_) => ErrorCode::E500,
+            Self::ToolError(_) => ErrorCode::E304,
+        }
+    }
+
+    /// Get a short error title for display
+    pub fn title(&self) -> &'static str {
+        match self {
+            Self::ApiKeyMissing { .. } => "API Key Missing",
+            Self::HttpError(_) => "Network Error",
+            Self::ApiError { .. } => "API Error",
+            Self::ParseError(_) => "Parse Error",
+            Self::ModelNotFound { .. } => "Model Not Found",
+            Self::RateLimitExceeded { .. } => "Rate Limit Exceeded",
+            Self::ContextLengthExceeded { .. } => "Context Length Exceeded",
+            Self::InvalidRequest(_) => "Invalid Request",
+            Self::ProviderUnavailable { .. } => "Provider Unavailable",
+            Self::StreamError(_) => "Streaming Error",
+            Self::Timeout { .. } => "Request Timeout",
+            Self::ConfigError(_) => "Configuration Error",
+            Self::ToolError(_) => "Tool Error",
         }
     }
 }

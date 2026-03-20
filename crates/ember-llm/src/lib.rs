@@ -74,7 +74,7 @@ pub mod router;
 pub mod mock;
 
 // Re-exports
-pub use error::{Error, Result};
+pub use error::{Error, ErrorCode, Result};
 pub use provider::LLMProvider;
 pub use types::*;
 

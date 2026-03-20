@@ -136,7 +136,16 @@ enum ConfigAction {
 }
 
 #[tokio::main]
-async fn main() -> Result<()> {
+async fn main() {
+    // Run the actual main function and handle errors gracefully
+    if let Err(e) = run().await {
+        error_display::display_error(&e);
+        std::process::exit(1);
+    }
+}
+
+/// The actual main function that returns a Result
+async fn run() -> Result<()> {
     let cli = Cli::parse();
 
     // Initialize logging
