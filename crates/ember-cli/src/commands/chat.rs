@@ -9,9 +9,9 @@
 //! 2. **Agent Mode (with tools)**
 //!    - Enables AI to execute tools automatically
 //!    - Available tools:
-//!        • shell       – run shell commands
-//!        • filesystem  – read/write files
-//!        • web         – fetch web pages
+//!      - shell: run shell commands
+//!      - filesystem: read/write files
+//!      - web: fetch web pages
 //!
 //! ## Examples
 //!

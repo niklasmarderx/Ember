@@ -127,7 +127,7 @@ fn bench_parameter_parsing(c: &mut Criterion) {
 
     // Benchmark parameter validation (simulated)
     group.bench_function("validate_params", |b| {
-        let schema = json!({
+        let _schema = json!({
             "type": "object",
             "properties": {
                 "name": {"type": "string", "minLength": 1},

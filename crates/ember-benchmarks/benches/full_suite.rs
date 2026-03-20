@@ -409,7 +409,7 @@ fn full_memory_benchmarks(c: &mut Criterion) {
             |b, &size| {
                 b.iter(|| {
                     let mut map: HashMap<String, serde_json::Value> = HashMap::new();
-                    for i in 0..*size {
+                    for i in 0..size {
                         map.insert(format!("key_{}", i), serde_json::json!({"value": i}));
                     }
                     black_box(map)
