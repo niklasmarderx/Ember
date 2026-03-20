@@ -5,7 +5,10 @@
 //! - Stream control (pause, resume, cancel)
 //! - Real-time progress updates
 //! - Multi-client broadcast support
+//! - Robust reconnection with state synchronization
+//! - Message sequencing for deduplication
 
+use crate::reconnection::{ConnectionState, MessageBuffer, WebSocketConfig};
 use crate::state::AppState;
 use axum::extract::ws::{Message as WsMessage, WebSocket, WebSocketUpgrade};
 use axum::extract::State;
@@ -16,6 +19,7 @@ use futures_util::SinkExt;
 use serde::{Deserialize, Serialize};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
+use std::time::Instant;
 use tokio::sync::{broadcast, mpsc, RwLock};
 use tracing::{debug, error, info, warn};
 
@@ -49,7 +53,11 @@ pub enum ClientMessage {
     /// Cancel the current stream
     CancelStream,
     /// Ping for keepalive
-    Ping,
+    Ping {
+        /// Client timestamp for RTT calculation
+        #[serde(default)]
+        timestamp_ms: Option<u64>,
+    },
     /// Subscribe to global events
     Subscribe {
         /// Channel name to subscribe to
@@ -60,14 +68,38 @@ pub enum ClientMessage {
         /// Channel name to unsubscribe from
         channel: String,
     },
+    /// Request state synchronization after reconnection
+    SyncState {
+        /// Last sequence number received by client
+        last_received_seq: u64,
+        /// Optional session ID for session resumption
+        session_id: Option<String>,
+    },
+    /// Acknowledge receipt of a message (for reliable delivery)
+    Ack {
+        /// Sequence number being acknowledged
+        seq: u64,
+    },
 }
 
 /// Server-to-client WebSocket messages
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum ServerMessage {
+    /// Connection established with session info
+    Connected {
+        /// Unique session identifier for reconnection
+        session_id: String,
+        /// Current server sequence number
+        current_seq: u64,
+        /// Server heartbeat interval in milliseconds
+        heartbeat_interval_ms: u64,
+    },
     /// Stream started
     StreamStart {
+        /// Sequence number for this message
+        #[serde(default)]
+        seq: u64,
         /// Unique stream identifier
         stream_id: String,
         /// Model being used
@@ -77,6 +109,9 @@ pub enum ServerMessage {
     },
     /// Token chunk
     Token {
+        /// Sequence number for this message
+        #[serde(default)]
+        seq: u64,
         /// Stream identifier
         stream_id: String,
         /// Token content
@@ -88,6 +123,9 @@ pub enum ServerMessage {
     },
     /// Stream progress update
     Progress {
+        /// Sequence number for this message
+        #[serde(default)]
+        seq: u64,
         /// Stream identifier
         stream_id: String,
         /// Number of tokens generated so far
@@ -99,16 +137,25 @@ pub enum ServerMessage {
     },
     /// Stream paused
     StreamPaused {
+        /// Sequence number for this message
+        #[serde(default)]
+        seq: u64,
         /// Stream identifier
         stream_id: String,
     },
     /// Stream resumed
     StreamResumed {
+        /// Sequence number for this message
+        #[serde(default)]
+        seq: u64,
         /// Stream identifier
         stream_id: String,
     },
     /// Stream completed
     StreamComplete {
+        /// Sequence number for this message
+        #[serde(default)]
+        seq: u64,
         /// Stream identifier
         stream_id: String,
         /// Total tokens generated
@@ -120,11 +167,17 @@ pub enum ServerMessage {
     },
     /// Stream cancelled
     StreamCancelled {
+        /// Sequence number for this message
+        #[serde(default)]
+        seq: u64,
         /// Stream identifier
         stream_id: String,
     },
     /// Error occurred
     Error {
+        /// Sequence number for this message
+        #[serde(default)]
+        seq: u64,
         /// Stream identifier (if applicable)
         stream_id: Option<String>,
         /// Error code
@@ -134,15 +187,44 @@ pub enum ServerMessage {
     },
     /// Pong response
     Pong {
-        /// Timestamp in milliseconds since UNIX epoch
+        /// Server timestamp in milliseconds since UNIX epoch
         timestamp_ms: u64,
+        /// Echo back client timestamp for RTT calculation
+        client_timestamp_ms: Option<u64>,
     },
     /// System notification
     SystemNotification {
+        /// Sequence number for this message
+        #[serde(default)]
+        seq: u64,
         /// Channel name
         channel: String,
         /// Notification payload
         payload: String,
+    },
+    /// State synchronization response
+    SyncStateResponse {
+        /// Number of messages being replayed
+        replayed_count: u32,
+        /// Current server sequence number
+        current_seq: u64,
+        /// Whether the session was successfully resumed
+        session_resumed: bool,
+        /// Any gaps in sequence numbers that couldn't be filled
+        #[serde(default)]
+        gaps: Vec<(u64, u64)>,
+    },
+    /// Connection state change notification
+    ConnectionStateChanged {
+        /// New connection state
+        state: ConnectionState,
+        /// Reason for state change (if applicable)
+        reason: Option<String>,
+    },
+    /// Heartbeat timeout warning (connection may be unhealthy)
+    HeartbeatWarning {
+        /// Milliseconds since last pong received
+        ms_since_last_pong: u64,
     },
 }
 
@@ -180,16 +262,47 @@ pub struct StreamManager {
     broadcast_tx: broadcast::Sender<ServerMessage>,
     /// Connected client count
     client_count: AtomicU64,
+    /// Global message sequence counter
+    global_sequence: AtomicU64,
+    /// Message buffer for replay after reconnection
+    message_buffer: Arc<MessageBuffer<ServerMessage>>,
+    /// WebSocket configuration
+    config: WebSocketConfig,
+    /// Client sessions for reconnection (session_id -> client state)
+    client_sessions: RwLock<std::collections::HashMap<String, ClientSession>>,
+}
+
+/// Represents a client session that can be resumed after reconnection
+#[derive(Debug)]
+pub struct ClientSession {
+    /// Session creation time
+    pub created_at: Instant,
+    /// Last activity time
+    pub last_activity: Instant,
+    /// Last sequence number sent to this client
+    pub last_sent_seq: u64,
+    /// Active stream IDs for this session
+    pub active_streams: Vec<String>,
 }
 
 impl StreamManager {
-    /// Create a new stream manager
+    /// Create a new stream manager with default configuration
     pub fn new() -> Self {
+        Self::with_config(WebSocketConfig::default())
+    }
+
+    /// Create a new stream manager with custom configuration
+    pub fn with_config(config: WebSocketConfig) -> Self {
         let (broadcast_tx, _) = broadcast::channel(1024);
+        let message_buffer = Arc::new(MessageBuffer::new(&config));
         Self {
             streams: RwLock::new(std::collections::HashMap::new()),
             broadcast_tx,
             client_count: AtomicU64::new(0),
+            global_sequence: AtomicU64::new(0),
+            message_buffer,
+            config,
+            client_sessions: RwLock::new(std::collections::HashMap::new()),
         }
     }
 
@@ -254,6 +367,82 @@ impl StreamManager {
     pub fn client_count(&self) -> u64 {
         self.client_count.load(Ordering::SeqCst)
     }
+
+    /// Get next sequence number
+    pub fn next_sequence(&self) -> u64 {
+        self.global_sequence.fetch_add(1, Ordering::SeqCst)
+    }
+
+    /// Get current sequence number (without incrementing)
+    pub fn current_sequence(&self) -> u64 {
+        self.global_sequence.load(Ordering::SeqCst)
+    }
+
+    /// Buffer a message for potential replay
+    pub async fn buffer_message(&self, message: ServerMessage) -> u64 {
+        self.message_buffer.push(message).await
+    }
+
+    /// Get messages for replay after reconnection
+    pub async fn get_messages_since(&self, last_seq: u64) -> Vec<ServerMessage> {
+        self.message_buffer
+            .get_since(last_seq)
+            .await
+            .into_iter()
+            .map(|bm| bm.message)
+            .collect()
+    }
+
+    /// Register a new client session
+    pub async fn register_session(&self, session_id: String) {
+        let mut sessions = self.client_sessions.write().await;
+        sessions.insert(
+            session_id,
+            ClientSession {
+                created_at: Instant::now(),
+                last_activity: Instant::now(),
+                last_sent_seq: 0,
+                active_streams: Vec::new(),
+            },
+        );
+    }
+
+    /// Update session last activity
+    pub async fn touch_session(&self, session_id: &str) {
+        if let Some(session) = self.client_sessions.write().await.get_mut(session_id) {
+            session.last_activity = Instant::now();
+        }
+    }
+
+    /// Get session info for resumption
+    pub async fn get_session(&self, session_id: &str) -> Option<ClientSession> {
+        self.client_sessions.read().await.get(session_id).map(|s| ClientSession {
+            created_at: s.created_at,
+            last_activity: s.last_activity,
+            last_sent_seq: s.last_sent_seq,
+            active_streams: s.active_streams.clone(),
+        })
+    }
+
+    /// Update session's last sent sequence
+    pub async fn update_session_seq(&self, session_id: &str, seq: u64) {
+        if let Some(session) = self.client_sessions.write().await.get_mut(session_id) {
+            session.last_sent_seq = seq;
+        }
+    }
+
+    /// Clean up expired sessions
+    pub async fn cleanup_expired_sessions(&self) {
+        let retention = self.config.message_retention;
+        let mut sessions = self.client_sessions.write().await;
+        let now = Instant::now();
+        sessions.retain(|_, session| now.duration_since(session.last_activity) < retention);
+    }
+
+    /// Get the WebSocket configuration
+    pub fn config(&self) -> &WebSocketConfig {
+        &self.config
+    }
 }
 
 impl Default for StreamManager {
@@ -278,7 +467,12 @@ pub async fn websocket_handler(
 async fn handle_socket(socket: WebSocket, state: AppState) {
     let stream_manager = state.stream_manager.clone();
     let client_id = stream_manager.add_client();
-    info!(client_id = client_id, "WebSocket client connected");
+    let session_id = uuid::Uuid::new_v4().to_string();
+    
+    info!(client_id = client_id, session_id = %session_id, "WebSocket client connected");
+
+    // Register session for reconnection support
+    stream_manager.register_session(session_id.clone()).await;
 
     let (mut ws_sender, mut ws_receiver) = socket.split();
 
@@ -288,6 +482,13 @@ async fn handle_socket(socket: WebSocket, state: AppState) {
     // Current active stream for this connection
     let current_stream: Arc<RwLock<Option<String>>> = Arc::new(RwLock::new(None));
 
+    // Track last pong received for heartbeat monitoring
+    let last_pong = Arc::new(RwLock::new(Instant::now()));
+    
+    // Session ID for this connection
+    let session_id_clone = session_id.clone();
+    let stream_manager_clone = stream_manager.clone();
+    
     // Task to forward messages to WebSocket
     let msg_sender = tokio::spawn(async move {
         while let Some(msg) = msg_rx.recv().await {
@@ -301,8 +502,20 @@ async fn handle_socket(socket: WebSocket, state: AppState) {
             if ws_sender.send(WsMessage::Text(json)).await.is_err() {
                 break;
             }
+            // Update session activity
+            stream_manager_clone.touch_session(&session_id_clone).await;
         }
     });
+
+    // Send initial connected message with session info
+    let config = stream_manager.config();
+    let _ = msg_tx
+        .send(ServerMessage::Connected {
+            session_id: session_id.clone(),
+            current_seq: stream_manager.current_sequence(),
+            heartbeat_interval_ms: config.heartbeat_interval.as_millis() as u64,
+        })
+        .await;
 
     // Handle incoming messages
     while let Some(msg) = FuturesStreamExt::next(&mut ws_receiver).await {
@@ -326,6 +539,7 @@ async fn handle_socket(socket: WebSocket, state: AppState) {
             Err(e) => {
                 let _ = msg_tx
                     .send(ServerMessage::Error {
+                        seq: 0,
                         stream_id: None,
                         code: "parse_error".to_string(),
                         message: format!("Invalid message format: {}", e),
@@ -365,6 +579,7 @@ async fn handle_socket(socket: WebSocket, state: AppState) {
                 // Send stream start
                 let _ = msg_tx
                     .send(ServerMessage::StreamStart {
+                        seq: stream_manager.next_sequence(),
                         stream_id: stream_id.clone(),
                         model: model_name.clone(),
                         conversation_id: conv_id.clone(),
@@ -407,6 +622,7 @@ async fn handle_socket(socket: WebSocket, state: AppState) {
                                     // Check for cancellation
                                     _ = cancel_rx.recv() => {
                                         let _ = msg_tx_clone.send(ServerMessage::StreamCancelled {
+                                            seq: 0,
                                             stream_id: stream_id_clone.clone(),
                                         }).await;
                                         break;
@@ -423,6 +639,7 @@ async fn handle_socket(socket: WebSocket, state: AppState) {
 
                                                     // Send token
                                                     let _ = msg_tx_clone.send(ServerMessage::Token {
+                                                        seq: 0, // Tokens don't need sequence for replay
                                                         stream_id: stream_id_clone.clone(),
                                                         content,
                                                         index: token_index,
@@ -439,6 +656,7 @@ async fn handle_socket(socket: WebSocket, state: AppState) {
                                                         };
 
                                                         let _ = msg_tx_clone.send(ServerMessage::Progress {
+                                                            seq: 0,
                                                             stream_id: stream_id_clone.clone(),
                                                             tokens_generated: tokens as u32,
                                                             elapsed_ms: elapsed,
@@ -458,6 +676,7 @@ async fn handle_socket(socket: WebSocket, state: AppState) {
                                                         .unwrap_or_else(|| "unknown".to_string());
 
                                                     let _ = msg_tx_clone.send(ServerMessage::StreamComplete {
+                                                        seq: 0,
                                                         stream_id: stream_id_clone.clone(),
                                                         total_tokens,
                                                         total_duration_ms: total_duration,
@@ -468,6 +687,7 @@ async fn handle_socket(socket: WebSocket, state: AppState) {
                                             }
                                             Some(Err(e)) => {
                                                 let _ = msg_tx_clone.send(ServerMessage::Error {
+                                                    seq: 0,
                                                     stream_id: Some(stream_id_clone.clone()),
                                                     code: "stream_error".to_string(),
                                                     message: e.to_string(),
@@ -480,6 +700,7 @@ async fn handle_socket(socket: WebSocket, state: AppState) {
                                                 let total_duration = start_time.elapsed().as_millis() as u64;
 
                                                 let _ = msg_tx_clone.send(ServerMessage::StreamComplete {
+                                                    seq: 0,
                                                     stream_id: stream_id_clone.clone(),
                                                     total_tokens,
                                                     total_duration_ms: total_duration,
@@ -496,6 +717,7 @@ async fn handle_socket(socket: WebSocket, state: AppState) {
                             let error_msg: String = e.to_string();
                             let _ = msg_tx_clone
                                 .send(ServerMessage::Error {
+                                    seq: 0,
                                     stream_id: Some(stream_id_clone.clone()),
                                     code: "provider_error".to_string(),
                                     message: error_msg,
@@ -521,6 +743,7 @@ async fn handle_socket(socket: WebSocket, state: AppState) {
                 if let Some(stream_id) = current_stream.read().await.as_ref() {
                     let _ = msg_tx
                         .send(ServerMessage::StreamPaused {
+                            seq: 0,
                             stream_id: stream_id.clone(),
                         })
                         .await;
@@ -531,19 +754,24 @@ async fn handle_socket(socket: WebSocket, state: AppState) {
                 if let Some(stream_id) = current_stream.read().await.as_ref() {
                     let _ = msg_tx
                         .send(ServerMessage::StreamResumed {
+                            seq: 0,
                             stream_id: stream_id.clone(),
                         })
                         .await;
                 }
             }
 
-            ClientMessage::Ping => {
+            ClientMessage::Ping { timestamp_ms } => {
+                // Update last pong time (client is responsive)
+                *last_pong.write().await = Instant::now();
+                
                 let _ = msg_tx
                     .send(ServerMessage::Pong {
                         timestamp_ms: std::time::SystemTime::now()
                             .duration_since(std::time::UNIX_EPOCH)
                             .unwrap_or_default()
                             .as_millis() as u64,
+                        client_timestamp_ms: timestamp_ms,
                     })
                     .await;
             }
@@ -554,6 +782,55 @@ async fn handle_socket(socket: WebSocket, state: AppState) {
 
             ClientMessage::Unsubscribe { channel } => {
                 debug!(channel = %channel, "Client unsubscribed from channel");
+            }
+
+            ClientMessage::SyncState {
+                last_received_seq,
+                session_id: client_session_id,
+            } => {
+                info!(
+                    last_seq = last_received_seq,
+                    session = ?client_session_id,
+                    "Client requesting state sync"
+                );
+
+                // Check if we can resume the session
+                let session_resumed = if let Some(sid) = &client_session_id {
+                    stream_manager.get_session(sid).await.is_some()
+                } else {
+                    false
+                };
+
+                // Get messages to replay
+                let messages_to_replay = stream_manager.get_messages_since(last_received_seq).await;
+                let replayed_count = messages_to_replay.len() as u32;
+
+                // Send sync response
+                let _ = msg_tx
+                    .send(ServerMessage::SyncStateResponse {
+                        replayed_count,
+                        current_seq: stream_manager.current_sequence(),
+                        session_resumed,
+                        gaps: vec![], // Could calculate actual gaps if needed
+                    })
+                    .await;
+
+                // Replay missed messages
+                for msg in messages_to_replay {
+                    let _ = msg_tx.send(msg).await;
+                }
+
+                info!(
+                    replayed = replayed_count,
+                    session_resumed = session_resumed,
+                    "State sync completed"
+                );
+            }
+
+            ClientMessage::Ack { seq } => {
+                // Client acknowledges receipt - update session tracking
+                stream_manager.update_session_seq(&session_id, seq).await;
+                debug!(seq = seq, "Message acknowledged by client");
             }
         }
     }

@@ -56,6 +56,7 @@
 
 pub mod error;
 pub mod handlers;
+pub mod reconnection;
 pub mod routes;
 pub mod state;
 pub mod websocket;
@@ -71,6 +72,10 @@ pub use routes::{
     create_router, create_router_api_only, create_router_with_static, paths, API_PREFIX,
 };
 pub use state::{AppState, LLMProviderType, ServerConfig};
+pub use reconnection::{
+    BackoffCalculator, BufferedMessage, ClientStateTracker, ConnectionState, MessageBuffer,
+    SyncStateRequest, SyncStateResponse, WebSocketConfig,
+};
 pub use websocket::{ClientMessage, ServerMessage, StreamManager, StreamsInfoResponse};
 
 use std::net::SocketAddr;
