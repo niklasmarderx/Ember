@@ -59,14 +59,15 @@ pub fn might_contain_pii(value: &str) -> bool {
     let lower = value.to_lowercase();
 
     // Check for common PII patterns
+    // All patterns must be lowercase since we compare against lowercased input
     let pii_patterns = [
-        "@",        // Email
-        "password", // Credentials
-        "secret",   // Secrets
-        "token",    // Tokens
-        "key",      // API keys
-        "Bearer",   // Auth headers
-        "Authorization",
+        "@",             // Email
+        "password",      // Credentials
+        "secret",        // Secrets
+        "token",         // Tokens
+        "key",           // API keys
+        "bearer",        // Auth headers (lowercase for comparison)
+        "authorization", // Auth headers (lowercase for comparison)
         "api_key",
         "apikey",
     ];

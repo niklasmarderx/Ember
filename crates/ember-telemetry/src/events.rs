@@ -190,20 +190,22 @@ fn bucket_duration(duration_secs: u64) -> String {
 /// Anonymize model names to remove any custom/personal identifiers
 fn anonymize_model_name(model: &str) -> String {
     // Known model patterns - keep only the base model name
+    // IMPORTANT: More specific (longer) patterns must come first to ensure correct matching
+    // e.g., "gpt-4-turbo" must be checked before "gpt-4"
     let known_models = [
-        "gpt-4",
         "gpt-4-turbo",
         "gpt-4o",
+        "gpt-4",
         "gpt-3.5",
+        "claude-instant",
         "claude-3",
         "claude-2",
-        "claude-instant",
-        "gemini-pro",
         "gemini-ultra",
-        "llama",
-        "mistral",
-        "mixtral",
+        "gemini-pro",
         "codellama",
+        "llama",
+        "mixtral",
+        "mistral",
         "deepseek",
         "qwen",
         "phi",
