@@ -763,7 +763,10 @@ mod tests {
         for i in 0..10 {
             manager.add_message(
                 MessageRole::User,
-                &format!("This is a longer test message number {} with more content", i),
+                &format!(
+                    "This is a longer test message number {} with more content",
+                    i
+                ),
             );
         }
 
