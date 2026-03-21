@@ -748,23 +748,28 @@ mod tests {
     #[test]
     fn test_pruning() {
         let config = ContextConfig {
-            max_tokens: 100,
-            reserved_response_tokens: 20,
-            reserved_system_tokens: 20,
+            max_tokens: 50, // Lower max to ensure pruning is triggered
+            reserved_response_tokens: 10,
+            reserved_system_tokens: 10,
             preserve_recent_count: 2,
             ..Default::default()
         };
 
         let mut manager = ContextManager::with_config(config);
 
-        // Add messages until pruning is triggered
-        for i in 0..20 {
-            manager.add_message(MessageRole::User, &format!("Message {}", i));
+        // Add messages with longer content to ensure we exceed token limit
+        // Available tokens: 50 - 10 - 10 = 30 tokens
+        // Each message ~10 tokens -> 3 messages should trigger pruning
+        for i in 0..10 {
+            manager.add_message(
+                MessageRole::User,
+                &format!("This is a longer test message number {} with more content", i),
+            );
         }
 
         // Should have pruned some messages
         assert!(manager.stats.messages_pruned > 0);
-        assert!(manager.message_count() < 20);
+        assert!(manager.message_count() < 10);
     }
 
     #[test]
