@@ -1121,7 +1121,7 @@ mod tests {
 
         let duplicates = engine.find_duplicates(&lines);
         // The algorithm requires min_lines (5) consecutive matching lines
-        // Lines 1-5 and 9-13 share: "let x = 1;", "let y = 2;", "let z = x + y;", 
+        // Lines 1-5 and 9-13 share: "let x = 1;", "let y = 2;", "let z = x + y;",
         // "println!(\"{}\", z);", "let result = z * 2;" - that's 5 lines
         assert!(
             duplicates.is_some(),
