@@ -191,7 +191,6 @@ impl std::str::FromStr for Locale {
     }
 }
 
-
 /// Errors that can occur during i18n operations
 #[derive(Error, Debug)]
 pub enum I18nError {

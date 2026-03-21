@@ -163,10 +163,7 @@ impl PreferenceLearner {
                 .project_type
                 .clone()
                 .unwrap_or_else(|| "general".to_string());
-            let pref = self
-                .model_preferences
-                .entry(task_type)
-                .or_default();
+            let pref = self.model_preferences.entry(task_type).or_default();
 
             if event.event_type == EventType::SuggestionAccepted {
                 pref.success_count += 1;

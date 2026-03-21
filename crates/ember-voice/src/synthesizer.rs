@@ -337,11 +337,7 @@ impl Synthesizer {
                     </prosody>
                 </voice>
             </speak>"#,
-            self.config.voice.language,
-            self.config.voice.id,
-            rate_percent,
-            self.config.pitch,
-            text
+            self.config.voice.language, self.config.voice.id, rate_percent, self.config.pitch, text
         );
 
         let response = self

@@ -781,7 +781,10 @@ impl AuditLogger {
         matches!(
             (self.config.min_severity, severity),
             (AuditSeverity::Critical, AuditSeverity::Critical)
-                | (AuditSeverity::Error, AuditSeverity::Critical | AuditSeverity::Error)
+                | (
+                    AuditSeverity::Error,
+                    AuditSeverity::Critical | AuditSeverity::Error
+                )
                 | (
                     AuditSeverity::Warning,
                     AuditSeverity::Critical | AuditSeverity::Error | AuditSeverity::Warning,
@@ -1174,16 +1177,12 @@ impl PolicyEngine {
                     false
                 }
             }
-            ConditionOperator::In => {
-                value
-                    .map(|v| condition.value.split(',').any(|item| item == v))
-                    .unwrap_or(false)
-            }
-            ConditionOperator::NotIn => {
-                value
-                    .map(|v| !condition.value.split(',').any(|item| item == v))
-                    .unwrap_or(true)
-            }
+            ConditionOperator::In => value
+                .map(|v| condition.value.split(',').any(|item| item == v))
+                .unwrap_or(false),
+            ConditionOperator::NotIn => value
+                .map(|v| !condition.value.split(',').any(|item| item == v))
+                .unwrap_or(true),
         }
     }
 }
