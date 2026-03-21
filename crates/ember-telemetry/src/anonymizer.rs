@@ -35,7 +35,7 @@ pub fn sanitize_string(value: &str) -> String {
     let sanitized = value
         .replace(std::path::MAIN_SEPARATOR, "/")
         .split('/')
-        .last()
+        .next_back()
         .unwrap_or(value)
         .to_string();
 

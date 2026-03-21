@@ -582,7 +582,7 @@ impl ContextManager {
         let assistant_weight = self.config.priority_weights.assistant_message;
         let tool_weight = self.config.priority_weights.tool_call;
 
-        for msg in self.messages.iter_mut() {
+        for msg in &mut self.messages {
             let recency = (current_index - msg.index) as f64;
             let recency_factor = 1.0 / (1.0 + recency * recency_multiplier);
             let base_priority = match msg.role {

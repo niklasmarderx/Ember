@@ -197,7 +197,7 @@ impl PatternRecognizer {
                 name: name.to_string(),
                 description: describe_workflow(name),
                 steps: actions.iter().map(|a| a.event_type).collect(),
-                context_triggers: vec![context],
+                context_triggers: vec![context.clone()],
                 occurrence_count: 1,
                 confidence: 0.5,
             });
@@ -347,6 +347,7 @@ impl SequencePattern {
 }
 
 /// Internal action record.
+#[allow(dead_code)]
 #[derive(Debug, Clone)]
 struct ActionRecord {
     event_type: EventType,

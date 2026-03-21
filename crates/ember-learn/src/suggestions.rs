@@ -10,6 +10,7 @@ use uuid::Uuid;
 #[derive(Debug, Clone, Default)]
 pub struct SuggestionEngine {
     /// Cached suggestions.
+    #[allow(dead_code)]
     cache: Vec<CachedSuggestion>,
     /// Configuration.
     config: SuggestionConfig,
@@ -332,6 +333,7 @@ impl Default for SuggestionConfig {
 }
 
 /// Cached suggestion for quick retrieval.
+#[allow(dead_code)]
 #[derive(Debug, Clone)]
 struct CachedSuggestion {
     suggestion: Suggestion,

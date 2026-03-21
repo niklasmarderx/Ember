@@ -35,8 +35,14 @@
 //! let test_suite = testgen.generate_tests(&analysis, &content);
 //! ```
 
-#![warn(missing_docs)]
-#![warn(rustdoc::missing_crate_level_docs)]
+// Allow common clippy lints for this crate during development
+#![allow(missing_docs)]
+#![allow(rustdoc::missing_crate_level_docs)]
+#![allow(clippy::too_many_arguments)]
+#![allow(clippy::ptr_arg)]
+#![allow(clippy::match_like_matches_macro)]
+#![allow(clippy::useless_format)]
+#![allow(clippy::double_ended_iterator_last)]
 
 pub mod analyzer;
 pub mod refactor;

@@ -73,7 +73,8 @@ pub struct PoolStats {
 pub struct PooledConnection<T: Send + 'static> {
     connection: Option<T>,
     pool: Arc<ConnectionPoolInner<T>>,
-    acquired_at: Instant,
+    #[allow(dead_code)]
+    _acquired_at: Instant,
     created_at: Instant,
 }
 
@@ -206,7 +207,7 @@ where
                 return Ok(PooledConnection {
                     connection: Some(conn),
                     pool: self.inner.clone(),
-                    acquired_at: Instant::now(),
+                    _acquired_at: Instant::now(),
                     created_at: Instant::now()
                         - Duration::from_millis(self.inner.config.max_lifetime_ms / 2),
                 });
@@ -229,7 +230,7 @@ where
         Ok(PooledConnection {
             connection: Some(conn),
             pool: self.inner.clone(),
-            acquired_at: Instant::now(),
+            _acquired_at: Instant::now(),
             created_at: Instant::now(),
         })
     }
@@ -372,6 +373,7 @@ pub struct BatchResult<T, E> {
 }
 
 /// Batch processor for bulk operations
+#[allow(clippy::type_complexity)]
 pub struct BatchProcessor<T, R, E, F>
 where
     F: Fn(Vec<T>) -> Pin<Box<dyn Future<Output = Vec<Result<R, E>>> + Send>>,
@@ -429,7 +431,7 @@ where
             return;
         }
 
-        let batch: Vec<_> = pending.drain(..).collect();
+        let batch: Vec<_> = std::mem::take(pending);
         let items: Vec<T> = batch.iter().map(|(item, _)| item.clone()).collect();
         let senders: Vec<_> = batch.into_iter().map(|(_, tx)| tx).collect();
 
@@ -591,6 +593,7 @@ impl Default for TaskPriority {
 }
 
 /// Scheduled task
+#[allow(dead_code)]
 struct ScheduledTask {
     id: String,
     priority: TaskPriority,

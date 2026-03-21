@@ -315,7 +315,7 @@ fn setup_tray(app: &App) -> Result<TrayIcon, Box<dyn std::error::Error>> {
                                         .notification()
                                         .builder()
                                         .title("Update Available")
-                                        .body(&format!("Version {} is available", update.version))
+                                        .body(format!("Version {} is available", update.version))
                                         .show();
                                 }
                                 Ok(None) => {
@@ -350,7 +350,7 @@ fn setup_tray(app: &App) -> Result<TrayIcon, Box<dyn std::error::Error>> {
                             .notification()
                             .builder()
                             .title("Model Changed")
-                            .body(&format!("Now using {}", model))
+                            .body(format!("Now using {}", model))
                             .show();
 
                         if let Some(window) = app.get_webview_window("main") {
@@ -432,7 +432,7 @@ async fn check_updates_on_startup(app: AppHandle) {
                     .notification()
                     .builder()
                     .title("Update Available")
-                    .body(&format!(
+                    .body(format!(
                         "Ember AI {} is available. Click to update.",
                         update.version
                     ))

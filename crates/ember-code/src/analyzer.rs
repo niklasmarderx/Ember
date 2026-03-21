@@ -833,7 +833,7 @@ impl CodeAnalyzer {
         &self,
         path: &Path,
         content: &str,
-        language: Language,
+        _language: Language,
         metrics: &ComplexityMetrics,
         symbols: &[CodeSymbol],
     ) -> Vec<CodeSmell> {

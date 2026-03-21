@@ -2,7 +2,7 @@
 //!
 //! Learns user preferences from interactions.
 
-use crate::{EventContext, EventType, LearningEvent};
+use crate::{EventType, LearningEvent};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -166,7 +166,7 @@ impl PreferenceLearner {
             let pref = self
                 .model_preferences
                 .entry(task_type)
-                .or_insert_with(ModelPreference::default);
+                .or_default();
 
             if event.event_type == EventType::SuggestionAccepted {
                 pref.success_count += 1;
@@ -356,7 +356,7 @@ impl ActivityPatterns {
     }
 }
 
-use chrono::{Datelike, Timelike, Weekday};
+use chrono::{Datelike, Timelike};
 
 #[cfg(test)]
 mod tests {

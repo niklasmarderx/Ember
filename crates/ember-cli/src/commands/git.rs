@@ -1022,11 +1022,11 @@ fn infer_emoji(files: &[&str]) -> &'static str {
 fn generate_pr_title(branch: &str) -> String {
     let parts: Vec<&str> = branch.split('/').collect();
     if parts.len() >= 2 {
-        let desc = parts[1..].join(" ").replace('-', " ").replace('_', " ");
+        let desc = parts[1..].join(" ").replace(['-', '_'], " ");
         let first_char = desc.chars().next().unwrap_or(' ').to_uppercase();
         format!("{}{}", first_char, &desc[1..])
     } else {
-        branch.replace('-', " ").replace('_', " ")
+        branch.replace(['-', '_'], " ")
     }
 }
 

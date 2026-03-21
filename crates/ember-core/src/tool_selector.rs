@@ -385,7 +385,7 @@ impl ToolSelector {
     }
 
     /// Find alternative tools.
-    fn find_alternatives(&self, tool_name: &str, query: &str) -> Vec<String> {
+    fn find_alternatives(&self, tool_name: &str, _query: &str) -> Vec<String> {
         let current_tool = match self.tools.get(tool_name) {
             Some(t) => t,
             None => return vec![],
@@ -522,6 +522,7 @@ fn extract_url(query: &str) -> Option<String> {
 }
 
 /// Create default tool metadata for built-in tools.
+#[allow(dead_code)]
 pub fn builtin_tool_metadata() -> Vec<ToolMetadata> {
     vec![
         ToolMetadata {

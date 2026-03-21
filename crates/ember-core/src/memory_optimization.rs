@@ -373,7 +373,8 @@ pub struct LazyConversationLoader<T> {
     /// Loaded conversations cache
     cache: RwLock<LruCache<String, T>>,
     /// Configuration
-    config: MemoryConfig,
+    #[allow(dead_code)]
+    _config: MemoryConfig,
 }
 
 impl<T: Clone + Send + Sync> LazyConversationLoader<T> {
@@ -381,7 +382,7 @@ impl<T: Clone + Send + Sync> LazyConversationLoader<T> {
     pub fn new(config: MemoryConfig) -> Self {
         Self {
             cache: RwLock::new(LruCache::new(config.clone())),
-            config,
+            _config: config,
         }
     }
 

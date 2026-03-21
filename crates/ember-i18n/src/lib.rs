@@ -40,9 +40,10 @@ pub use rust_i18n::t;
 rust_i18n::i18n!("locales", fallback = "en");
 
 /// Supported locales in Ember
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub enum Locale {
     /// English (default)
+    #[default]
     English,
     /// German (Deutsch)
     German,
@@ -190,11 +191,6 @@ impl std::str::FromStr for Locale {
     }
 }
 
-impl Default for Locale {
-    fn default() -> Self {
-        Locale::English
-    }
-}
 
 /// Errors that can occur during i18n operations
 #[derive(Error, Debug)]

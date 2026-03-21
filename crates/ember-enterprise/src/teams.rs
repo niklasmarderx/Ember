@@ -6,7 +6,7 @@
 //! - Team roles
 //! - Invitations
 
-use crate::{EnterpriseError, Result, User};
+use crate::{EnterpriseError, Result};
 use chrono::{DateTime, Duration, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;

@@ -6,6 +6,10 @@
 //! - Role-Based Access Control (RBAC)
 //! - Team management and collaboration
 
+// Allow common clippy lints for this crate during development
+#![allow(clippy::derivable_impls)]
+#![allow(clippy::field_reassign_with_default)]
+
 pub mod audit;
 pub mod auth;
 pub mod rbac;

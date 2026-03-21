@@ -105,7 +105,7 @@ pub enum EventType {
 }
 
 /// Context for a learning event.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct EventContext {
     /// Current language/framework.
     pub language: Option<String>,
@@ -119,19 +119,6 @@ pub struct EventContext {
     pub session_id: Option<String>,
     /// Tags.
     pub tags: Vec<String>,
-}
-
-impl Default for EventContext {
-    fn default() -> Self {
-        Self {
-            language: None,
-            project_type: None,
-            file_path: None,
-            model: None,
-            session_id: None,
-            tags: Vec::new(),
-        }
-    }
 }
 
 /// The main learning system.

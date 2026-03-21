@@ -5,7 +5,7 @@
 use anyhow::{Context, Result};
 use clap::{Args, Subcommand, ValueEnum};
 use colored::Colorize;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 /// Arguments for the code command.
 #[derive(Args)]
@@ -353,7 +353,7 @@ async fn analyze_code(
     for file in &files {
         // Simulate analysis
         let loc = estimate_loc(file)?;
-        let complexity = (loc / 50).max(1).min(25);
+        let complexity = (loc / 50).clamp(1, 25);
         total_loc += loc;
         total_complexity += complexity;
 
@@ -477,17 +477,17 @@ async fn analyze_code(
         }
         OutputFormat::Markdown => {
             let mut md = String::new();
-            md.push_str(&format!("# Code Analysis Report\n\n"));
+            md.push_str("# Code Analysis Report\n\n");
             md.push_str(&format!("**Path:** `{}`\n\n", path.display()));
-            md.push_str(&format!("## Summary\n\n"));
-            md.push_str(&format!("| Metric | Value |\n"));
-            md.push_str(&format!("|--------|-------|\n"));
+            md.push_str("## Summary\n\n");
+            md.push_str("| Metric | Value |\n");
+            md.push_str("|--------|-------|\n");
             md.push_str(&format!("| Files analyzed | {} |\n", files.len()));
             md.push_str(&format!("| Total lines | {} |\n", total_loc));
             md.push_str(&format!("| Average complexity | {} |\n", avg_complexity));
 
             if !high_complexity_files.is_empty() {
-                md.push_str(&format!("\n## High Complexity Files\n\n"));
+                md.push_str("\n## High Complexity Files\n\n");
                 for (file, complexity) in &high_complexity_files {
                     md.push_str(&format!(
                         "- `{}` (complexity: {})\n",
@@ -509,7 +509,7 @@ async fn analyze_code(
             csv.push_str("file,lines,complexity,smells\n");
             for file in &files {
                 let loc = estimate_loc(file).unwrap_or(0);
-                let complexity = (loc / 50).max(1).min(25);
+                let complexity = (loc / 50).clamp(1, 25);
                 let smell_count = smells_found.iter().filter(|(f, _, _)| f == file).count();
                 csv.push_str(&format!(
                     "{},{},{},{}\n",
@@ -973,7 +973,7 @@ fn matches_confidence(confidence: &str, min: ConfidenceLevel) -> bool {
     level >= min_level
 }
 
-fn detect_framework(path: &PathBuf) -> String {
+fn detect_framework(path: &Path) -> String {
     let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("");
     match ext {
         "rs" => "rust-test".to_string(),

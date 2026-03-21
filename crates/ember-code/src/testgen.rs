@@ -491,7 +491,7 @@ def {}(input_val):
         func_name: &str,
         language: Language,
         framework: TestFramework,
-        test_type: TestType,
+        _test_type: TestType,
         inputs: &str,
         expected: &str,
     ) -> String {

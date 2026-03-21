@@ -148,6 +148,7 @@ pub struct ValidationMetadata {
 pub struct InputValidator {
     config: ValidationConfig,
     blocked_regexes: Vec<Regex>,
+    #[allow(dead_code)]
     allowed_regexes: Vec<Regex>,
     url_regex: Regex,
     path_regex: Regex,
@@ -730,7 +731,7 @@ impl AuditLogger {
         category: AuditCategory,
         action: &str,
         actor: &str,
-    ) -> AuditEventBuilder {
+    ) -> AuditEventBuilder<'_> {
         AuditEventBuilder::new(
             self,
             severity,
@@ -777,16 +778,16 @@ impl AuditLogger {
     }
 
     fn should_log_severity(&self, severity: AuditSeverity) -> bool {
-        match (self.config.min_severity, severity) {
-            (AuditSeverity::Critical, AuditSeverity::Critical) => true,
-            (AuditSeverity::Error, AuditSeverity::Critical | AuditSeverity::Error) => true,
-            (
-                AuditSeverity::Warning,
-                AuditSeverity::Critical | AuditSeverity::Error | AuditSeverity::Warning,
-            ) => true,
-            (AuditSeverity::Info, _) => true,
-            _ => false,
-        }
+        matches!(
+            (self.config.min_severity, severity),
+            (AuditSeverity::Critical, AuditSeverity::Critical)
+                | (AuditSeverity::Error, AuditSeverity::Critical | AuditSeverity::Error)
+                | (
+                    AuditSeverity::Warning,
+                    AuditSeverity::Critical | AuditSeverity::Error | AuditSeverity::Warning,
+                )
+                | (AuditSeverity::Info, _)
+        )
     }
 
     fn redact_pii(&self, mut event: AuditEvent) -> AuditEvent {
@@ -1098,7 +1099,7 @@ impl PolicyEngine {
     pub async fn evaluate(&self, context: &PolicyContext) -> PolicyResult {
         let policies = self.policies.read().await;
 
-        for policy in policies.iter().filter(|p| p.enabled) {
+        if let Some(policy) = policies.iter().find(|p| p.enabled) {
             for rule in policy.rules.iter().filter(|r| r.enabled) {
                 if self.matches_conditions(&rule.conditions, context) {
                     return PolicyResult {
@@ -1174,12 +1175,14 @@ impl PolicyEngine {
                 }
             }
             ConditionOperator::In => {
-                let list: Vec<&str> = condition.value.split(',').collect();
-                value.map(|v| list.contains(&v.as_str())).unwrap_or(false)
+                value
+                    .map(|v| condition.value.split(',').any(|item| item == v))
+                    .unwrap_or(false)
             }
             ConditionOperator::NotIn => {
-                let list: Vec<&str> = condition.value.split(',').collect();
-                value.map(|v| !list.contains(&v.as_str())).unwrap_or(true)
+                value
+                    .map(|v| !condition.value.split(',').any(|item| item == v))
+                    .unwrap_or(true)
             }
         }
     }

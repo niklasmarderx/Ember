@@ -328,6 +328,7 @@ impl Synthesizer {
         let url = format!("{}/cognitiveservices/v1", endpoint);
 
         // Build SSML
+        let rate_percent = format!("{:.0}%", (self.config.rate - 1.0) * 100.0);
         let ssml = format!(
             r#"<speak version='1.0' xml:lang='{}'>
                 <voice name='{}'>
@@ -338,7 +339,7 @@ impl Synthesizer {
             </speak>"#,
             self.config.voice.language,
             self.config.voice.id,
-            format!("{:.0}%", (self.config.rate - 1.0) * 100.0),
+            rate_percent,
             self.config.pitch,
             text
         );

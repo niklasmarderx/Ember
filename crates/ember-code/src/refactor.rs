@@ -2,7 +2,7 @@
 //!
 //! AI-powered refactoring suggestions and automatic code transformations.
 
-use crate::analyzer::{CodeSmell, CodeSymbol, FileAnalysis, Language, Severity, SymbolKind};
+use crate::analyzer::{CodeSmell, CodeSymbol, FileAnalysis, Language, SymbolKind};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
@@ -525,7 +525,7 @@ impl RefactoringEngine {
     }
 
     /// Generate split function suggestion
-    fn generate_split_function(&self, code: &str, language: Language) -> String {
+    fn generate_split_function(&self, _code: &str, language: Language) -> String {
         match language {
             Language::Rust => {
                 format!(
@@ -558,7 +558,7 @@ impl RefactoringEngine {
     }
 
     /// Generate early return pattern
-    fn generate_early_return(&self, code: &str, language: Language) -> String {
+    fn generate_early_return(&self, _code: &str, language: Language) -> String {
         // Simplified - in real implementation would parse and transform AST
         match language {
             Language::Rust => "// Instead of:\n\
@@ -1048,6 +1048,7 @@ impl Default for RefactoringEngine {
 }
 
 // Helper trait for Python compatibility
+#[allow(dead_code)]
 trait StringExt {
     fn startswith(&self, prefix: &str) -> bool;
 }

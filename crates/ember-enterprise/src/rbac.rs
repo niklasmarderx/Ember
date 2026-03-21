@@ -430,7 +430,7 @@ impl RbacManager {
     }
 
     /// Check if a user has a specific permission
-    pub fn has_permission(&self, user_id: Uuid, permission: &str) -> Result<bool> {
+    pub fn has_permission(&self, _user_id: Uuid, _permission: &str) -> Result<bool> {
         if !self.config.enabled || !self.config.enforce {
             return Ok(true);
         }
@@ -441,7 +441,7 @@ impl RbacManager {
     }
 
     /// Check if a user can access a resource
-    pub fn can_access(&self, user_id: Uuid, resource: &str, action: &str) -> Result<bool> {
+    pub fn can_access(&self, _user_id: Uuid, _resource: &str, _action: &str) -> Result<bool> {
         if !self.config.enabled || !self.config.enforce {
             return Ok(true);
         }
