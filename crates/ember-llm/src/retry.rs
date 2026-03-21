@@ -285,7 +285,7 @@ impl<P> RetryProvider<P> {
 #[cfg(feature = "retry-provider")]
 mod retry_provider_impl {
     use super::*;
-    use crate::{ModelInfo, StreamResponse};
+    use crate::{provider::StreamResponse, ModelInfo};
     use async_trait::async_trait;
 
     #[async_trait]

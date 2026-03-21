@@ -10,8 +10,8 @@ use std::env;
 use tracing::{debug, instrument};
 
 use crate::{
-    provider::StreamResponse, CompletionRequest, CompletionResponse, ContentPart, Error,
-    FinishReason, LLMProvider, ModelInfo, Result, StreamChunk, TokenUsage, ToolCall, ToolCallDelta,
+    provider::StreamResponse, CompletionRequest, CompletionResponse, Error, FinishReason,
+    LLMProvider, ModelInfo, Result, StreamChunk, TokenUsage, ToolCall, ToolCallDelta,
 };
 
 use tokio_stream::wrappers::ReceiverStream;
@@ -548,7 +548,7 @@ impl From<CompletionRequest> for GroqRequest {
                         m.content_parts
                             .iter()
                             .filter_map(|p| match p {
-                                ContentPart::Text { text } => Some(text.as_str()),
+                                crate::types::ContentPart::Text { text } => Some(text.as_str()),
                                 _ => None,
                             })
                             .collect::<Vec<_>>()
