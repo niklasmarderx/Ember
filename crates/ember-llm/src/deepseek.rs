@@ -501,15 +501,17 @@ struct DeepSeekStreamFunction {
 }
 
 /// Convert Ember ContentPart to DeepSeek ContentPart
-fn convert_content_part(part: &ContentPart) -> DeepSeekContentPart {
+fn convert_content_part(part: &crate::types::ContentPart) -> DeepSeekContentPart {
     match part {
-        ContentPart::Text { text } => DeepSeekContentPart::Text { text: text.clone() },
-        ContentPart::Image { source, .. } => {
+        crate::types::ContentPart::Text { text } => {
+            DeepSeekContentPart::Text { text: text.clone() }
+        }
+        crate::types::ContentPart::Image { source, .. } => {
             let url = match source {
-                ImageSource::Base64 { media_type, data } => {
+                crate::types::ImageSource::Base64 { media_type, data } => {
                     format!("data:{};base64,{}", media_type.as_mime_type(), data)
                 }
-                ImageSource::Url { url } => url.clone(),
+                crate::types::ImageSource::Url { url } => url.clone(),
             };
             DeepSeekContentPart::ImageUrl {
                 image_url: DeepSeekImageUrl { url },

@@ -479,17 +479,17 @@ struct MessageDeltaContent {
 // Conversion implementations
 
 /// Convert Ember ContentPart to Anthropic ContentBlock
-fn convert_content_part_to_anthropic(part: &ContentPart) -> ContentBlock {
+fn convert_content_part_to_anthropic(part: &crate::types::ContentPart) -> ContentBlock {
     match part {
-        ContentPart::Text { text } => ContentBlock::Text { text: text.clone() },
-        ContentPart::Image { source, .. } => match source {
-            ImageSource::Base64 { media_type, data } => ContentBlock::Image {
+        crate::types::ContentPart::Text { text } => ContentBlock::Text { text: text.clone() },
+        crate::types::ContentPart::Image { source, .. } => match source {
+            crate::types::ImageSource::Base64 { media_type, data } => ContentBlock::Image {
                 source: AnthropicImageSource::Base64 {
                     media_type: media_type.as_mime_type().to_string(),
                     data: data.clone(),
                 },
             },
-            ImageSource::Url { url } => ContentBlock::Image {
+            crate::types::ImageSource::Url { url } => ContentBlock::Image {
                 source: AnthropicImageSource::Url { url: url.clone() },
             },
         },

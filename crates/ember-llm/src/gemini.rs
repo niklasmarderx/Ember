@@ -541,7 +541,7 @@ impl GeminiRequest {
                     // Add image content parts
                     for part in msg.content_parts {
                         match part {
-                            ContentPart::Text { text } => {
+                            crate::types::ContentPart::Text { text } => {
                                 parts.push(GeminiPart {
                                     text: Some(text),
                                     inline_data: None,
@@ -549,8 +549,10 @@ impl GeminiRequest {
                                     function_response: None,
                                 });
                             }
-                            ContentPart::Image { source, .. } => {
-                                if let ImageSource::Base64 { media_type, data } = source {
+                            crate::types::ContentPart::Image { source, .. } => {
+                                if let crate::types::ImageSource::Base64 { media_type, data } =
+                                    source
+                                {
                                     parts.push(GeminiPart {
                                         text: None,
                                         inline_data: Some(GeminiInlineData {

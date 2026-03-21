@@ -481,15 +481,17 @@ struct MistralStreamFunction {
 }
 
 /// Convert Ember ContentPart to Mistral ContentPart
-fn convert_content_part(part: &ContentPart) -> MistralContentPart {
+fn convert_content_part(part: &crate::types::ContentPart) -> MistralContentPart {
     match part {
-        ContentPart::Text { text } => MistralContentPart::Text { text: text.clone() },
-        ContentPart::Image { source, .. } => {
+        crate::types::ContentPart::Text { text } => {
+            MistralContentPart::Text { text: text.clone() }
+        }
+        crate::types::ContentPart::Image { source, .. } => {
             let url = match source {
-                ImageSource::Base64 { media_type, data } => {
+                crate::types::ImageSource::Base64 { media_type, data } => {
                     format!("data:{};base64,{}", media_type.as_mime_type(), data)
                 }
-                ImageSource::Url { url } => url.clone(),
+                crate::types::ImageSource::Url { url } => url.clone(),
             };
             MistralContentPart::ImageUrl {
                 image_url: MistralImageUrl { url },
