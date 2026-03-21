@@ -1095,24 +1095,24 @@ mod tests {
         });
 
         // Success
-        let result: Result<i32, &str> = breaker.call(async { Ok(42) }).await;
+        let result = breaker.call(async { Ok::<i32, &str>(42) }).await;
         assert!(result.is_ok());
 
         // Failures to open circuit
-        let _: Result<i32, &str> = breaker.call(async { Err("error") }).await;
-        let _: Result<i32, &str> = breaker.call(async { Err("error") }).await;
+        let _ = breaker.call(async { Err::<i32, &str>("error") }).await;
+        let _ = breaker.call(async { Err::<i32, &str>("error") }).await;
 
         assert_eq!(breaker.state().await, BreakerState::Open);
 
         // Should fail fast
-        let result: Result<i32, &str> = breaker.call(async { Ok(42) }).await;
+        let result = breaker.call(async { Ok::<i32, &str>(42) }).await;
         assert!(matches!(result, Err(CircuitBreakerError::Open)));
 
         // Wait for half-open
         tokio::time::sleep(Duration::from_millis(150)).await;
 
         // Should allow one request
-        let result: Result<i32, &str> = breaker.call(async { Ok(42) }).await;
+        let result = breaker.call(async { Ok::<i32, &str>(42) }).await;
         assert!(result.is_ok());
 
         assert_eq!(breaker.state().await, BreakerState::Closed);
