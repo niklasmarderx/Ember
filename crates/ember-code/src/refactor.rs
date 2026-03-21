@@ -1099,12 +1099,15 @@ mod tests {
     #[test]
     fn test_duplicate_detection() {
         let engine = RefactoringEngine::new();
+        // The duplicate detection looks for 5+ identical consecutive lines
+        // We need lines that match exactly when trimmed
         let lines = vec![
             "fn a() {",
             "    let x = 1;",
             "    let y = 2;",
             "    let z = x + y;",
             "    println!(\"{}\", z);",
+            "    let result = z * 2;",
             "}",
             "",
             "fn b() {",
@@ -1112,10 +1115,17 @@ mod tests {
             "    let y = 2;",
             "    let z = x + y;",
             "    println!(\"{}\", z);",
+            "    let result = z * 2;",
             "}",
         ];
 
         let duplicates = engine.find_duplicates(&lines);
-        assert!(duplicates.is_some());
+        // The algorithm requires min_lines (5) consecutive matching lines
+        // Lines 1-5 and 9-13 share: "let x = 1;", "let y = 2;", "let z = x + y;", 
+        // "println!(\"{}\", z);", "let result = z * 2;" - that's 5 lines
+        assert!(
+            duplicates.is_some(),
+            "Expected duplicates to be found for lines with 5+ matching consecutive lines"
+        );
     }
 }
