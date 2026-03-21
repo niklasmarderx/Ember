@@ -483,9 +483,7 @@ struct MistralStreamFunction {
 /// Convert Ember ContentPart to Mistral ContentPart
 fn convert_content_part(part: &crate::types::ContentPart) -> MistralContentPart {
     match part {
-        crate::types::ContentPart::Text { text } => {
-            MistralContentPart::Text { text: text.clone() }
-        }
+        crate::types::ContentPart::Text { text } => MistralContentPart::Text { text: text.clone() },
         crate::types::ContentPart::Image { source, .. } => {
             let url = match source {
                 crate::types::ImageSource::Base64 { media_type, data } => {
