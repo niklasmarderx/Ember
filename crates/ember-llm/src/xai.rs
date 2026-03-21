@@ -5,7 +5,7 @@
 
 use crate::{
     CompletionRequest, CompletionResponse, Error, FinishReason, LLMProvider, Message, ModelInfo,
-    Result, Role, StreamChunk, ToolCall, ToolCallDelta, ToolDefinition, TokenUsage,
+    Result, Role, StreamChunk, TokenUsage, ToolCall, ToolCallDelta, ToolDefinition,
 };
 use async_trait::async_trait;
 use futures::Stream;
@@ -33,8 +33,7 @@ impl XAIProvider {
 
     /// Create from environment variable XAI_API_KEY
     pub fn from_env() -> Result<Self> {
-        let api_key = std::env::var("XAI_API_KEY")
-            .map_err(|_| Error::api_key_missing("xai"))?;
+        let api_key = std::env::var("XAI_API_KEY").map_err(|_| Error::api_key_missing("xai"))?;
         Ok(Self::new(api_key))
     }
 
@@ -283,7 +282,11 @@ impl LLMProvider for XAIProvider {
         let messages = self.build_messages(&request);
         let tools = self.build_tools(request.tools.as_ref());
 
-        let has_tools = request.tools.as_ref().map(|t| !t.is_empty()).unwrap_or(false);
+        let has_tools = request
+            .tools
+            .as_ref()
+            .map(|t| !t.is_empty())
+            .unwrap_or(false);
         let xai_request = XAIRequest {
             model: request.model.clone(),
             messages,
@@ -314,7 +317,11 @@ impl LLMProvider for XAIProvider {
         if !status.is_success() {
             let error_text = response.text().await.unwrap_or_default();
             if let Ok(error_resp) = serde_json::from_str::<XAIErrorResponse>(&error_text) {
-                return Err(Error::api_error("xai", status.as_u16(), error_resp.error.message));
+                return Err(Error::api_error(
+                    "xai",
+                    status.as_u16(),
+                    error_resp.error.message,
+                ));
             }
             return Err(Error::api_error("xai", status.as_u16(), error_text));
         }
@@ -348,11 +355,14 @@ impl LLMProvider for XAIProvider {
             content: choice.message.content.unwrap_or_default(),
             model: request.model,
             tool_calls,
-            usage: xai_response.usage.map(|u| TokenUsage {
-                prompt_tokens: u.prompt_tokens,
-                completion_tokens: u.completion_tokens,
-                total_tokens: u.total_tokens,
-            }).unwrap_or_default(),
+            usage: xai_response
+                .usage
+                .map(|u| TokenUsage {
+                    prompt_tokens: u.prompt_tokens,
+                    completion_tokens: u.completion_tokens,
+                    total_tokens: u.total_tokens,
+                })
+                .unwrap_or_default(),
             finish_reason: parse_finish_reason(choice.finish_reason),
             id: Some(xai_response.id),
         })
@@ -366,7 +376,11 @@ impl LLMProvider for XAIProvider {
         let messages = self.build_messages(&request);
         let tools = self.build_tools(request.tools.as_ref());
 
-        let has_tools = request.tools.as_ref().map(|t| !t.is_empty()).unwrap_or(false);
+        let has_tools = request
+            .tools
+            .as_ref()
+            .map(|t| !t.is_empty())
+            .unwrap_or(false);
         let xai_request = XAIRequest {
             model: request.model.clone(),
             messages,
@@ -397,7 +411,11 @@ impl LLMProvider for XAIProvider {
         if !status.is_success() {
             let error_text = response.text().await.unwrap_or_default();
             if let Ok(error_resp) = serde_json::from_str::<XAIErrorResponse>(&error_text) {
-                return Err(Error::api_error("xai", status.as_u16(), error_resp.error.message));
+                return Err(Error::api_error(
+                    "xai",
+                    status.as_u16(),
+                    error_resp.error.message,
+                ));
             }
             return Err(Error::api_error("xai", status.as_u16(), error_text));
         }
