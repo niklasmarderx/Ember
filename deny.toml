@@ -59,6 +59,10 @@ ignore = [
     # glib unsound VariantStrIter - from GTK bindings
     # We don't use this API directly
     "RUSTSEC-2024-0429",
+    
+    # glib memory safety issues with Signal handling
+    # From GTK bindings via Tauri, not exploitable in our usage
+    "RUSTSEC-2024-0437",
 ]
 
 [licenses]
