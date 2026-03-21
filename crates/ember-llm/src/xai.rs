@@ -4,8 +4,8 @@
 //! Uses OpenAI-compatible API format at api.x.ai
 
 use crate::{
-    CompletionRequest, CompletionResponse, Error, LLMProvider, Message, ModelInfo, Result, Role,
-    StreamChunk, ToolCall, ToolDefinition,
+    CompletionRequest, CompletionResponse, Error, FinishReason, LLMProvider, Message, ModelInfo,
+    Result, Role, StreamChunk, ToolCall, ToolDefinition,
 };
 use async_trait::async_trait;
 use futures::Stream;
@@ -345,7 +345,7 @@ impl LLMProvider for XAIProvider {
                 completion_tokens: u.completion_tokens,
                 total_tokens: u.total_tokens,
             }),
-            finish_reason: choice.finish_reason,
+            finish_reason: parse_finish_reason(choice.finish_reason),
         })
     }
 
@@ -431,7 +431,7 @@ impl LLMProvider for XAIProvider {
                                             yield Ok(StreamChunk {
                                                 content: content.clone(),
                                                 tool_calls: vec![],
-                                                finish_reason: choice.finish_reason.clone(),
+                                                finish_reason: parse_finish_reason(choice.finish_reason.clone()),
                                             });
                                         }
 
@@ -469,7 +469,7 @@ impl LLMProvider for XAIProvider {
                                             yield Ok(StreamChunk {
                                                 content: String::new(),
                                                 tool_calls: std::mem::take(&mut tool_calls),
-                                                finish_reason: choice.finish_reason.clone(),
+                                                finish_reason: parse_finish_reason(choice.finish_reason.clone()),
                                             });
                                         }
                                     }
@@ -547,6 +547,17 @@ fn get_model_description(id: &str) -> String {
         "grok-2-image-1212" => "Grok 2 for image generation".to_string(),
         _ => "xAI Grok model".to_string(),
     }
+}
+
+/// Parse finish reason string from API response to FinishReason enum
+fn parse_finish_reason(reason: Option<String>) -> Option<FinishReason> {
+    reason.and_then(|r| match r.as_str() {
+        "stop" => Some(FinishReason::Stop),
+        "length" => Some(FinishReason::Length),
+        "tool_calls" => Some(FinishReason::ToolCalls),
+        "content_filter" => Some(FinishReason::ContentFilter),
+        _ => None,
+    })
 }
 
 #[cfg(test)]

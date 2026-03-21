@@ -247,7 +247,7 @@ mod edge_case_tests {
     }
 
     #[test_case(0.0, 1000.0 => 0.0; "zero input cost")]
-    #[test_case(1000.0, 0.0 => 1.0; "one dollar per 1k tokens")]
+    #[test_case(1000.0, 1.0 => 1.0; "one dollar per 1k tokens")]
     #[test_case(500.0, 2.0 => 1.0; "half cost")]
     fn calculate_cost(tokens: f64, cost_per_1k: f64) -> f64 {
         (tokens / 1000.0) * cost_per_1k

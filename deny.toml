@@ -9,7 +9,9 @@ unmaintained = "warn"
 yanked = "warn"
 notice = "warn"
 ignore = [
-    # Add advisory IDs to ignore here if needed
+    # lru 0.12.5 IterMut unsound issue - not security critical for TUI usage
+    # ratatui depends on this, waiting for upstream fix
+    "RUSTSEC-2026-0002",
 ]
 
 [licenses]
