@@ -5,7 +5,7 @@
 
 use crate::{
     CompletionRequest, CompletionResponse, Error, FinishReason, LLMProvider, Message, ModelInfo,
-    Result, Role, StreamChunk, ToolCall, ToolDefinition,
+    Result, Role, StreamChunk, ToolCall, ToolCallDelta, ToolDefinition, TokenUsage,
 };
 use async_trait::async_trait;
 use futures::Stream;
@@ -34,7 +34,7 @@ impl XAIProvider {
     /// Create from environment variable XAI_API_KEY
     pub fn from_env() -> Result<Self> {
         let api_key = std::env::var("XAI_API_KEY")
-            .map_err(|_| Error::Configuration("XAI_API_KEY environment variable not set".into()))?;
+            .map_err(|_| Error::api_key_missing("xai"))?;
         Ok(Self::new(api_key))
     }
 
@@ -47,17 +47,7 @@ impl XAIProvider {
     fn build_messages(&self, request: &CompletionRequest) -> Vec<XAIMessage> {
         let mut messages = Vec::new();
 
-        // Add system message if present
-        if let Some(ref system) = request.system_prompt {
-            messages.push(XAIMessage {
-                role: "system".to_string(),
-                content: Some(system.clone()),
-                tool_calls: None,
-                tool_call_id: None,
-            });
-        }
-
-        // Convert messages
+        // Convert messages (system messages are included in request.messages)
         for msg in &request.messages {
             let role = match msg.role {
                 Role::User => "user",
@@ -83,7 +73,8 @@ impl XAIProvider {
                             r#type: "function".to_string(),
                             function: XAIFunction {
                                 name: tc.name.clone(),
-                                arguments: tc.arguments.clone(),
+                                // Convert serde_json::Value to String for API
+                                arguments: tc.arguments.to_string(),
                             },
                         })
                         .collect(),
@@ -101,7 +92,8 @@ impl XAIProvider {
         messages
     }
 
-    fn build_tools(&self, tools: &[ToolDefinition]) -> Option<Vec<XAITool>> {
+    fn build_tools(&self, tools: Option<&Vec<ToolDefinition>>) -> Option<Vec<XAITool>> {
+        let tools = tools?;
         if tools.is_empty() {
             return None;
         }
@@ -262,11 +254,36 @@ impl LLMProvider for XAIProvider {
         "xai"
     }
 
+    fn default_model(&self) -> &str {
+        "grok-2"
+    }
+
+    async fn health_check(&self) -> Result<()> {
+        // Try to list models to verify API key and connectivity
+        let response = self
+            .client
+            .get(format!("{}/models", self.base_url))
+            .header("Authorization", format!("Bearer {}", self.api_key))
+            .send()
+            .await
+            .map_err(|e| Error::provider_unavailable("xai", e.to_string()))?;
+
+        if response.status().is_success() {
+            Ok(())
+        } else {
+            Err(Error::provider_unavailable(
+                "xai",
+                format!("API returned status {}", response.status()),
+            ))
+        }
+    }
+
     #[instrument(skip(self, request), fields(model = %request.model))]
     async fn complete(&self, request: CompletionRequest) -> Result<CompletionResponse> {
         let messages = self.build_messages(&request);
-        let tools = self.build_tools(&request.tools);
+        let tools = self.build_tools(request.tools.as_ref());
 
+        let has_tools = request.tools.as_ref().map(|t| !t.is_empty()).unwrap_or(false);
         let xai_request = XAIRequest {
             model: request.model.clone(),
             messages,
@@ -274,7 +291,7 @@ impl LLMProvider for XAIProvider {
             temperature: request.temperature,
             top_p: request.top_p,
             tools,
-            tool_choice: if !request.tools.is_empty() {
+            tool_choice: if has_tools {
                 Some("auto".to_string())
             } else {
                 None
@@ -291,36 +308,26 @@ impl LLMProvider for XAIProvider {
             .header("Content-Type", "application/json")
             .json(&xai_request)
             .send()
-            .await
-            .map_err(|e| Error::Network(e.to_string()))?;
+            .await?;
 
         let status = response.status();
         if !status.is_success() {
             let error_text = response.text().await.unwrap_or_default();
             if let Ok(error_resp) = serde_json::from_str::<XAIErrorResponse>(&error_text) {
-                return Err(Error::Api {
-                    status_code: status.as_u16(),
-                    message: error_resp.error.message,
-                });
+                return Err(Error::api_error("xai", status.as_u16(), error_resp.error.message));
             }
-            return Err(Error::Api {
-                status_code: status.as_u16(),
-                message: error_text,
-            });
+            return Err(Error::api_error("xai", status.as_u16(), error_text));
         }
 
-        let xai_response: XAIResponse = response
-            .json()
-            .await
-            .map_err(|e| Error::Parsing(e.to_string()))?;
+        let xai_response: XAIResponse = response.json().await?;
 
         let choice = xai_response
             .choices
             .into_iter()
             .next()
-            .ok_or_else(|| Error::Parsing("No choices in response".into()))?;
+            .ok_or_else(|| Error::InvalidRequest("No choices in response".into()))?;
 
-        // Extract tool calls
+        // Extract tool calls - convert arguments from String to serde_json::Value
         let tool_calls = choice
             .message
             .tool_calls
@@ -330,7 +337,8 @@ impl LLMProvider for XAIProvider {
                     .map(|tc| ToolCall {
                         id: tc.id,
                         name: tc.function.name,
-                        arguments: tc.function.arguments,
+                        arguments: serde_json::from_str(&tc.function.arguments)
+                            .unwrap_or(serde_json::Value::String(tc.function.arguments)),
                     })
                     .collect()
             })
@@ -340,12 +348,13 @@ impl LLMProvider for XAIProvider {
             content: choice.message.content.unwrap_or_default(),
             model: request.model,
             tool_calls,
-            usage: xai_response.usage.map(|u| crate::Usage {
+            usage: xai_response.usage.map(|u| TokenUsage {
                 prompt_tokens: u.prompt_tokens,
                 completion_tokens: u.completion_tokens,
                 total_tokens: u.total_tokens,
-            }),
+            }).unwrap_or_default(),
             finish_reason: parse_finish_reason(choice.finish_reason),
+            id: Some(xai_response.id),
         })
     }
 
@@ -355,8 +364,9 @@ impl LLMProvider for XAIProvider {
         request: CompletionRequest,
     ) -> Result<Pin<Box<dyn Stream<Item = Result<StreamChunk>> + Send>>> {
         let messages = self.build_messages(&request);
-        let tools = self.build_tools(&request.tools);
+        let tools = self.build_tools(request.tools.as_ref());
 
+        let has_tools = request.tools.as_ref().map(|t| !t.is_empty()).unwrap_or(false);
         let xai_request = XAIRequest {
             model: request.model.clone(),
             messages,
@@ -364,7 +374,7 @@ impl LLMProvider for XAIProvider {
             temperature: request.temperature,
             top_p: request.top_p,
             tools,
-            tool_choice: if !request.tools.is_empty() {
+            tool_choice: if has_tools {
                 Some("auto".to_string())
             } else {
                 None
@@ -381,22 +391,15 @@ impl LLMProvider for XAIProvider {
             .header("Content-Type", "application/json")
             .json(&xai_request)
             .send()
-            .await
-            .map_err(|e| Error::Network(e.to_string()))?;
+            .await?;
 
         let status = response.status();
         if !status.is_success() {
             let error_text = response.text().await.unwrap_or_default();
             if let Ok(error_resp) = serde_json::from_str::<XAIErrorResponse>(&error_text) {
-                return Err(Error::Api {
-                    status_code: status.as_u16(),
-                    message: error_resp.error.message,
-                });
+                return Err(Error::api_error("xai", status.as_u16(), error_resp.error.message));
             }
-            return Err(Error::Api {
-                status_code: status.as_u16(),
-                message: error_text,
-            });
+            return Err(Error::api_error("xai", status.as_u16(), error_text));
         }
 
         let stream = async_stream::stream! {
@@ -410,7 +413,7 @@ impl LLMProvider for XAIProvider {
             );
 
             let mut line = String::new();
-            let mut tool_calls: Vec<ToolCall> = Vec::new();
+            let mut tool_call_deltas: Vec<ToolCallDelta> = Vec::new();
 
             loop {
                 line.clear();
@@ -429,47 +432,39 @@ impl LLMProvider for XAIProvider {
                                         // Handle content
                                         if let Some(content) = &choice.delta.content {
                                             yield Ok(StreamChunk {
-                                                content: content.clone(),
-                                                tool_calls: vec![],
-                                                finish_reason: parse_finish_reason(choice.finish_reason.clone()),
+                                                content: Some(content.clone()),
+                                                tool_calls: None,
+                                                done: false,
+                                                finish_reason: None,
                                             });
                                         }
 
                                         // Handle tool calls
                                         if let Some(tc_deltas) = &choice.delta.tool_calls {
                                             for tc_delta in tc_deltas {
-                                                let idx = tc_delta.index;
-
-                                                // Ensure we have enough slots
-                                                while tool_calls.len() <= idx {
-                                                    tool_calls.push(ToolCall {
-                                                        id: String::new(),
-                                                        name: String::new(),
-                                                        arguments: String::new(),
-                                                    });
-                                                }
-
-                                                // Update the tool call
-                                                if let Some(id) = &tc_delta.id {
-                                                    tool_calls[idx].id = id.clone();
-                                                }
-                                                if let Some(f) = &tc_delta.function {
-                                                    if let Some(name) = &f.name {
-                                                        tool_calls[idx].name = name.clone();
-                                                    }
-                                                    if let Some(args) = &f.arguments {
-                                                        tool_calls[idx].arguments.push_str(args);
-                                                    }
-                                                }
+                                                let delta = ToolCallDelta {
+                                                    index: tc_delta.index,
+                                                    id: tc_delta.id.clone(),
+                                                    name: tc_delta.function.as_ref().and_then(|f| f.name.clone()),
+                                                    arguments: tc_delta.function.as_ref().and_then(|f| f.arguments.clone()),
+                                                };
+                                                tool_call_deltas.push(delta);
                                             }
                                         }
 
                                         // Check for finish
-                                        if choice.finish_reason.is_some() && !tool_calls.is_empty() {
+                                        if choice.finish_reason.is_some() {
+                                            let finish_reason = parse_finish_reason(choice.finish_reason.clone());
+                                            let tool_calls = if tool_call_deltas.is_empty() {
+                                                None
+                                            } else {
+                                                Some(std::mem::take(&mut tool_call_deltas))
+                                            };
                                             yield Ok(StreamChunk {
-                                                content: String::new(),
-                                                tool_calls: std::mem::take(&mut tool_calls),
-                                                finish_reason: parse_finish_reason(choice.finish_reason.clone()),
+                                                content: None,
+                                                tool_calls,
+                                                done: true,
+                                                finish_reason,
                                             });
                                         }
                                     }
@@ -481,7 +476,7 @@ impl LLMProvider for XAIProvider {
                         }
                     }
                     Err(e) => {
-                        yield Err(Error::Network(e.to_string()));
+                        yield Err(Error::StreamError(e.to_string()));
                         break;
                     }
                 }
@@ -497,22 +492,15 @@ impl LLMProvider for XAIProvider {
             .get(format!("{}/models", self.base_url))
             .header("Authorization", format!("Bearer {}", self.api_key))
             .send()
-            .await
-            .map_err(|e| Error::Network(e.to_string()))?;
+            .await?;
 
         let status = response.status();
         if !status.is_success() {
             let error_text = response.text().await.unwrap_or_default();
-            return Err(Error::Api {
-                status_code: status.as_u16(),
-                message: error_text,
-            });
+            return Err(Error::api_error("xai", status.as_u16(), error_text));
         }
 
-        let models_response: XAIModelsResponse = response
-            .json()
-            .await
-            .map_err(|e| Error::Parsing(e.to_string()))?;
+        let models_response: XAIModelsResponse = response.json().await?;
 
         Ok(models_response
             .data
@@ -522,8 +510,20 @@ impl LLMProvider for XAIProvider {
                 name: format_model_name(&m.id),
                 provider: "xai".to_string(),
                 description: Some(get_model_description(&m.id)),
+                context_window: get_context_window(&m.id),
+                max_output_tokens: None,
+                supports_tools: true,
+                supports_vision: m.id.contains("vision"),
             })
             .collect())
+    }
+}
+
+fn get_context_window(model: &str) -> Option<u32> {
+    match model {
+        "grok-2" | "grok-2-mini" => Some(131072),
+        "grok-2-vision-1212" => Some(32768),
+        _ => None,
     }
 }
 
@@ -568,13 +568,14 @@ mod tests {
     fn test_provider_creation() {
         let provider = XAIProvider::new("test-key");
         assert_eq!(provider.name(), "xai");
+        assert_eq!(provider.default_model(), "grok-2");
     }
 
     #[test]
     fn test_message_building() {
         let provider = XAIProvider::new("test-key");
         let request = CompletionRequest::new("grok-2")
-            .with_system_prompt("You are Grok.")
+            .with_message(Message::system("You are Grok."))
             .with_message(Message::user("Hello!"));
 
         let messages = provider.build_messages(&request);
@@ -598,10 +599,17 @@ mod tests {
             }),
         }];
 
-        let xai_tools = provider.build_tools(&tools);
+        let xai_tools = provider.build_tools(Some(&tools));
         assert!(xai_tools.is_some());
         let xai_tools = xai_tools.unwrap();
         assert_eq!(xai_tools.len(), 1);
         assert_eq!(xai_tools[0].function.name, "search");
+    }
+
+    #[test]
+    fn test_tool_building_none() {
+        let provider = XAIProvider::new("test-key");
+        let xai_tools = provider.build_tools(None);
+        assert!(xai_tools.is_none());
     }
 }

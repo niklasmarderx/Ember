@@ -62,7 +62,7 @@ ignore = [
 ]
 
 [licenses]
-unlicensed = "deny"
+version = 2
 allow = [
     "MIT",
     "Apache-2.0",
@@ -78,7 +78,6 @@ allow = [
     "BSL-1.0",
     "0BSD",
 ]
-copyleft = "warn"
 confidence-threshold = 0.8
 
 # Clarify licenses for specific crates
