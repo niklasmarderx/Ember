@@ -1,0 +1,16 @@
+---
+source: crates/ember-cli/tests/snapshot_tests.rs
+expression: error
+---
+Error: Rate limit exceeded
+
+You've exceeded the API rate limit.
+
+Details:
+  - Limit: 60 requests/minute
+  - Reset: in 45 seconds
+
+Consider:
+  - Waiting before retrying
+  - Using a different API key
+  - Upgrading your API plan

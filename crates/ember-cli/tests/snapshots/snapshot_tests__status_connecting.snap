@@ -1,0 +1,5 @@
+---
+source: crates/ember-cli/tests/snapshot_tests.rs
+expression: status
+---
+Connecting to OpenAI API...

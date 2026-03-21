@@ -1,0 +1,23 @@
+---
+source: crates/ember-cli/tests/snapshot_tests.rs
+expression: help
+---
+name: ember
+version: 1.0.0
+description: An open-source AI agent framework
+usage: "ember [OPTIONS] <COMMAND>"
+subcommands:
+  - chat
+  - config
+  - history
+  - export
+  - serve
+  - plugin
+  - completions
+  - tui
+global_options:
+  - "--help"
+  - "--version"
+  - "--verbose"
+  - "--quiet"
+  - "--config"

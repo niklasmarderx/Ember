@@ -1,0 +1,13 @@
+---
+source: crates/ember-cli/tests/snapshot_tests.rs
+expression: error
+---
+Error: API key not found
+
+The OpenAI API key is required but was not found.
+
+To fix this, either:
+  1. Set the OPENAI_API_KEY environment variable
+  2. Add it to your config file: ember config set openai.api_key <YOUR_KEY>
+
+For more information, see: https://docs.ember.ai/configuration

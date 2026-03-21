@@ -1,0 +1,8 @@
+---
+source: crates/ember-cli/tests/snapshot_tests.rs
+expression: message
+---
+role: assistant
+content: "The capital of France is Paris. Paris is the largest city in France and serves as the country's political, economic, and cultural center."
+timestamp: "2024-01-15T10:30:05Z"
+tokens: 32

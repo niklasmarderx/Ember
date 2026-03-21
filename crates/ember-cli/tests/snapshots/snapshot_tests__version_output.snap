@@ -1,0 +1,11 @@
+---
+source: crates/ember-cli/tests/snapshot_tests.rs
+expression: version
+---
+ember 1.0.0
+
+An open-source AI agent framework written in Rust.
+
+Homepage: https://ember.ai
+Repository: https://github.com/ember-ai/ember
+License: MIT OR Apache-2.0

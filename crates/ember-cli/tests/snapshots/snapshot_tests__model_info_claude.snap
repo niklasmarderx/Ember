@@ -1,0 +1,13 @@
+---
+source: crates/ember-cli/tests/snapshot_tests.rs
+expression: model
+---
+name: claude-3-opus
+provider: Anthropic
+context_window: 200000
+input_cost_per_1k: 0.015
+output_cost_per_1k: 0.075
+capabilities:
+  - chat
+  - vision
+  - long_context

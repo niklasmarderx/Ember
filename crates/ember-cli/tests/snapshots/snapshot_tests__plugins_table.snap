@@ -1,0 +1,12 @@
+---
+source: crates/ember-cli/tests/snapshot_tests.rs
+expression: table
+---
+
++------------------+----------+---------+-------------+
+| Name             | Version  | Status  | Description |
++------------------+----------+---------+-------------+
+| weather          | 1.0.0    | Active  | Get weather |
+| github           | 2.1.0    | Active  | GitHub ops  |
+| slack            | 1.5.0    | Inactive| Slack msgs  |
++------------------+----------+---------+-------------+

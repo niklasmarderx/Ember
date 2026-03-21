@@ -1,0 +1,10 @@
+---
+source: crates/ember-cli/tests/snapshot_tests.rs
+expression: status
+---
+
+Response complete
+  Model: gpt-4
+  Tokens: 150 (input: 50, output: 100)
+  Cost: $0.0072
+  Time: 2.3s

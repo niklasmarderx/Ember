@@ -1,0 +1,16 @@
+---
+source: crates/ember-cli/tests/snapshot_tests.rs
+expression: json
+---
+{
+  "id": "msg_123",
+  "role": "assistant",
+  "content": "Hello! How can I help you today?",
+  "model": "gpt-4",
+  "usage": {
+    "prompt_tokens": 10,
+    "completion_tokens": 9,
+    "total_tokens": 19
+  },
+  "finish_reason": "stop"
+}

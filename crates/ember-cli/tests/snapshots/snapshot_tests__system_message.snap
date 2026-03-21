@@ -1,0 +1,8 @@
+---
+source: crates/ember-cli/tests/snapshot_tests.rs
+expression: message
+---
+role: system
+content: You are a helpful AI assistant. Be concise and accurate in your responses.
+timestamp: ~
+tokens: 15

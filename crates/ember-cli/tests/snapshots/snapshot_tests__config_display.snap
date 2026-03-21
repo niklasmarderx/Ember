@@ -1,0 +1,10 @@
+---
+source: crates/ember-cli/tests/snapshot_tests.rs
+expression: config
+---
+provider: openai
+model: gpt-4
+api_key_set: true
+temperature: 0.7
+max_tokens: 4096
+stream: true

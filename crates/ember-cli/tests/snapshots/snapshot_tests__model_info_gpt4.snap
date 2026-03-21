@@ -1,0 +1,13 @@
+---
+source: crates/ember-cli/tests/snapshot_tests.rs
+expression: model
+---
+name: gpt-4
+provider: OpenAI
+context_window: 8192
+input_cost_per_1k: 0.03
+output_cost_per_1k: 0.06
+capabilities:
+  - chat
+  - function_calling
+  - vision

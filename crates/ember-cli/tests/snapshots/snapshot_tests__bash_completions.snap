@@ -1,0 +1,20 @@
+---
+source: crates/ember-cli/tests/snapshot_tests.rs
+expression: completions
+---
+_ember() {
+    local cur prev words cword
+    _init_completion || return
+
+    case $prev in
+        ember)
+            COMPREPLY=( $(compgen -W "chat config history export serve plugin completions tui help" -- "$cur") )
+            return
+            ;;
+        chat)
+            COMPREPLY=( $(compgen -W "--model --provider --temperature --stream" -- "$cur") )
+            return
+            ;;
+    esac
+}
+complete -F _ember ember

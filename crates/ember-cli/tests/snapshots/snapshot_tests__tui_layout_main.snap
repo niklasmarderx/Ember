@@ -1,0 +1,27 @@
+---
+source: crates/ember-cli/tests/snapshot_tests.rs
+expression: layout
+---
+
++----------------------------------------------------------+
+| Ember - AI Assistant                          [gpt-4] [] |
++----------------------------------------------------------+
+|                                                          |
+| Conversations  | Chat                                    |
+| -------------  | ----------------------------------------|
+| > New Chat     |                                         |
+|   Geography    | User: What is the capital of France?   |
+|   Code Review  |                                         |
+|   Email Draft  | Assistant: The capital of France is    |
+|                | Paris. Paris is the largest city in    |
+|                | France and serves as the country's     |
+|                | political, economic, and cultural      |
+|                | center.                                 |
+|                |                                         |
+|                |                                         |
+|                |                                         |
++----------------------------------------------------------+
+| Type a message...                                   [Send]|
++----------------------------------------------------------+
+| Tokens: 150 | Cost: $0.0045 | Model: gpt-4    | Stream: On|
++----------------------------------------------------------+

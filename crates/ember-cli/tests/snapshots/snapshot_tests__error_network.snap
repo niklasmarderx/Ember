@@ -1,0 +1,14 @@
+---
+source: crates/ember-cli/tests/snapshot_tests.rs
+expression: error
+---
+Error: Connection failed
+
+Could not connect to the OpenAI API.
+
+Possible causes:
+  - No internet connection
+  - API endpoint is unreachable
+  - Firewall blocking the connection
+
+Try again later or check your network settings.

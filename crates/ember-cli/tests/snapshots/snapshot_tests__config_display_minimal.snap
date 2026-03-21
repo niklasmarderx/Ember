@@ -1,0 +1,10 @@
+---
+source: crates/ember-cli/tests/snapshot_tests.rs
+expression: config
+---
+provider: ollama
+model: llama3
+api_key_set: false
+temperature: 0
+max_tokens: ~
+stream: false

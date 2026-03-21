@@ -1,0 +1,8 @@
+---
+source: crates/ember-cli/tests/snapshot_tests.rs
+expression: message
+---
+role: user
+content: What is the capital of France?
+timestamp: "2024-01-15T10:30:00Z"
+tokens: 8
