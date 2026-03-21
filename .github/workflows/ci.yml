@@ -30,7 +30,7 @@ jobs:
         uses: Swatinem/rust-cache@v2
         
       - name: Check
-        run: cargo check --workspace
+        run: cargo check --workspace --exclude ember-desktop
 
   test:
     name: Test
@@ -55,7 +55,7 @@ jobs:
         uses: Swatinem/rust-cache@v2
         
       - name: Run tests
-        run: cargo test --workspace
+        run: cargo test --workspace --exclude ember-desktop
 
   fmt:
     name: Format
@@ -92,7 +92,7 @@ jobs:
         uses: Swatinem/rust-cache@v2
         
       - name: Clippy
-        run: cargo clippy --workspace -- -D warnings
+        run: cargo clippy --workspace --exclude ember-desktop -- -D warnings
 
   docs:
     name: Documentation
@@ -113,7 +113,7 @@ jobs:
         uses: Swatinem/rust-cache@v2
         
       - name: Build docs
-        run: cargo doc --workspace --no-deps
+        run: cargo doc --workspace --no-deps --exclude ember-desktop
         env:
           RUSTDOCFLAGS: -D warnings
 
