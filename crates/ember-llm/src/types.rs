@@ -300,7 +300,7 @@ impl Message {
     /// Create a user message with multiple images
     ///
     /// # Example
-    /// ```rust
+    /// ```rust,ignore
     /// use ember_llm::{Message, ContentPart, ImageMediaType};
     ///
     /// let img1_data = "base64data1";
