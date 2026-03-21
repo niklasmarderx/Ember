@@ -368,7 +368,6 @@ fn describe_workflow(name: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use chrono::Utc;
 
     #[test]
     fn test_pattern_recognizer_creation() {

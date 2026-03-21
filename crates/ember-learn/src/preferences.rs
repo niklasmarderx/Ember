@@ -358,6 +358,7 @@ use chrono::{Datelike, Timelike};
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::EventContext;
     use chrono::Utc;
 
     #[test]
