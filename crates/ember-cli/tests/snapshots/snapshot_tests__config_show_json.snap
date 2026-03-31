@@ -1,0 +1,31 @@
+---
+source: crates/ember-cli/tests/snapshot_tests.rs
+assertion_line: 294
+expression: stdout
+---
+{
+  "provider": {
+    "default": "openai",
+    "openai": {
+      "api_key": "***",
+      "model": "gpt-4o"
+    },
+    "ollama": {
+      "url": "http://localhost:11434",
+      "model": "llama3.2"
+    }
+  },
+  "agent": {
+    "system_prompt": "You are Ember, a helpful AI assistant.",
+    "temperature": 0.7,
+    "max_iterations": 10,
+    "streaming": true
+  },
+  "tools": {
+    "shell_enabled": true,
+    "filesystem_enabled": true,
+    "web_enabled": true,
+    "allowed_paths": [],
+    "shell_timeout": 30
+  }
+}

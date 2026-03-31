@@ -104,7 +104,12 @@ pub fn init(force: bool) -> Result<()> {
 /// ```bash
 /// ember config show
 /// ```
-pub fn show(config: &AppConfig) -> Result<()> {
+pub fn show(config: &AppConfig, json: bool) -> Result<()> {
+    if json {
+        println!("{}", format_json(config)?);
+        return Ok(());
+    }
+
     println!("{}", "Ember Configuration".bright_yellow().bold());
     println!();
 
@@ -194,6 +199,15 @@ pub fn show(config: &AppConfig) -> Result<()> {
     );
 
     Ok(())
+}
+
+fn format_json(config: &AppConfig) -> Result<String> {
+    let mut sanitized = config.clone();
+    if sanitized.provider.openai.api_key.is_some() {
+        sanitized.provider.openai.api_key = Some("***".to_string());
+    }
+
+    Ok(serde_json::to_string_pretty(&sanitized)?)
 }
 
 /// Set a configuration key to a new value.

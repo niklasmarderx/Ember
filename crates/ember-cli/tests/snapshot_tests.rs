@@ -3,8 +3,11 @@
 //! These tests capture CLI output and compare against stored snapshots.
 //! Run `cargo insta review` to review and accept changes.
 
+use assert_cmd::Command;
 use insta::{assert_snapshot, assert_yaml_snapshot};
 use serde::{Deserialize, Serialize};
+use std::fs;
+use tempfile::NamedTempFile;
 
 /// Represents a formatted CLI output for testing
 #[derive(Debug, Serialize, Deserialize)]
@@ -242,6 +245,53 @@ fn test_config_display_minimal() {
     };
 
     assert_yaml_snapshot!("config_display_minimal", config);
+}
+
+#[test]
+fn test_config_show_json_output() {
+    let config = r#"
+[provider]
+default = "openai"
+
+[provider.openai]
+api_key = "sk-test-key-12345"
+model = "gpt-4o"
+
+[provider.ollama]
+url = "http://localhost:11434"
+model = "llama3.2"
+
+[agent]
+system_prompt = "You are Ember, a helpful AI assistant."
+temperature = 0.7
+max_iterations = 10
+streaming = true
+
+[tools]
+shell_enabled = true
+filesystem_enabled = true
+web_enabled = true
+shell_timeout = 30
+"#;
+
+    let config_file = NamedTempFile::new().unwrap();
+    fs::write(config_file.path(), config).unwrap();
+
+    let output = Command::cargo_bin("ember")
+        .unwrap()
+        .arg("--config")
+        .arg(config_file.path())
+        .arg("config")
+        .arg("show")
+        .arg("--json")
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+
+    let stdout = String::from_utf8(output).unwrap();
+    assert_snapshot!("config_show_json", stdout);
 }
 
 // Test error messages
