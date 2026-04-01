@@ -93,10 +93,6 @@ pub enum Error {
     #[error("Not found: {0}")]
     NotFound(String),
 
-    /// Configuration error (for task planner)
-    #[error("Configuration error: {0}")]
-    Configuration(String),
-
     /// Resource exhausted (limits reached)
     #[error("Resource exhausted: {0}")]
     ResourceExhausted(String),
@@ -138,7 +134,7 @@ impl Error {
     pub fn is_recoverable(&self) -> bool {
         matches!(
             self,
-            Self::ToolExecution { .. } | Self::Timeout { .. } | Self::Memory(_)
+            Self::ToolExecution { .. } | Self::Timeout { .. } | Self::TimeoutMsg(_) | Self::Memory(_)
         )
     }
 

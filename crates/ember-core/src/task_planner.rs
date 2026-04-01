@@ -825,7 +825,7 @@ impl TaskPlanner {
         let tasks = self.decompose_goal(&goal).await?;
 
         if tasks.len() > self.config.max_tasks {
-            return Err(Error::Configuration(format!(
+            return Err(Error::config(format!(
                 "Plan exceeds maximum tasks: {} > {}",
                 tasks.len(),
                 self.config.max_tasks
@@ -1236,7 +1236,7 @@ impl TaskPlanner {
     /// Replan based on execution state
     pub async fn replan(&self, plan: &mut ExecutionPlan) -> Result<()> {
         if !self.config.auto_replan {
-            return Err(Error::Configuration("Auto replan is disabled".into()));
+            return Err(Error::config("Auto replan is disabled"));
         }
 
         info!(plan_id = %plan.id, version = plan.version, "Replanning");

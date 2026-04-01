@@ -193,7 +193,7 @@ fn display_core_error(error: &ember_core::Error) {
                 "ember chat".bright_green()
             );
         }
-        ember_core::Error::Config(msg) | ember_core::Error::Configuration(msg) => {
+        ember_core::Error::Config(msg) => {
             eprintln!("  {} Configuration error", "⚙️".bright_red());
             eprintln!();
             eprintln!("  {}", msg.bright_white());
@@ -256,9 +256,7 @@ fn display_core_error(error: &ember_core::Error) {
 fn get_core_error_info(error: &ember_core::Error) -> (&'static str, &'static str) {
     match error {
         ember_core::Error::Llm(_) => ("E000", "LLM Error"),
-        ember_core::Error::Config(_) | ember_core::Error::Configuration(_) => {
-            ("E500", "Configuration Error")
-        }
+        ember_core::Error::Config(_) => ("E500", "Configuration Error"),
         ember_core::Error::NotInitialized(_) => ("E501", "Not Initialized"),
         ember_core::Error::ToolExecution { .. } => ("E304", "Tool Execution Error"),
         ember_core::Error::ContextOverflow { .. } => ("E303", "Context Overflow"),
