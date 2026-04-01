@@ -409,7 +409,11 @@ enum ConfigAction {
     },
 
     /// Show current configuration
-    Show,
+    Show {
+        /// Output the configuration as formatted JSON
+        #[arg(long)]
+        json: bool,
+    },
 
     /// Set a configuration value
     Set {
@@ -487,8 +491,8 @@ async fn run() -> Result<()> {
             ConfigAction::Init { force } => {
                 config_cmd::init(force)?;
             }
-            ConfigAction::Show => {
-                config_cmd::show(&config)?;
+            ConfigAction::Show { json } => {
+                config_cmd::show(&config, json)?;
             }
             ConfigAction::Set { key, value } => {
                 config_cmd::set(&key, &value)?;
