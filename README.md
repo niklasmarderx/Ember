@@ -4,7 +4,7 @@
 
 # Ember
 
-**Ein AI-Agent-Framework in Rust. Schnell, klein, laeuft ueberall.**
+**An AI agent framework in Rust. Fast, small, runs everywhere.**
 
 [![Website](https://img.shields.io/badge/website-ember.dev-orange)](https://niklasmarderx.github.io/Ember/)
 [![Crates.io](https://img.shields.io/crates/v/ember-cli)](https://crates.io/crates/ember-cli)
@@ -15,17 +15,17 @@
 
 ---
 
-## Was ist Ember?
+## What is Ember?
 
-Ember ist ein Kommandozeilen-Tool und Framework, mit dem du KI-Modelle nutzen kannst - zum Chatten, fuer Code-Generierung oder um Aufgaben auf deinem Computer zu automatisieren.
+Ember is a command-line tool and framework for working with AI models — for chatting, generating code, or automating tasks on your machine.
 
-Das Besondere: Ember ist in Rust geschrieben und kommt als einzelne ausfuehrbare Datei. Kein Python, kein Node.js, keine Abhaengigkeiten. Du laeadst eine Datei herunter, und es funktioniert.
+What sets it apart: Ember is written in Rust and ships as a single executable. No Python, no Node.js, no dependencies. Download one file and it works.
 
 ---
 
-## Schnellstart
+## Quick Start
 
-### Mit Cloud-APIs (OpenAI, Anthropic, etc.)
+### With cloud APIs (OpenAI, Anthropic, etc.)
 
 ```bash
 curl -fsSL https://ember.dev/install.sh | sh
@@ -33,122 +33,122 @@ export OPENAI_API_KEY="sk-..."
 ember chat
 ```
 
-### Komplett offline und kostenlos
+### Fully offline and free
 
 ```bash
-# Ollama installieren (einmalig)
+# Install Ollama (one-time setup)
 curl -fsSL https://ollama.ai/install.sh | sh
 ollama pull llama3.2
 
-# Ember installieren und nutzen
+# Install and use Ember
 curl -fsSL https://ember.dev/install.sh | sh
 ember chat --provider ollama
 ```
 
-### Als Docker-Container
+### As a Docker container
 
 ```bash
-docker run -it --rm ghcr.io/niklasmarderx/Ember chat "Hallo!"
+docker run -it --rm ghcr.io/niklasmarderx/Ember chat "Hello!"
 ```
 
-### Web-Oberflaeche
+### Web UI
 
 ```bash
 ember serve
-# Oeffne http://localhost:3000 im Browser
+# Open http://localhost:3000 in your browser
 ```
 
 ---
 
-## Warum Ember?
+## Why Ember?
 
-### Ein Binary, keine Abhaengigkeiten
+### One binary, no dependencies
 
-Ember kompiliert zu einer einzigen 15 MB grossen Datei. Du kopierst sie auf einen Server, einen Raspberry Pi oder deinen Laptop - und es laeuft. Keine `pip install`, keine Versionskonflikte, keine `node_modules`.
+Ember compiles to a single 15 MB file. Copy it to a server, a Raspberry Pi, or your laptop — and it runs. No `pip install`, no version conflicts, no `node_modules`.
 
-### Schnell
+### Fast
 
-Rust-Programme starten sofort. Ember braucht etwa 80ms zum Starten, nicht mehrere Sekunden wie Python-basierte Tools. Der Speicherverbrauch liegt bei ca. 45 MB statt mehreren hundert MB.
+Rust programs start immediately. Ember takes about 80ms to start, not several seconds like Python-based tools. Memory usage is around 45 MB instead of several hundred.
 
-### Funktioniert offline
+### Works offline
 
-Mit Ollama kannst du lokale Modelle wie Llama, Qwen oder Mistral nutzen. Komplett ohne Internet, ohne API-Kosten, ohne dass deine Daten irgendwohin geschickt werden.
+With Ollama you can run local models like Llama, Qwen, or Mistral. Completely without internet, without API costs, without your data leaving your machine.
 
-### Viele Anbieter, ein Interface
+### Many providers, one interface
 
-Ember unterstuetzt OpenAI, Anthropic, Google Gemini, Mistral, Groq, DeepSeek, xAI, OpenRouter und Ollama. Du wechselst den Anbieter mit einem Flag, der Code bleibt gleich.
-
----
-
-## Unterstuetzte LLM-Anbieter
-
-| Anbieter | Beispiel-Modelle | Kosten |
-|----------|------------------|--------|
-| OpenAI | GPT-4o, GPT-4o-mini, o1 | Kostenpflichtig |
-| Anthropic | Claude 3.5 Sonnet, Haiku | Kostenpflichtig |
-| Google Gemini | Gemini 2.0, 1.5 Pro | Gratis-Kontingent |
-| Groq | Llama 3.3 70B, Mixtral | Gratis-Kontingent |
-| DeepSeek | V3, R1 | Guenstig |
-| Mistral | Large, Codestral | Kostenpflichtig |
-| xAI | Grok 2 | Kostenpflichtig |
-| OpenRouter | 200+ Modelle | Variiert |
-| Ollama | Llama, Qwen, etc. | Kostenlos (lokal) |
+Ember supports OpenAI, Anthropic, Google Gemini, Mistral, Groq, DeepSeek, xAI, OpenRouter, and Ollama. Switch providers with a flag — the code stays the same.
 
 ---
 
-## Was kann Ember?
+## Supported LLM Providers
 
-### Chat und Code-Generierung
+| Provider | Example Models | Cost |
+|----------|----------------|------|
+| OpenAI | GPT-4o, GPT-4o-mini, o1 | Paid |
+| Anthropic | Claude 3.5 Sonnet, Haiku | Paid |
+| Google Gemini | Gemini 2.0, 1.5 Pro | Free tier available |
+| Groq | Llama 3.3 70B, Mixtral | Free tier available |
+| DeepSeek | V3, R1 | Low cost |
+| Mistral | Large, Codestral | Paid |
+| xAI | Grok 2 | Paid |
+| OpenRouter | 200+ models | Varies |
+| Ollama | Llama, Qwen, etc. | Free (local) |
+
+---
+
+## What can Ember do?
+
+### Chat and code generation
 
 ```bash
-ember chat "Erklaer mir Rekursion"
-ember chat "Schreib eine Python-Funktion, die Primzahlen findet"
+ember chat "Explain recursion"
+ember chat "Write a Python function that finds prime numbers"
 ```
 
-### Tools aktivieren
+### Enable tools
 
-Ember kann Befehle ausfuehren, Dateien lesen und schreiben, Git nutzen und im Web suchen:
+Ember can execute commands, read and write files, use Git, and search the web:
 
 ```bash
-ember chat --tools shell,fs "Erstelle einen neuen Ordner 'projekt' und initialisiere Git"
-ember chat --tools web "Was ist der aktuelle Bitcoin-Preis?"
+ember chat --tools shell,fs "Create a new folder 'project' and initialize Git"
+ember chat --tools web "What is the current Bitcoin price?"
 ```
 
-### Web-Oberflaeche
+### Web UI
 
-Die Web-UI zeigt Chat-Verlaeufe, Kosten-Tracking und laesst dich zwischen Modellen wechseln.
+The web UI shows chat history, cost tracking, and lets you switch between models.
 
 ### Checkpoints
 
-Ember speichert jeden Schritt. Du kannst jederzeit zurueckgehen, wenn etwas schiefgeht.
+Ember saves every step. You can go back at any time if something goes wrong.
 
-### Kosten-Tracking
+### Cost tracking
 
-Bei Cloud-Anbietern siehst du in Echtzeit, was ein Chat kostet. Du kannst Budget-Limits setzen.
+With cloud providers, you see in real time what a chat costs. You can set budget limits.
 
 ---
 
 ## Installation
 
-### Ein Befehl
+### One command
 
 ```bash
 curl -fsSL https://ember.dev/install.sh | sh
 ```
 
-### Mit Cargo (wenn du Rust installiert hast)
+### With Cargo (if you have Rust installed)
 
 ```bash
 cargo install ember-cli
 ```
 
-### Mit Homebrew (macOS/Linux)
+### With Homebrew (macOS/Linux)
 
 ```bash
 brew install ember-agent
 ```
 
-### Aus dem Quellcode
+### From source
 
 ```bash
 git clone https://github.com/niklasmarderx/Ember
@@ -158,9 +158,9 @@ cargo build --release
 
 ---
 
-## Konfiguration
+## Configuration
 
-Ember liest API-Keys aus Umgebungsvariablen:
+Ember reads API keys from environment variables:
 
 ```bash
 # OpenAI
@@ -169,10 +169,10 @@ export OPENAI_API_KEY="sk-..."
 # Anthropic
 export ANTHROPIC_API_KEY="..."
 
-# Fuer andere Anbieter siehe die Dokumentation
+# For other providers see the documentation
 ```
 
-Oder leg eine `.env`-Datei an:
+Or create a `.env` file:
 
 ```
 OPENAI_API_KEY=sk-...
@@ -182,9 +182,9 @@ EMBER_DEFAULT_MODEL=gpt-4o-mini
 
 ---
 
-## Beispiele
+## Examples
 
-### Einfacher Chat
+### Simple chat
 
 ```rust
 use ember::prelude::*;
@@ -194,14 +194,14 @@ async fn main() -> Result<()> {
     let agent = Agent::builder()
         .provider(OpenAIProvider::from_env()?)
         .build()?;
-    
-    let antwort = agent.chat("Was ist die Hauptstadt von Frankreich?").await?;
-    println!("{}", antwort);
+
+    let response = agent.chat("What is the capital of France?").await?;
+    println!("{}", response);
     Ok(())
 }
 ```
 
-### Mit Tools
+### With tools
 
 ```rust
 use ember::prelude::*;
@@ -213,46 +213,46 @@ async fn main() -> Result<()> {
         .tool(tools::Shell::new())
         .tool(tools::Filesystem::sandboxed("./workspace"))
         .build()?;
-    
-    agent.chat("Liste alle .rs Dateien im aktuellen Verzeichnis").await?;
+
+    agent.chat("List all .rs files in the current directory").await?;
     Ok(())
 }
 ```
 
 ---
 
-## Projektstruktur
+## Project Structure
 
 ```
 ember/
 ├── crates/
-│   ├── ember-core/      # Agent, Memory, Konfiguration
-│   ├── ember-llm/       # LLM-Anbieter
-│   ├── ember-tools/     # Shell, Dateisystem, Git, Web
-│   ├── ember-storage/   # SQLite, Vektor-DB, RAG
-│   ├── ember-cli/       # Kommandozeile
-│   ├── ember-web/       # Web-Server und React-Frontend
+│   ├── ember-core/      # Agent, memory, configuration
+│   ├── ember-llm/       # LLM providers
+│   ├── ember-tools/     # Shell, filesystem, Git, web
+│   ├── ember-storage/   # SQLite, vector DB, RAG
+│   ├── ember-cli/       # Command-line interface
+│   ├── ember-web/       # Web server and React frontend
 │   └── ...
-├── examples/            # Code-Beispiele
-├── docs/                # Dokumentation
-└── extensions/          # VS Code Extension
+├── examples/            # Code examples
+├── docs/                # Documentation
+└── extensions/          # VS Code extension
 ```
 
 ---
 
-## Dokumentation
+## Documentation
 
-- [Erste Schritte](https://ember.dev/docs/getting-started)
-- [CLI-Referenz](https://ember.dev/docs/cli)
-- [Anbieter konfigurieren](https://ember.dev/docs/providers)
-- [Eigene Tools bauen](https://ember.dev/docs/custom-tools)
-- [API-Dokumentation (Rust)](https://docs.rs/ember)
+- [Getting Started](https://ember.dev/docs/getting-started)
+- [CLI Reference](https://ember.dev/docs/cli)
+- [Configure Providers](https://ember.dev/docs/providers)
+- [Build Custom Tools](https://ember.dev/docs/custom-tools)
+- [API Documentation (Rust)](https://docs.rs/ember)
 
 ---
 
-## Mithelfen
+## Contributing
 
-Beitraege sind willkommen. Schau dir [CONTRIBUTING.md](CONTRIBUTING.md) an fuer Details.
+Contributions are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for details.
 
 ```bash
 git clone https://github.com/niklasmarderx/Ember
@@ -263,15 +263,15 @@ cargo run -p ember-cli -- chat "Test"
 
 ---
 
-## Lizenz
+## License
 
-MIT - siehe [LICENSE-MIT](LICENSE-MIT)
+MIT — see [LICENSE-MIT](LICENSE-MIT)
 
 ---
 
 <div align="center">
 
-**Fragen?** [niklas.marder@gmail.com](mailto:niklas.marder@gmail.com)
+**Questions?** [niklas.marder@gmail.com](mailto:niklas.marder@gmail.com)
 
 [![GitHub](https://img.shields.io/github/stars/niklasmarderx/Ember?style=social)](https://github.com/niklasmarderx/Ember)
 
