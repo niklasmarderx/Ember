@@ -42,8 +42,8 @@ Enhancement suggestions are tracked as GitHub issues. When creating an enhanceme
 
 ```bash
 # Clone the repository
-git clone https://github.com/ember-ai/ember.git
-cd ember
+git clone https://github.com/niklasmarderx/Ember.git
+cd Ember
 
 # Build all crates
 cargo build --workspace
