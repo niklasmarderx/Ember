@@ -134,7 +134,10 @@ impl Error {
     pub fn is_recoverable(&self) -> bool {
         matches!(
             self,
-            Self::ToolExecution { .. } | Self::Timeout { .. } | Self::TimeoutMsg(_) | Self::Memory(_)
+            Self::ToolExecution { .. }
+                | Self::Timeout { .. }
+                | Self::TimeoutMsg(_)
+                | Self::Memory(_)
         )
     }
 
