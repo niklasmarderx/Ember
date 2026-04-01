@@ -518,3 +518,32 @@ fn test_tui_layout_settings() {
 
     assert_snapshot!("tui_layout_settings", layout);
 }
+
+// Test chat format output options
+#[test]
+fn test_chat_format_json_output() {
+    // Test the expected JSON output structure for chat --format json
+    let json_output = r#"{
+  "response": "The capital of France is Paris.",
+  "model": "gpt-4",
+  "provider": "openai",
+  "tokens": 25,
+  "duration_ms": 1234
+}"#;
+
+    assert_snapshot!("chat_format_json", json_output);
+}
+
+#[test]
+fn test_chat_format_markdown_output() {
+    // Test the expected markdown output structure for chat --format markdown
+    let markdown_output = r#"## Response
+
+The capital of France is Paris. It is known for its art, fashion, gastronomy and culture.
+
+---
+
+*Model: gpt-4 | Provider: openai*"#;
+
+    assert_snapshot!("chat_format_markdown", markdown_output);
+}

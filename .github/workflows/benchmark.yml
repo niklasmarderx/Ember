@@ -133,10 +133,10 @@ jobs:
           cargo bench -p ember-benchmarks --bench full_suite -- --save-baseline base
         continue-on-error: true
 
-      - name: Checkout PR branch
+      - name: Checkout PR commit
         if: github.event_name == 'pull_request'
         run: |
-          git checkout ${{ github.head_ref }}
+          git checkout ${{ github.event.pull_request.head.sha }}
 
       - name: Compare benchmarks
         if: github.event_name == 'pull_request'

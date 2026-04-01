@@ -1,0 +1,11 @@
+---
+source: crates/ember-cli/tests/snapshot_tests.rs
+expression: json_output
+---
+{
+  "response": "The capital of France is Paris.",
+  "model": "gpt-4",
+  "provider": "openai",
+  "tokens": 25,
+  "duration_ms": 1234
+}

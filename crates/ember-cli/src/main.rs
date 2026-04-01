@@ -112,6 +112,18 @@ pub enum LogFormat {
     Full,
 }
 
+/// Chat output format.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, ValueEnum)]
+pub enum ChatFormat {
+    /// Plain text output (default)
+    #[default]
+    Text,
+    /// JSON formatted output
+    Json,
+    /// Markdown formatted output
+    Markdown,
+}
+
 #[derive(Subcommand)]
 enum Commands {
     /// Launch the Terminal UI (interactive mode)
@@ -163,6 +175,10 @@ shell commands, access the filesystem, and fetch web content.",
         /// Enable tools (comma-separated: shell,filesystem,web)
         #[arg(long, value_delimiter = ',')]
         tools: Option<Vec<String>>,
+
+        /// Output format (text, json, markdown)
+        #[arg(short, long, value_enum, default_value = "text")]
+        format: ChatFormat,
     },
 
     /// Execute a task using the AI agent and exit.
@@ -469,6 +485,7 @@ async fn run() -> Result<()> {
             temperature,
             no_stream,
             tools,
+            format,
         } => {
             chat::run(
                 config,
@@ -479,6 +496,7 @@ async fn run() -> Result<()> {
                 temperature,
                 !no_stream,
                 tools,
+                format,
             )
             .await?;
         }
