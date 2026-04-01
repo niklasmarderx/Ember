@@ -6,10 +6,11 @@
 
 **An AI agent framework in Rust. Fast, small, runs everywhere.**
 
-[![Website](https://img.shields.io/badge/website-ember.dev-orange)](https://niklasmarderx.github.io/Ember/)
+[![CI](https://github.com/niklasmarderx/Ember/actions/workflows/ci.yml/badge.svg)](https://github.com/niklasmarderx/Ember/actions/workflows/ci.yml)
 [![Crates.io](https://img.shields.io/crates/v/ember-cli)](https://crates.io/crates/ember-cli)
+[![Downloads](https://img.shields.io/crates/d/ember-cli)](https://crates.io/crates/ember-cli)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE-MIT)
-[![CI](https://github.com/niklasmarderx/Ember/actions/workflows/ci.yml/badge.svg)](https://github.com/niklasmarderx/Ember/actions)
+[![Website](https://img.shields.io/badge/docs-ember.dev-orange)](https://niklasmarderx.github.io/Ember/)
 
 </div>
 
