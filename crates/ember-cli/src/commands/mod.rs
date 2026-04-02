@@ -9,3 +9,4 @@ pub mod git;
 pub mod history;
 pub mod plugin;
 pub mod serve;
+pub mod slash;
