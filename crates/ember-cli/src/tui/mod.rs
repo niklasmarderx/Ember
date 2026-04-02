@@ -10,6 +10,11 @@ mod app;
 #[cfg(feature = "tui")]
 mod ui;
 
+pub mod renderer;
+
+#[allow(unused_imports)]
+pub use renderer::{ColorTheme, Spinner, TerminalRenderer, ToolOutputFormatter};
+
 #[cfg(feature = "tui")]
 pub async fn run(config: crate::config::AppConfig) -> anyhow::Result<()> {
     app::run(config).await

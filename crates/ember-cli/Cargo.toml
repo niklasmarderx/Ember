@@ -46,6 +46,12 @@ ratatui = { workspace = true, optional = true }
 # Colors and styling
 colored = "2.1"
 
+# Markdown parsing
+pulldown-cmark = "0.12"
+
+# Syntax highlighting
+syntect = { version = "5.2", default-features = false, features = ["default-fancy"] }
+
 # Configuration
 toml = "0.8"
 dirs = "5.0"
