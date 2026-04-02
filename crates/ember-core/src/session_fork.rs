@@ -250,7 +250,10 @@ mod tests {
         // Verify content matches the original turns
         for (original, restored_turn) in conv.turns.iter().zip(restored.iter()) {
             assert_eq!(original.user_message, restored_turn.user_message);
-            assert_eq!(original.assistant_response, restored_turn.assistant_response);
+            assert_eq!(
+                original.assistant_response,
+                restored_turn.assistant_response
+            );
         }
     }
 
@@ -285,14 +288,8 @@ mod tests {
 
         assert_eq!(mgr.fork_count(), 2);
         assert_ne!(fork_a.fork_id, fork_b.fork_id);
-        assert_eq!(
-            mgr.restore_fork(&fork_a.fork_id).unwrap().len(),
-            2
-        );
-        assert_eq!(
-            mgr.restore_fork(&fork_b.fork_id).unwrap().len(),
-            4
-        );
+        assert_eq!(mgr.restore_fork(&fork_a.fork_id).unwrap().len(), 2);
+        assert_eq!(mgr.restore_fork(&fork_b.fork_id).unwrap().len(), 4);
     }
 
     // -------------------------------------------------------------------------
@@ -305,13 +302,13 @@ mod tests {
 
         let fork = mgr.fork(&conv, "sess", Some("try-different-approach".to_string()));
 
-        assert_eq!(
-            fork.branch_name.as_deref(),
-            Some("try-different-approach")
-        );
+        assert_eq!(fork.branch_name.as_deref(), Some("try-different-approach"));
 
         let stored = mgr.get_fork(&fork.fork_id).unwrap();
-        assert_eq!(stored.branch_name.as_deref(), Some("try-different-approach"));
+        assert_eq!(
+            stored.branch_name.as_deref(),
+            Some("try-different-approach")
+        );
     }
 
     // -------------------------------------------------------------------------
@@ -383,9 +380,6 @@ mod tests {
         let fork = mgr.fork(&conv, "session-empty", None);
 
         assert_eq!(fork.fork_point, 0);
-        assert_eq!(
-            mgr.restore_fork(&fork.fork_id).unwrap().len(),
-            0
-        );
+        assert_eq!(mgr.restore_fork(&fork.fork_id).unwrap().len(), 0);
     }
 }

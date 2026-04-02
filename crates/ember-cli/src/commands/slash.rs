@@ -12,6 +12,8 @@
 //! assert_eq!(cmd, Some(SlashCommand::Model { model: Some("gpt-4o".into()) }));
 //! ```
 
+#![allow(dead_code)]
+
 // ──────────────────────────────────────────────────────────────────────────────
 // SlashCommand enum
 // ──────────────────────────────────────────────────────────────────────────────
@@ -132,7 +134,9 @@ impl SlashCommand {
             SlashCommand::Permissions { .. } => "Show or change the current permission mode",
             SlashCommand::Config { .. } => "Display configuration, optionally for a named section",
             SlashCommand::Memory => "Show memory and context window usage",
-            SlashCommand::Clear { .. } => "Clear the current conversation (prompts for confirmation)",
+            SlashCommand::Clear { .. } => {
+                "Clear the current conversation (prompts for confirmation)"
+            }
             SlashCommand::Cost => "Show a cost breakdown for the current session",
             SlashCommand::Fork { .. } => "Fork the current session, optionally giving it a name",
             SlashCommand::Forks => "List all session forks",

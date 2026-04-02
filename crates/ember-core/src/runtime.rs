@@ -179,11 +179,7 @@ pub trait LlmBackend {
     ///
     /// `system` is the system prompt; `messages` is the full conversation
     /// history including the current user turn at the end.
-    fn complete(
-        &self,
-        system: &str,
-        messages: &[Message],
-    ) -> Result<LlmResponse, RuntimeError>;
+    fn complete(&self, system: &str, messages: &[Message]) -> Result<LlmResponse, RuntimeError>;
 }
 
 /// Abstraction over tool execution.
@@ -746,7 +742,9 @@ mod tests {
         let has_tool_result = events
             .iter()
             .any(|e| matches!(e, RuntimeEvent::ToolResult { is_error, .. } if !is_error));
-        let has_text = events.iter().any(|e| matches!(e, RuntimeEvent::TextDelta(_)));
+        let has_text = events
+            .iter()
+            .any(|e| matches!(e, RuntimeEvent::TextDelta(_)));
         let has_complete = events
             .iter()
             .any(|e| matches!(e, RuntimeEvent::TurnComplete));
@@ -768,7 +766,9 @@ mod tests {
             max_tool_rounds: 3,
             ..Default::default()
         });
-        let llm = InfiniteToolLlm { tool_name: "loop_tool" };
+        let llm = InfiniteToolLlm {
+            tool_name: "loop_tool",
+        };
         let tools = MockTools {
             name: "loop_tool",
             result: "still going",
@@ -784,7 +784,9 @@ mod tests {
         );
         // TurnComplete should NOT be present.
         assert!(
-            !events.iter().any(|e| matches!(e, RuntimeEvent::TurnComplete)),
+            !events
+                .iter()
+                .any(|e| matches!(e, RuntimeEvent::TurnComplete)),
             "TurnComplete should not appear when limit is exceeded"
         );
         // turn_count should NOT increment when the loop aborts.
@@ -798,7 +800,7 @@ mod tests {
     #[test]
     fn test_should_compact_below_threshold() {
         let rt = ConversationRuntime::with_defaults(); // 0 tokens used
-        // 0 >= 0.8 * 100_000 = 80_000 → false
+                                                       // 0 >= 0.8 * 100_000 = 80_000 → false
         assert!(!rt.should_compact(100_000));
     }
 

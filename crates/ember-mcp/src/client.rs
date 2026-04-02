@@ -1347,16 +1347,13 @@ mod tests {
     fn test_server_config_http() {
         let cfg = McpServerConfig::http("web-tools", "http://api.example.com/mcp");
         assert_eq!(cfg.transport, McpTransport::Http);
-        assert_eq!(
-            cfg.endpoint.as_deref(),
-            Some("http://api.example.com/mcp")
-        );
+        assert_eq!(cfg.endpoint.as_deref(), Some("http://api.example.com/mcp"));
     }
 
     #[test]
     fn test_server_config_disabled() {
-        let cfg = McpServerConfig::sse("stream-server", "http://stream.example.com/events")
-            .disabled();
+        let cfg =
+            McpServerConfig::sse("stream-server", "http://stream.example.com/events").disabled();
         assert!(!cfg.enabled);
         assert_eq!(cfg.transport, McpTransport::Sse);
     }

@@ -66,13 +66,25 @@ pub use error::{Error, Result};
 
 // Client exports
 pub use client::{
-    // existing
-    MCPClient, MCPClientConfig, MCPManager, MCPTransport, StdioTransport,
-    // new multi-transport registry
-    HttpTransport, McpClientRegistry, McpContent, McpServerConfig, McpToolDefinition,
-    McpToolResult, McpTransport, WebSocketTransport,
     // name helpers
-    mcp_tool_name, normalize_mcp_name, parse_mcp_tool_name,
+    mcp_tool_name,
+    normalize_mcp_name,
+    parse_mcp_tool_name,
+    // new multi-transport registry
+    HttpTransport,
+    // existing
+    MCPClient,
+    MCPClientConfig,
+    MCPManager,
+    MCPTransport,
+    McpClientRegistry,
+    McpContent,
+    McpServerConfig,
+    McpToolDefinition,
+    McpToolResult,
+    McpTransport,
+    StdioTransport,
+    WebSocketTransport,
 };
 
 // Server exports

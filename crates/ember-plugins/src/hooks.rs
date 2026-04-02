@@ -537,16 +537,8 @@ mod tests {
     fn handlers_for_event_filters_correctly() {
         let mut runner = HookRunner::new();
 
-        runner.register(allow_handler(
-            "pre-only",
-            0,
-            vec![HookEvent::PreToolUse],
-        ));
-        runner.register(allow_handler(
-            "post-only",
-            0,
-            vec![HookEvent::PostToolUse],
-        ));
+        runner.register(allow_handler("pre-only", 0, vec![HookEvent::PreToolUse]));
+        runner.register(allow_handler("post-only", 0, vec![HookEvent::PostToolUse]));
         runner.register(allow_handler(
             "both",
             0,
@@ -571,11 +563,7 @@ mod tests {
     #[test]
     fn handler_only_runs_for_subscribed_events() {
         let mut runner = HookRunner::new();
-        runner.register(deny_handler(
-            "post-denier",
-            0,
-            vec![HookEvent::PostToolUse],
-        ));
+        runner.register(deny_handler("post-denier", 0, vec![HookEvent::PostToolUse]));
 
         // PreToolUse — the post-only handler must not fire.
         let result = runner.run(&pre_ctx());

@@ -1,7 +1,7 @@
 //! Granular per-tool permission system.
 //!
 //! This module provides fine-grained control over what individual tools are
-//! allowed to do. While [`crate::sandbox`] enforces broad capability policies
+//! allowed to do. While the sandbox module enforces broad capability policies
 //! across all tools, `permissions` lets you tune rules per-tool:
 //!
 //! - Which filesystem paths a tool may read or write
@@ -377,19 +377,31 @@ mod tests {
         let policy = PermissionPolicy::unrestricted();
 
         assert_eq!(
-            policy.check("any_tool", &ToolAction::ReadFile(PathBuf::from("/etc/passwd"))),
+            policy.check(
+                "any_tool",
+                &ToolAction::ReadFile(PathBuf::from("/etc/passwd"))
+            ),
             PermissionResult::Allowed
         );
         assert_eq!(
-            policy.check("any_tool", &ToolAction::WriteFile(PathBuf::from("/etc/shadow"))),
+            policy.check(
+                "any_tool",
+                &ToolAction::WriteFile(PathBuf::from("/etc/shadow"))
+            ),
             PermissionResult::Allowed
         );
         assert_eq!(
-            policy.check("any_tool", &ToolAction::ExecuteCommand("rm -rf /".to_string())),
+            policy.check(
+                "any_tool",
+                &ToolAction::ExecuteCommand("rm -rf /".to_string())
+            ),
             PermissionResult::Allowed
         );
         assert_eq!(
-            policy.check("any_tool", &ToolAction::NetworkAccess("evil.example.com".to_string())),
+            policy.check(
+                "any_tool",
+                &ToolAction::NetworkAccess("evil.example.com".to_string())
+            ),
             PermissionResult::Allowed
         );
     }
@@ -497,7 +509,10 @@ mod tests {
             PermissionResult::Allowed
         );
         assert_eq!(
-            policy.check("shell", &ToolAction::ExecuteCommand("git status".to_string())),
+            policy.check(
+                "shell",
+                &ToolAction::ExecuteCommand("git status".to_string())
+            ),
             PermissionResult::Allowed
         );
         assert!(matches!(
@@ -581,9 +596,7 @@ mod tests {
         let mut perm = ToolPermission::default();
         perm.tool_name = "restricted".to_string();
         perm.allowed_paths = vec![PathBuf::from("/workspace")];
-        policy
-            .tool_overrides
-            .insert("restricted".to_string(), perm);
+        policy.tool_overrides.insert("restricted".to_string(), perm);
 
         assert_eq!(
             policy.check(

@@ -87,17 +87,14 @@
 #![allow(clippy::range_plus_one)]
 #![allow(clippy::useless_vec)]
 
-pub mod bootstrap;
-pub mod config_merge;
-pub mod oauth;
-pub mod runtime;
 mod agent;
+pub mod bootstrap;
 mod cache;
-pub mod session_fork;
-pub mod compaction;
 mod checkpoint;
 mod collaboration;
+pub mod compaction;
 mod config;
+pub mod config_merge;
 mod context;
 mod context_manager;
 mod conversation;
@@ -106,14 +103,17 @@ mod error;
 mod knowledge_graph;
 mod memory;
 pub mod memory_optimization;
+pub mod oauth;
 mod orchestrator;
 pub mod performance;
 pub mod permissions;
 mod planning;
 mod privacy;
+pub mod runtime;
 mod sandbox;
 pub mod security;
 mod self_healing;
+pub mod session_fork;
 mod streaming;
 mod task_planner;
 pub mod thinking;
@@ -122,11 +122,11 @@ mod tool_selector;
 pub mod usage_tracker;
 
 pub use bootstrap::{BootstrapPhase, BootstrapPlan, BootstrapTimer};
-pub use runtime::{
-    CompactionSummary, ConversationRuntime, LlmBackend, LlmResponse, ResponseBlock,
-    RuntimeConfig, RuntimeError, RuntimeEvent, RuntimeStats, TokenUsageUpdate, ToolBackend,
-};
 pub use error::{Error, Result};
+pub use runtime::{
+    CompactionSummary, ConversationRuntime, LlmBackend, LlmResponse, ResponseBlock, RuntimeConfig,
+    RuntimeError, RuntimeEvent, RuntimeStats, TokenUsageUpdate, ToolBackend,
+};
 /// Alias for CoreError used by internal modules
 pub type CoreError = Error;
 pub use agent::{Agent, AgentBuilder, AgentState};
@@ -139,19 +139,19 @@ pub use collaboration::{
     Proposal, ProposalStatus, SessionId, SharedMemory, SharedMemoryEvent, SharedValue,
     TaskDelegator, TaskEvent, TaskStatus as CollaborativeTaskStatus, ACP_VERSION,
 };
+pub use compaction::{
+    compact_conversation, estimate_tokens as estimate_conversation_tokens, should_compact,
+    CompactionConfig, CompactionResult,
+};
 pub use config::{AgentConfig, AgentConfigBuilder};
 pub use config_merge::{
-    ConfigEntry, ConfigLoader, ConfigSource, MergedConfig,
-    deep_merge, discover_config_files, load_config_file,
+    deep_merge, discover_config_files, load_config_file, ConfigEntry, ConfigLoader, ConfigSource,
+    MergedConfig,
 };
 pub use context::{Context, ContextManager};
 pub use context_manager::{
     ContextManager as ContextManagerV2, ContextManagerBuilder as ContextManagerV2Builder,
     ContextMessage, MessageRole, PriorityWeights, PruningStrategy, TokenCount,
-};
-pub use compaction::{
-    compact_conversation, estimate_tokens as estimate_conversation_tokens, should_compact,
-    CompactionConfig, CompactionResult,
 };
 pub use conversation::{
     Conversation, ConversationExport, ConversationId, ExportFormat, ExportMessage, ExportMetadata,
@@ -160,9 +160,6 @@ pub use conversation::{
 pub use cost_predictor::{
     BudgetAlert, BudgetConfig, CostPredictor, CostRecommendation, PredictionResult, UsageRecord,
     UsageStats,
-};
-pub use usage_tracker::{
-    pricing_for_model, ModelPricing, SessionUsageTracker, TurnUsage, UsageCostEstimate,
 };
 pub use knowledge_graph::{
     Entity, EntityId, FilterOperation, GraphConfig, GraphExport, GraphQuery, GraphStats,
@@ -206,15 +203,14 @@ pub use performance::{
     // Throttler
     Throttler,
 };
+pub use permissions::{
+    PermissionMode, PermissionPolicy, PermissionResult, ToolAction, ToolPermission,
+};
 pub use planning::{AgentMode, Plan, PlanBuilder, PlanStep, PlannerConfig};
 pub use privacy::{
     AccessType, AuditEntry, DataMinimizer, PiiMatch, PiiType, PrivacyConfig, PrivacyLevel,
     PrivacyShield, PrivacyStats,
 };
-pub use permissions::{
-    PermissionMode, PermissionPolicy, PermissionResult, ToolAction, ToolPermission,
-};
-pub use session_fork::{ForkNode, SessionFork, SessionForkManager};
 pub use sandbox::{
     Capability, CommandRules, NetworkRules, PathRules, ResourceLimits, SecurityCheckResult,
     SecurityConfig, SecurityEvent, SecurityEventType, SecurityLevel, SecuritySandbox,
@@ -252,6 +248,7 @@ pub use self_healing::{
     CircuitBreaker, CircuitState, ErrorCategory, RecoveryRecord, RecoveryStats, RecoveryStrategy,
     SelfHealingSystem,
 };
+pub use session_fork::{ForkNode, SessionFork, SessionForkManager};
 pub use streaming::{
     FilterTransformer, MapTransformer, MergeStrategy, MultiStreamMerger, StreamBuilder,
     StreamConfig, StreamController, StreamState, StreamStats, StreamToken, StreamTransformer,
@@ -270,6 +267,9 @@ pub use tool_executor::{
 pub use tool_selector::{
     SelectionContext, ToolCapability, ToolMetadata, ToolRecommendation, ToolSelector,
     ToolSelectorConfig,
+};
+pub use usage_tracker::{
+    pricing_for_model, ModelPricing, SessionUsageTracker, TurnUsage, UsageCostEstimate,
 };
 
 /// Re-export commonly used types from ember-llm
@@ -300,12 +300,6 @@ pub mod prelude {
         CacheStats,
         Capability,
         Checkpoint,
-        // Granular tool permissions
-        PermissionMode,
-        PermissionPolicy,
-        PermissionResult,
-        ToolAction,
-        ToolPermission,
         CheckpointConfig,
         CheckpointId,
         CheckpointManager,
@@ -327,6 +321,10 @@ pub mod prelude {
         MemoryEntry,
         Orchestrator,
         OrchestratorTask,
+        // Granular tool permissions
+        PermissionMode,
+        PermissionPolicy,
+        PermissionResult,
         PiiType,
         Plan,
         PlanBuilder,
@@ -352,6 +350,8 @@ pub mod prelude {
         TaskId,
         // Intelligent Task Planner
         TaskPlanner,
+        ToolAction,
+        ToolPermission,
         Turn,
         WorkflowBuilder,
     };

@@ -3,8 +3,8 @@
 //!
 //! # Overview
 //!
-//! This module extends the existing [`ShellTool`] with first-class support for:
-//! - Per-command timeouts independent of the global [`ShellConfig`]
+//! This module extends the existing [`crate::shell::ShellTool`] with first-class support for:
+//! - Per-command timeouts independent of the global [`crate::shell::ShellConfig`]
 //! - Background task execution with a [`BackgroundTaskManager`]
 //! - Per-command sandbox policies ([`BashSandboxPolicy`])
 //! - Structured output ([`BashCommandOutput`]) including exit code, timing,
@@ -59,7 +59,7 @@ pub enum FilesystemMode {
 /// Per-command sandbox configuration.
 ///
 /// When `enabled` is `false` (the default), no additional restrictions are
-/// imposed beyond those of the global [`ShellTool`] security rules.
+/// imposed beyond those of the global [`crate::shell::ShellTool`] security rules.
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct BashSandboxPolicy {
     /// Whether to activate sandbox restrictions for this command.
@@ -80,7 +80,7 @@ pub struct BashSandboxPolicy {
 pub struct BashCommandInput {
     /// The shell command to execute.
     pub command: String,
-    /// Per-command timeout; overrides the global [`ShellConfig::timeout_secs`].
+    /// Per-command timeout; overrides the global [`crate::shell::ShellConfig::timeout_secs`].
     pub timeout_secs: Option<u64>,
     /// Human-readable description (logged at DEBUG level before execution).
     pub description: Option<String>,
@@ -166,7 +166,7 @@ pub struct BashCommandOutput {
     pub execution_time_ms: u64,
     /// For background commands: the task ID assigned by [`BackgroundTaskManager`].
     pub background_task_id: Option<String>,
-    /// `true` when stdout or stderr was cut at [`DEFAULT_MAX_OUTPUT_BYTES`].
+    /// `true` when stdout or stderr was cut at the internal `DEFAULT_MAX_OUTPUT_BYTES` limit (1 MiB).
     pub truncated: bool,
 }
 
@@ -552,6 +552,7 @@ mod tests {
 
     // ── execute_bash: simple execution ──────────────────────────────────────
 
+    #[cfg(unix)]
     #[tokio::test]
     async fn test_simple_command_execution() {
         let output = execute_bash(&BashCommandInput::simple("echo hello"))
@@ -564,6 +565,7 @@ mod tests {
 
     // ── execute_bash: exit code captured ────────────────────────────────────
 
+    #[cfg(unix)]
     #[tokio::test]
     async fn test_exit_code_captured() {
         let output = execute_bash(&BashCommandInput::simple("exit 42"))
@@ -574,6 +576,7 @@ mod tests {
 
     // ── execute_bash: non-zero exit ──────────────────────────────────────────
 
+    #[cfg(unix)]
     #[tokio::test]
     async fn test_nonzero_exit_code() {
         let output = execute_bash(&BashCommandInput::simple("false"))
@@ -584,6 +587,7 @@ mod tests {
 
     // ── execute_bash: stderr captured separately ─────────────────────────────
 
+    #[cfg(unix)]
     #[tokio::test]
     async fn test_stderr_captured_separately() {
         let output = execute_bash(&BashCommandInput::simple(
@@ -599,6 +603,7 @@ mod tests {
 
     // ── execute_bash: timeout triggers ──────────────────────────────────────
 
+    #[cfg(unix)]
     #[tokio::test]
     async fn test_timeout_triggers() {
         let input = BashCommandInput::simple("sleep 60").with_timeout(1);
@@ -609,6 +614,7 @@ mod tests {
 
     // ── execute_bash: working dir override ──────────────────────────────────
 
+    #[cfg(unix)]
     #[tokio::test]
     async fn test_working_dir_override() {
         let input = BashCommandInput::simple("pwd").with_working_dir("/tmp");
@@ -625,6 +631,7 @@ mod tests {
 
     // ── execute_bash: env vars passed ────────────────────────────────────────
 
+    #[cfg(unix)]
     #[tokio::test]
     async fn test_env_vars_passed() {
         let input = BashCommandInput::simple("echo $MY_VAR").with_env("MY_VAR", "hello_env");
@@ -634,6 +641,7 @@ mod tests {
 
     // ── execute_bash: execution time tracked ────────────────────────────────
 
+    #[cfg(unix)]
     #[tokio::test]
     async fn test_execution_time_tracked() {
         let output = execute_bash(&BashCommandInput::simple("echo ok"))
@@ -645,6 +653,7 @@ mod tests {
 
     // ── execute_bash: empty command error ────────────────────────────────────
 
+    #[cfg(unix)]
     #[tokio::test]
     async fn test_empty_command_returns_error() {
         let result = execute_bash(&BashCommandInput::simple("   ")).await;
@@ -653,6 +662,7 @@ mod tests {
 
     // ── BackgroundTaskManager ────────────────────────────────────────────────
 
+    #[cfg(unix)]
     #[tokio::test]
     async fn test_background_task_spawn_returns_id() {
         let mut mgr = BackgroundTaskManager::new();
@@ -660,6 +670,7 @@ mod tests {
         assert!(id.starts_with("bg-"));
     }
 
+    #[cfg(unix)]
     #[tokio::test]
     async fn test_background_task_list_shows_running() {
         let mut mgr = BackgroundTaskManager::new();
@@ -673,6 +684,7 @@ mod tests {
         mgr.kill(&id);
     }
 
+    #[cfg(unix)]
     #[tokio::test]
     async fn test_background_task_completes() {
         let mut mgr = BackgroundTaskManager::new();
@@ -686,6 +698,7 @@ mod tests {
         assert_eq!(output.stdout.trim(), "done");
     }
 
+    #[cfg(unix)]
     #[tokio::test]
     async fn test_background_task_kill() {
         let mut mgr = BackgroundTaskManager::new();
@@ -695,12 +708,14 @@ mod tests {
         assert!(mgr.status(&id).is_none());
     }
 
+    #[cfg(unix)]
     #[tokio::test]
     async fn test_background_task_kill_nonexistent() {
         let mut mgr = BackgroundTaskManager::new();
         assert!(!mgr.kill("bg-9999"));
     }
 
+    #[cfg(unix)]
     #[tokio::test]
     async fn test_background_task_collect_running_returns_none() {
         let mut mgr = BackgroundTaskManager::new();
@@ -710,6 +725,7 @@ mod tests {
         mgr.kill(&id);
     }
 
+    #[cfg(unix)]
     #[tokio::test]
     async fn test_background_task_id_in_output() {
         let mut mgr = BackgroundTaskManager::new();
@@ -721,6 +737,7 @@ mod tests {
         assert_eq!(output.background_task_id.as_deref(), Some(id.as_str()));
     }
 
+    #[cfg(unix)]
     #[tokio::test]
     async fn test_multiple_background_tasks() {
         let mut mgr = BackgroundTaskManager::new();
