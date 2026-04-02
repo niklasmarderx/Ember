@@ -102,6 +102,7 @@ mod memory;
 pub mod memory_optimization;
 mod orchestrator;
 pub mod performance;
+pub mod permissions;
 mod planning;
 mod privacy;
 mod sandbox;
@@ -186,6 +187,9 @@ pub use planning::{AgentMode, Plan, PlanBuilder, PlanStep, PlannerConfig};
 pub use privacy::{
     AccessType, AuditEntry, DataMinimizer, PiiMatch, PiiType, PrivacyConfig, PrivacyLevel,
     PrivacyShield, PrivacyStats,
+};
+pub use permissions::{
+    PermissionMode, PermissionPolicy, PermissionResult, ToolAction, ToolPermission,
 };
 pub use sandbox::{
     Capability, CommandRules, NetworkRules, PathRules, ResourceLimits, SecurityCheckResult,
@@ -272,6 +276,12 @@ pub mod prelude {
         CacheStats,
         Capability,
         Checkpoint,
+        // Granular tool permissions
+        PermissionMode,
+        PermissionPolicy,
+        PermissionResult,
+        ToolAction,
+        ToolPermission,
         CheckpointConfig,
         CheckpointId,
         CheckpointManager,
