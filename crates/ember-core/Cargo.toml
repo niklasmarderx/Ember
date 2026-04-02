@@ -45,6 +45,11 @@ regex = "1.10"
 chrono = { version = "0.4", features = ["serde"] }
 humantime = "2.1"
 
+# OAuth / PKCE
+sha2 = "0.10"
+base64 = "0.22"
+dirs = { workspace = true }
+
 [features]
 default = ["tools", "storage"]
 tools = ["dep:ember-tools"]

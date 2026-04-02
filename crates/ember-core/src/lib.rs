@@ -89,6 +89,7 @@
 
 pub mod bootstrap;
 pub mod config_merge;
+pub mod oauth;
 mod agent;
 mod cache;
 pub mod session_fork;
