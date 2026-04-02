@@ -5,6 +5,8 @@
 //! target (including `Vec<u8>`) so all rendering paths are unit-testable
 //! without a real TTY.
 
+#![allow(dead_code)]
+
 use crossterm::style::{Color, ResetColor, SetForegroundColor};
 use crossterm::{cursor, queue};
 use pulldown_cmark::{Event as MdEvent, HeadingLevel, Options, Parser as MdParser, Tag, TagEnd};
@@ -152,14 +154,14 @@ impl TerminalRenderer {
             match event {
                 // ── Block tags ─────────────────────────────────────────────
                 MdEvent::Start(Tag::Heading { level, .. }) => {
-                    write!(w, "\n")?;
+                    writeln!(w)?;
                     let prefix = heading_prefix(level);
                     queue!(w, SetForegroundColor(self.theme.heading))?;
                     write!(w, "{prefix}")?;
                     queue!(w, ResetColor)?;
                 }
                 MdEvent::End(TagEnd::Heading(_)) => {
-                    write!(w, "\n")?;
+                    writeln!(w)?;
                 }
 
                 MdEvent::Start(Tag::Paragraph) => {}
@@ -172,7 +174,7 @@ impl TerminalRenderer {
                 }
                 MdEvent::End(TagEnd::BlockQuote(_)) => {
                     in_blockquote = false;
-                    write!(w, "\n")?;
+                    writeln!(w)?;
                 }
 
                 MdEvent::Start(Tag::CodeBlock(kind)) => {
@@ -191,13 +193,13 @@ impl TerminalRenderer {
 
                 MdEvent::Start(Tag::List(_)) => {}
                 MdEvent::End(TagEnd::List(_)) => {
-                    write!(w, "\n")?;
+                    writeln!(w)?;
                 }
                 MdEvent::Start(Tag::Item) => {
                     write!(w, "  • ")?;
                 }
                 MdEvent::End(TagEnd::Item) => {
-                    write!(w, "\n")?;
+                    writeln!(w)?;
                 }
 
                 MdEvent::Start(Tag::Strong) => {
@@ -229,7 +231,7 @@ impl TerminalRenderer {
                     write!(w, " ")?;
                 }
                 MdEvent::HardBreak => {
-                    write!(w, "\n")?;
+                    writeln!(w)?;
                 }
 
                 // ── Inline content ─────────────────────────────────────────
@@ -239,7 +241,7 @@ impl TerminalRenderer {
                     } else if in_blockquote {
                         queue!(w, SetForegroundColor(self.theme.quote))?;
                         for line in text.lines() {
-                            write!(w, "│ {line}\n")?;
+                            writeln!(w, "│ {line}")?;
                         }
                         queue!(w, ResetColor)?;
                     } else {
@@ -295,7 +297,7 @@ impl TerminalRenderer {
         for line in syntect::util::LinesWithEndings::from(code) {
             let ranges = highlighter
                 .highlight_line(line, &self.syntax_set)
-                .map_err(|e| io::Error::new(io::ErrorKind::Other, e.to_string()))?;
+                .map_err(|e| io::Error::other(e.to_string()))?;
             let escaped = as_24_bit_terminal_escaped(&ranges, false);
             write!(w, "{escaped}\x1b[0m")?;
         }
