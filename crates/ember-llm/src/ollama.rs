@@ -344,6 +344,7 @@ impl From<OllamaResponse> for CompletionResponse {
                 prompt_tokens: resp.prompt_eval_count,
                 completion_tokens: resp.eval_count,
                 total_tokens: resp.prompt_eval_count + resp.eval_count,
+                ..Default::default()
             },
             model: resp.model,
             id: None,

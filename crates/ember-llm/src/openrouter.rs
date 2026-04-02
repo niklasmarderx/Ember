@@ -700,11 +700,13 @@ impl From<OpenRouterResponse> for CompletionResponse {
                 prompt_tokens: 0,
                 completion_tokens: 0,
                 total_tokens: 0,
+                ..Default::default()
             },
             |u| TokenUsage {
                 prompt_tokens: u.prompt_tokens,
                 completion_tokens: u.completion_tokens,
                 total_tokens: u.total_tokens,
+                ..Default::default()
             },
         );
 
