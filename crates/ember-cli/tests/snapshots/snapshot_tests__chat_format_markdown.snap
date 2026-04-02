@@ -1,0 +1,11 @@
+---
+source: crates/ember-cli/tests/snapshot_tests.rs
+expression: markdown_output
+---
+## Response
+
+The capital of France is Paris. It is known for its art, fashion, gastronomy and culture.
+
+---
+
+*Model: gpt-4 | Provider: openai*

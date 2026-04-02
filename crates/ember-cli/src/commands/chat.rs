@@ -36,11 +36,13 @@
 //! ```
 
 use crate::config::AppConfig;
+use crate::ChatFormat;
 use anyhow::{Context, Result};
 use colored::Colorize;
 use ember_llm::{CompletionRequest, LLMProvider, Message, OllamaProvider, OpenAIProvider};
 use ember_tools::{FilesystemTool, ShellTool, ToolRegistry, WebTool};
 use futures::StreamExt;
+use serde_json;
 use std::io::{self, Write};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
@@ -176,6 +178,7 @@ pub async fn run(
     temperature: Option<f32>,
     streaming: bool,
     tools: Option<Vec<String>>,
+    format: ChatFormat,
 ) -> Result<()> {
     // Determine the provider to use (CLI override or config default)
     let provider_name = provider.unwrap_or_else(|| config.provider.default.clone());
@@ -210,6 +213,7 @@ pub async fn run(
                 &msg,
                 streaming,
                 registry,
+                format,
             )
             .await?;
         } else {
@@ -234,6 +238,7 @@ pub async fn run(
                 temp,
                 &msg,
                 streaming,
+                format,
             )
             .await?;
         } else {
@@ -350,6 +355,7 @@ pub async fn run_task(config: AppConfig, task: String, model: Option<String>) ->
         config.agent.temperature,
         &task,
         true,
+        ChatFormat::Text,
     )
     .await
 }
@@ -363,19 +369,23 @@ async fn agent_one_shot(
     message: &str,
     streaming: bool,
     registry: ToolRegistry,
+    format: ChatFormat,
 ) -> Result<()> {
-    println!(
-        "{} Agent mode with {} tool(s): {}",
-        "[ember]".bright_yellow(),
-        registry.len().to_string().bright_green(),
-        registry.tool_names().join(", ").bright_cyan()
-    );
-    println!(
-        "   Using {} with {}",
-        provider.name().bright_blue(),
-        model.bright_green()
-    );
-    println!();
+    // Only show progress info in text mode
+    if format == ChatFormat::Text {
+        println!(
+            "{} Agent mode with {} tool(s): {}",
+            "[ember]".bright_yellow(),
+            registry.len().to_string().bright_green(),
+            registry.tool_names().join(", ").bright_cyan()
+        );
+        println!(
+            "   Using {} with {}",
+            provider.name().bright_blue(),
+            model.bright_green()
+        );
+        println!();
+    }
 
     // Get tool definitions for the LLM
     let tools = registry.llm_tool_definitions();
@@ -445,12 +455,29 @@ async fn agent_one_shot(
         }
 
         // No tool calls - this is the final response
-        println!();
-        if streaming {
-            // For final response, use streaming if available
-            print_final_response(&response.content);
-        } else {
-            println!("{}", response.content);
+        match format {
+            ChatFormat::Text => {
+                println!();
+                if streaming {
+                    // For final response, use streaming if available
+                    print_final_response(&response.content);
+                } else {
+                    println!("{}", response.content);
+                }
+            }
+            ChatFormat::Json => {
+                let output = serde_json::json!({
+                    "response": response.content,
+                    "model": model,
+                    "provider": provider.name(),
+                    "tools_used": response.tool_calls.iter().map(|tc| &tc.name).collect::<Vec<_>>(),
+                });
+                println!("{}", serde_json::to_string_pretty(&output)?);
+            }
+            ChatFormat::Markdown => {
+                println!("## Response\n\n{}", response.content);
+                println!("\n---\n*Model: {} | Provider: {}*", model, provider.name());
+            }
         }
 
         return Ok(());
@@ -680,22 +707,24 @@ async fn one_shot_chat(
     temperature: f32,
     message: &str,
     streaming: bool,
+    format: ChatFormat,
 ) -> Result<()> {
-    println!(
-        "{} Using {} with {}",
-        "[ember]".bright_yellow(),
-        provider.name().bright_blue(),
-        model.bright_green()
-    );
-    println!();
-
     // Build the request
     let request = CompletionRequest::new(model)
         .with_message(Message::system(system_prompt))
         .with_message(Message::user(message))
         .with_temperature(temperature);
 
-    if streaming {
+    if streaming && format == ChatFormat::Text {
+        // Only show progress indicator and stats in text mode
+        println!(
+            "{} Using {} with {}",
+            "[ember]".bright_yellow(),
+            provider.name().bright_blue(),
+            model.bright_green()
+        );
+        println!();
+
         // Start progress indicator
         let mut progress = ProgressIndicator::new("Thinking");
         progress.start();
@@ -710,6 +739,7 @@ async fn one_shot_chat(
 
         let start_time = Instant::now();
         let mut token_count = 0usize;
+        let mut full_response = String::new();
 
         while let Some(chunk_result) = stream.next().await {
             match chunk_result {
@@ -717,6 +747,7 @@ async fn one_shot_chat(
                     if let Some(content) = chunk.content {
                         print!("{}", content);
                         io::stdout().flush()?;
+                        full_response.push_str(&content);
                         // Approximate token count (rough estimate: ~4 chars per token)
                         token_count += (content.len() + 3) / 4;
                     }
@@ -739,25 +770,45 @@ async fn one_shot_chat(
         println!();
         println!("{}", stats.format().dimmed());
     } else {
-        // Non-streaming mode with progress indicator
-        let mut progress = ProgressIndicator::new("Thinking");
-        progress.start();
-
+        // Non-streaming mode (or streaming with non-text format)
         let start_time = Instant::now();
         let result = provider.complete(request).await;
-
-        progress.stop().await;
 
         let response = result.context("Failed to get response from LLM")?;
         let token_count = (response.content.len() + 3) / 4;
 
-        println!("{}", response.content);
+        match format {
+            ChatFormat::Text => {
+                println!(
+                    "{} Using {} with {}",
+                    "[ember]".bright_yellow(),
+                    provider.name().bright_blue(),
+                    model.bright_green()
+                );
+                println!();
+                println!("{}", response.content);
 
-        let stats = ResponseStats {
-            tokens: token_count,
-            duration: start_time.elapsed(),
-        };
-        println!("{}", stats.format().dimmed());
+                let stats = ResponseStats {
+                    tokens: token_count,
+                    duration: start_time.elapsed(),
+                };
+                println!("{}", stats.format().dimmed());
+            }
+            ChatFormat::Json => {
+                let output = serde_json::json!({
+                    "response": response.content,
+                    "model": model,
+                    "provider": provider.name(),
+                    "tokens": token_count,
+                    "duration_ms": start_time.elapsed().as_millis(),
+                });
+                println!("{}", serde_json::to_string_pretty(&output)?);
+            }
+            ChatFormat::Markdown => {
+                println!("## Response\n\n{}", response.content);
+                println!("\n---\n*Model: {} | Provider: {}*", model, provider.name());
+            }
+        }
     }
 
     Ok(())
