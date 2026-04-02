@@ -32,6 +32,9 @@ uuid = { workspace = true }
 # Time
 chrono = { workspace = true }
 
+# HTTP client (for HTTP/SSE transports)
+reqwest = { workspace = true }
+
 # Internal
 ember-tools = { workspace = true }
 
