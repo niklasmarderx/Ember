@@ -361,6 +361,7 @@ impl LLMProvider for XAIProvider {
                     prompt_tokens: u.prompt_tokens,
                     completion_tokens: u.completion_tokens,
                     total_tokens: u.total_tokens,
+                    ..Default::default()
                 })
                 .unwrap_or_default(),
             finish_reason: parse_finish_reason(choice.finish_reason),

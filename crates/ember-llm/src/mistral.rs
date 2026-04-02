@@ -625,6 +625,7 @@ impl From<MistralResponse> for CompletionResponse {
                 prompt_tokens: resp.usage.prompt_tokens,
                 completion_tokens: resp.usage.completion_tokens,
                 total_tokens: resp.usage.total_tokens,
+                ..Default::default()
             },
             model: resp.model,
             id: Some(resp.id),

@@ -708,11 +708,13 @@ impl GeminiResponse {
                 prompt_tokens: 0,
                 completion_tokens: 0,
                 total_tokens: 0,
+                ..Default::default()
             },
             |u| TokenUsage {
                 prompt_tokens: u.prompt_token_count,
                 completion_tokens: u.candidates_token_count,
                 total_tokens: u.total_token_count,
+                ..Default::default()
             },
         );
 

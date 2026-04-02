@@ -654,6 +654,12 @@ pub struct TokenUsage {
     pub completion_tokens: u32,
     /// Total tokens used
     pub total_tokens: u32,
+    /// Tokens written to the prompt cache (Anthropic prompt caching)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cache_creation_tokens: Option<u32>,
+    /// Tokens read from the prompt cache (Anthropic prompt caching)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cache_read_tokens: Option<u32>,
 }
 
 impl TokenUsage {
@@ -663,6 +669,8 @@ impl TokenUsage {
             prompt_tokens,
             completion_tokens,
             total_tokens: prompt_tokens + completion_tokens,
+            cache_creation_tokens: None,
+            cache_read_tokens: None,
         }
     }
 }
