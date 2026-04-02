@@ -87,6 +87,7 @@
 #![allow(clippy::range_plus_one)]
 #![allow(clippy::useless_vec)]
 
+pub mod bootstrap;
 mod agent;
 mod cache;
 pub mod compaction;
@@ -115,6 +116,7 @@ pub mod thinking;
 pub mod tool_executor;
 mod tool_selector;
 
+pub use bootstrap::{BootstrapPhase, BootstrapPlan, BootstrapTimer};
 pub use error::{Error, Result};
 /// Alias for CoreError used by internal modules
 pub type CoreError = Error;
