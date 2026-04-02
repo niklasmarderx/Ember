@@ -54,3 +54,4 @@ storage = ["dep:ember-storage"]
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
 proptest = "1.4"
 test-case = "3.3"
+tempfile = "3"

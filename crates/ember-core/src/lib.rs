@@ -88,6 +88,7 @@
 #![allow(clippy::useless_vec)]
 
 pub mod bootstrap;
+pub mod config_merge;
 mod agent;
 mod cache;
 pub mod session_fork;
@@ -133,6 +134,10 @@ pub use collaboration::{
     TaskDelegator, TaskEvent, TaskStatus as CollaborativeTaskStatus, ACP_VERSION,
 };
 pub use config::{AgentConfig, AgentConfigBuilder};
+pub use config_merge::{
+    ConfigEntry, ConfigLoader, ConfigSource, MergedConfig,
+    deep_merge, discover_config_files, load_config_file,
+};
 pub use context::{Context, ContextManager};
 pub use context_manager::{
     ContextManager as ContextManagerV2, ContextManagerBuilder as ContextManagerV2Builder,
