@@ -111,7 +111,11 @@ impl MergedConfig {
 
         let mut out = String::new();
         for entry in &self.entries {
-            out.push_str(&format!("[{}]\n  path: {}\n", entry.source, entry.path.display()));
+            out.push_str(&format!(
+                "[{}]\n  path: {}\n",
+                entry.source,
+                entry.path.display()
+            ));
             if entry.values.is_empty() {
                 out.push_str("  (no keys)\n");
             } else {
@@ -299,8 +303,7 @@ impl ConfigLoader {
     /// priority order (lowest first, so higher-priority sources overwrite).
     pub fn merge(mut self) -> MergedConfig {
         // Sort by ascending priority so higher-priority sources are applied last.
-        self.entries
-            .sort_by_key(|e| e.source.priority());
+        self.entries.sort_by_key(|e| e.source.priority());
 
         let mut merged_value = Value::Object(Default::default());
 
@@ -348,7 +351,11 @@ mod tests {
             Value::Object(m) => m.into_iter().collect(),
             _ => panic!("test helper requires a JSON object"),
         };
-        ConfigEntry { source, path, values }
+        ConfigEntry {
+            source,
+            path,
+            values,
+        }
     }
 
     fn loader_from_entries(entries: Vec<ConfigEntry>) -> MergedConfig {
@@ -380,7 +387,7 @@ mod tests {
         let mut base = json!({"db": {"host": "localhost", "port": 5432}});
         deep_merge(&mut base, &json!({"db": {"port": 9999}}));
         assert_eq!(base["db"]["host"], "localhost"); // preserved
-        assert_eq!(base["db"]["port"], 9999);        // overwritten
+        assert_eq!(base["db"]["port"], 9999); // overwritten
     }
 
     #[test]
@@ -402,8 +409,16 @@ mod tests {
     #[test]
     fn merge_priority_local_beats_project() {
         let config = loader_from_entries(vec![
-            entry(ConfigSource::Project, PathBuf::from("p"), json!({"x": "project"})),
-            entry(ConfigSource::Local, PathBuf::from("l"), json!({"x": "local"})),
+            entry(
+                ConfigSource::Project,
+                PathBuf::from("p"),
+                json!({"x": "project"}),
+            ),
+            entry(
+                ConfigSource::Local,
+                PathBuf::from("l"),
+                json!({"x": "local"}),
+            ),
         ]);
         assert_eq!(config.get::<String>("x").unwrap(), "local");
     }
@@ -412,7 +427,11 @@ mod tests {
     fn merge_priority_project_beats_user() {
         let config = loader_from_entries(vec![
             entry(ConfigSource::User, PathBuf::from("u"), json!({"x": "user"})),
-            entry(ConfigSource::Project, PathBuf::from("p"), json!({"x": "project"})),
+            entry(
+                ConfigSource::Project,
+                PathBuf::from("p"),
+                json!({"x": "project"}),
+            ),
         ]);
         assert_eq!(config.get::<String>("x").unwrap(), "project");
     }
@@ -421,7 +440,11 @@ mod tests {
     fn merge_priority_local_beats_user() {
         let config = loader_from_entries(vec![
             entry(ConfigSource::User, PathBuf::from("u"), json!({"x": "user"})),
-            entry(ConfigSource::Local, PathBuf::from("l"), json!({"x": "local"})),
+            entry(
+                ConfigSource::Local,
+                PathBuf::from("l"),
+                json!({"x": "local"}),
+            ),
         ]);
         assert_eq!(config.get::<String>("x").unwrap(), "local");
     }
@@ -430,8 +453,16 @@ mod tests {
     fn merge_all_three_correct_winner() {
         let config = loader_from_entries(vec![
             entry(ConfigSource::User, PathBuf::from("u"), json!({"x": "user"})),
-            entry(ConfigSource::Project, PathBuf::from("p"), json!({"x": "project"})),
-            entry(ConfigSource::Local, PathBuf::from("l"), json!({"x": "local"})),
+            entry(
+                ConfigSource::Project,
+                PathBuf::from("p"),
+                json!({"x": "project"}),
+            ),
+            entry(
+                ConfigSource::Local,
+                PathBuf::from("l"),
+                json!({"x": "local"}),
+            ),
         ]);
         assert_eq!(config.get::<String>("x").unwrap(), "local");
     }
@@ -440,23 +471,35 @@ mod tests {
 
     #[test]
     fn get_returns_none_for_missing_key() {
-        let config = loader_from_entries(vec![
-            entry(ConfigSource::User, PathBuf::from("u"), json!({"a": 1})),
-        ]);
+        let config = loader_from_entries(vec![entry(
+            ConfigSource::User,
+            PathBuf::from("u"),
+            json!({"a": 1}),
+        )]);
         assert!(config.get::<i64>("missing").is_none());
     }
 
     #[test]
     fn get_deserialises_nested_struct() {
         #[derive(serde::Deserialize, Debug, PartialEq)]
-        struct Db { host: String, port: u16 }
+        struct Db {
+            host: String,
+            port: u16,
+        }
 
-        let config = loader_from_entries(vec![
-            entry(ConfigSource::Project, PathBuf::from("p"),
-                  json!({"db": {"host": "127.0.0.1", "port": 5432}})),
-        ]);
+        let config = loader_from_entries(vec![entry(
+            ConfigSource::Project,
+            PathBuf::from("p"),
+            json!({"db": {"host": "127.0.0.1", "port": 5432}}),
+        )]);
         let db: Db = config.get("db").unwrap();
-        assert_eq!(db, Db { host: "127.0.0.1".to_string(), port: 5432 });
+        assert_eq!(
+            db,
+            Db {
+                host: "127.0.0.1".to_string(),
+                port: 5432
+            }
+        );
     }
 
     #[test]
@@ -470,17 +513,27 @@ mod tests {
 
     #[test]
     fn get_source_returns_none_for_absent_key() {
-        let config = loader_from_entries(vec![
-            entry(ConfigSource::User, PathBuf::from("u"), json!({"a": 1})),
-        ]);
+        let config = loader_from_entries(vec![entry(
+            ConfigSource::User,
+            PathBuf::from("u"),
+            json!({"a": 1}),
+        )]);
         assert!(config.get_source("nope").is_none());
     }
 
     #[test]
     fn get_source_only_in_user() {
         let config = loader_from_entries(vec![
-            entry(ConfigSource::User, PathBuf::from("u"), json!({"only_user": true})),
-            entry(ConfigSource::Project, PathBuf::from("p"), json!({"other": 1})),
+            entry(
+                ConfigSource::User,
+                PathBuf::from("u"),
+                json!({"only_user": true}),
+            ),
+            entry(
+                ConfigSource::Project,
+                PathBuf::from("p"),
+                json!({"other": 1}),
+            ),
         ]);
         assert_eq!(config.get_source("only_user"), Some(ConfigSource::User));
     }
@@ -496,10 +549,16 @@ mod tests {
     #[test]
     fn format_debug_lists_sources_and_keys() {
         let config = loader_from_entries(vec![
-            entry(ConfigSource::User, PathBuf::from("/home/u/.ember/config.json"),
-                  json!({"model": "gpt-4", "timeout": 30})),
-            entry(ConfigSource::Local, PathBuf::from(".ember/config.local.json"),
-                  json!({"debug": true})),
+            entry(
+                ConfigSource::User,
+                PathBuf::from("/home/u/.ember/config.json"),
+                json!({"model": "gpt-4", "timeout": 30}),
+            ),
+            entry(
+                ConfigSource::Local,
+                PathBuf::from(".ember/config.local.json"),
+                json!({"debug": true}),
+            ),
         ]);
         let s = config.format_debug();
         assert!(s.contains("user"), "should list user source");

@@ -91,8 +91,8 @@ impl std::fmt::Display for PkceChallengeMethod {
 
 /// A PKCE code verifier / challenge pair.
 ///
-/// Generate one with [`generate_pkce_pair`] and keep the [`verifier`] secret.
-/// Send only the [`challenge`] and [`challenge_method`] in the authorization
+/// Generate one with [`generate_pkce_pair`] and keep the [`Self::verifier`] secret.
+/// Send only the [`Self::challenge`] and [`Self::challenge_method`] in the authorization
 /// request; send the verifier in the token exchange request.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PkceCodePair {
@@ -136,9 +136,8 @@ impl OAuthTokenSet {
         expires_in_seconds: Option<i64>,
         scopes: Vec<String>,
     ) -> Self {
-        let expires_at = expires_in_seconds.map(|secs| {
-            Utc::now() + chrono::Duration::seconds(secs)
-        });
+        let expires_at =
+            expires_in_seconds.map(|secs| Utc::now() + chrono::Duration::seconds(secs));
 
         Self {
             access_token: access_token.into(),
@@ -184,11 +183,7 @@ pub fn generate_pkce_pair() -> PkceCodePair {
     // Build a 43-char (minimum RFC length) to 128-char verifier.
     // Two UUIDs without hyphens → 64 hex chars, then base64url-encode for
     // the URL-safe character set required by the spec.
-    let raw = format!(
-        "{}{}",
-        Uuid::new_v4().simple(),
-        Uuid::new_v4().simple()
-    );
+    let raw = format!("{}{}", Uuid::new_v4().simple(), Uuid::new_v4().simple());
     let verifier = URL_SAFE_NO_PAD.encode(raw.as_bytes());
 
     let challenge = compute_s256_challenge(&verifier);
@@ -252,7 +247,11 @@ pub fn build_authorization_url(
         .collect::<Vec<_>>()
         .join("&");
 
-    let separator = if config.auth_url.contains('?') { '&' } else { '?' };
+    let separator = if config.auth_url.contains('?') {
+        '&'
+    } else {
+        '?'
+    };
     Ok(format!("{}{}{}", config.auth_url, separator, query))
 }
 
@@ -276,13 +275,9 @@ fn percent_encode(input: &str) -> String {
     let mut encoded = String::with_capacity(input.len());
     for byte in input.bytes() {
         match byte {
-            b'A'..=b'Z'
-            | b'a'..=b'z'
-            | b'0'..=b'9'
-            | b'-'
-            | b'_'
-            | b'.'
-            | b'~' => encoded.push(byte as char),
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => {
+                encoded.push(byte as char);
+            }
             b => encoded.push_str(&format!("%{b:02X}")),
         }
     }
@@ -501,7 +496,10 @@ mod tests {
         let a = generate_pkce_pair();
         let b = generate_pkce_pair();
         assert_ne!(a.verifier, b.verifier, "consecutive verifiers must differ");
-        assert_ne!(a.challenge, b.challenge, "consecutive challenges must differ");
+        assert_ne!(
+            a.challenge, b.challenge,
+            "consecutive challenges must differ"
+        );
     }
 
     #[test]
@@ -547,7 +545,10 @@ mod tests {
         let pkce = generate_pkce_pair();
         let url = build_authorization_url(&config, &pkce, "s").unwrap();
         // Space is encoded as %20
-        assert!(url.contains("scope=read%20write"), "scope not found in: {url}");
+        assert!(
+            url.contains("scope=read%20write"),
+            "scope not found in: {url}"
+        );
     }
 
     #[test]
@@ -766,5 +767,4 @@ mod tests {
         let diff = (expires - Utc::now()).num_seconds();
         assert!(diff > 3594 && diff <= 3600, "unexpected diff: {diff}");
     }
-
 }

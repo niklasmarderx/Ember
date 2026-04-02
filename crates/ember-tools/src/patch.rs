@@ -149,6 +149,7 @@ pub fn compute_diff(original: &str, modified: &str) -> Vec<PatchHunk> {
 
     // Reconstruct the full edit script.
     // We interleave removals, common lines and additions in order.
+    #[allow(clippy::items_after_statements)]
     #[derive(Debug, Clone, Copy)]
     enum Edit {
         Keep(usize, usize), // (old_idx, new_idx)
@@ -494,15 +495,14 @@ pub fn write_file_tracked(path: &Path, new_content: &str) -> io::Result<FileWrit
 /// Undo a previous write by restoring the original content (or deleting the
 /// file if it was newly created).
 pub fn undo_write(result: &FileWriteResult) -> io::Result<()> {
-    match &result.original_content {
-        Some(original) => std::fs::write(&result.file_path, original),
-        None => {
-            // File was created by this operation — remove it.
-            if result.file_path.exists() {
-                std::fs::remove_file(&result.file_path)?;
-            }
-            Ok(())
+    if let Some(original) = &result.original_content {
+        std::fs::write(&result.file_path, original)
+    } else {
+        // File was created by this operation — remove it.
+        if result.file_path.exists() {
+            std::fs::remove_file(&result.file_path)?;
         }
+        Ok(())
     }
 }
 
@@ -733,8 +733,7 @@ mod tests {
         let dir = TempDir::new().unwrap();
         let path = dir.path().join("brand_new.txt");
 
-        let result =
-            write_file_tracked(&path, "hello\n").expect("write_file_tracked must succeed");
+        let result = write_file_tracked(&path, "hello\n").expect("write_file_tracked must succeed");
 
         assert!(result.created, "created flag must be true for new files");
         assert!(result.original_content.is_none());

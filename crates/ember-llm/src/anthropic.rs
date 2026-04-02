@@ -877,8 +877,11 @@ mod tests {
         let anthropic_req = AnthropicRequest::from_request(request, true);
 
         // The *last* user message must carry cache_control; the first must not.
-        let user_messages: Vec<&AnthropicMessage> =
-            anthropic_req.messages.iter().filter(|m| m.role == "user").collect();
+        let user_messages: Vec<&AnthropicMessage> = anthropic_req
+            .messages
+            .iter()
+            .filter(|m| m.role == "user")
+            .collect();
 
         assert_eq!(user_messages.len(), 2);
 
@@ -925,7 +928,10 @@ mod tests {
         let anthropic_req = AnthropicRequest::from_request(request, false);
 
         // System must be plain text, not blocks.
-        assert!(matches!(anthropic_req.system, Some(AnthropicSystem::Text(_))));
+        assert!(matches!(
+            anthropic_req.system,
+            Some(AnthropicSystem::Text(_))
+        ));
 
         // Messages must not contain any cache_control.
         for msg in &anthropic_req.messages {

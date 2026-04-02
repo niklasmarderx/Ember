@@ -79,9 +79,7 @@ impl TerminalRenderer {
             .unwrap_or_else(|| ThemeSet::load_defaults().themes["base16-ocean.dark"].clone());
 
         // Fall back gracefully when there is no terminal (CI / tests).
-        let terminal_width = crossterm::terminal::size()
-            .map(|(w, _)| w)
-            .unwrap_or(80);
+        let terminal_width = crossterm::terminal::size().map(|(w, _)| w).unwrap_or(80);
 
         Self {
             theme,
@@ -441,10 +439,7 @@ impl ToolOutputFormatter {
         }
         let kept = &lines[..max_lines];
         let omitted = lines.len() - max_lines;
-        format!(
-            "{}\n… ({omitted} more lines truncated)",
-            kept.join("\n")
-        )
+        format!("{}\n… ({omitted} more lines truncated)", kept.join("\n"))
     }
 
     /// Format a tool error.

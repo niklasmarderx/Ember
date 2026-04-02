@@ -101,8 +101,8 @@ pub use structured_bash::{
 pub use filesystem::FilesystemTool;
 
 pub use patch::{
-    apply_patch, compute_diff, format_unified_diff, reverse_hunks, undo_write,
-    write_file_tracked, DiffLine, FileOpHistory, FileWriteResult, PatchError, PatchHunk,
+    apply_patch, compute_diff, format_unified_diff, reverse_hunks, undo_write, write_file_tracked,
+    DiffLine, FileOpHistory, FileWriteResult, PatchError, PatchHunk,
 };
 
 #[cfg(feature = "web")]

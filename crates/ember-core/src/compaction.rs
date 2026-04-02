@@ -44,8 +44,8 @@ fn estimate_str_tokens(s: &str) -> usize {
 /// Counts the user message, assistant response, and the text content of
 /// every tool call (name + serialised arguments) and tool result.
 fn estimate_turn_tokens(turn: &Turn) -> usize {
-    let mut total = estimate_str_tokens(&turn.user_message)
-        + estimate_str_tokens(&turn.assistant_response);
+    let mut total =
+        estimate_str_tokens(&turn.user_message) + estimate_str_tokens(&turn.assistant_response);
 
     for call in &turn.tool_calls {
         total += estimate_str_tokens(&call.name);
@@ -112,7 +112,11 @@ impl CompactionConfig {
     /// Return `true` when `conversation` should be compacted under this
     /// configuration.
     pub fn should_compact(&self, conversation: &Conversation) -> bool {
-        should_compact(conversation, self.max_context_tokens, self.compact_threshold)
+        should_compact(
+            conversation,
+            self.max_context_tokens,
+            self.compact_threshold,
+        )
     }
 }
 
@@ -149,10 +153,7 @@ fn build_summary(turns: &[Turn], max_tokens: usize) -> String {
     let mut parts: Vec<String> = Vec::with_capacity(turns.len() * 2);
     let mut used_chars: usize = 0;
 
-    let header = format!(
-        "[Conversation summary — {} earlier turn(s)]\n",
-        turns.len()
-    );
+    let header = format!("[Conversation summary — {} earlier turn(s)]\n", turns.len());
     used_chars += header.len();
     parts.push(header);
 
@@ -163,12 +164,14 @@ fn build_summary(turns: &[Turn], max_tokens: usize) -> String {
         let assistant_line = if turn.assistant_response.is_empty() {
             None
         } else {
-            Some(format!("Turn {}: Assistant: {}", i + 1, turn.assistant_response))
+            Some(format!(
+                "Turn {}: Assistant: {}",
+                i + 1,
+                turn.assistant_response
+            ))
         };
 
-        let needed = user_line.len()
-            + assistant_line.as_ref().map_or(0, |s| s.len() + 1)
-            + 1; // newlines
+        let needed = user_line.len() + assistant_line.as_ref().map_or(0, |s| s.len() + 1) + 1; // newlines
 
         if used_chars + needed > char_budget {
             // Append a truncation marker and stop

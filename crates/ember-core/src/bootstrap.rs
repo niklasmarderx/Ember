@@ -120,10 +120,7 @@ impl BootstrapPlan {
     /// preserving the first occurrence of each phase.
     pub fn from_phases(phases: Vec<BootstrapPhase>) -> Self {
         let mut seen = std::collections::HashSet::new();
-        let deduped = phases
-            .into_iter()
-            .filter(|p| seen.insert(*p))
-            .collect();
+        let deduped = phases.into_iter().filter(|p| seen.insert(*p)).collect();
         Self { phases: deduped }
     }
 
@@ -213,7 +210,8 @@ impl BootstrapTimer {
         // Find and remove the most recent pending entry for this phase.
         if let Some(pos) = self.pending.iter().rposition(|(p, _)| *p == phase) {
             let (_, started_at) = self.pending.remove(pos);
-            self.phase_times.push((phase, now.duration_since(started_at)));
+            self.phase_times
+                .push((phase, now.duration_since(started_at)));
         }
     }
 
@@ -286,10 +284,7 @@ mod tests {
     // 3. fast_path skips the requested phases.
     #[test]
     fn fast_path_skips_phases() {
-        let skip = [
-            BootstrapPhase::PluginDiscovery,
-            BootstrapPhase::McpSetup,
-        ];
+        let skip = [BootstrapPhase::PluginDiscovery, BootstrapPhase::McpSetup];
         let plan = BootstrapPlan::fast_path(&skip);
 
         for &skipped in &skip {
@@ -431,10 +426,8 @@ mod tests {
     // 13. Inserting a phase that already exists is a no-op.
     #[test]
     fn insert_existing_phase_is_noop() {
-        let mut plan = BootstrapPlan::from_phases(vec![
-            BootstrapPhase::CliEntry,
-            BootstrapPhase::ConfigLoad,
-        ]);
+        let mut plan =
+            BootstrapPlan::from_phases(vec![BootstrapPhase::CliEntry, BootstrapPhase::ConfigLoad]);
         plan.insert_before(BootstrapPhase::ConfigLoad, BootstrapPhase::CliEntry);
         // Should remain unchanged.
         assert_eq!(
