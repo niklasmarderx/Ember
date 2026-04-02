@@ -56,6 +56,9 @@ pub mod sdk;
 #[cfg(feature = "shell")]
 pub mod shell;
 
+#[cfg(feature = "shell")]
+pub mod structured_bash;
+
 #[cfg(feature = "filesystem")]
 pub mod filesystem;
 
@@ -87,6 +90,12 @@ pub use sdk::{AsyncTool, ParamDef, ParamExtractor, ParamType, SimpleTool, Simple
 
 #[cfg(feature = "shell")]
 pub use shell::ShellTool;
+
+#[cfg(feature = "shell")]
+pub use structured_bash::{
+    execute_bash, BackgroundTask, BackgroundTaskManager, BashCommandInput, BashCommandOutput,
+    BashSandboxPolicy, FilesystemMode, ShellError, TaskStatus,
+};
 
 #[cfg(feature = "filesystem")]
 pub use filesystem::FilesystemTool;
