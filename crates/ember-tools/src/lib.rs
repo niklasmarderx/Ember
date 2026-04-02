@@ -59,6 +59,8 @@ pub mod shell;
 #[cfg(feature = "filesystem")]
 pub mod filesystem;
 
+pub mod patch;
+
 #[cfg(feature = "web")]
 pub mod web;
 
@@ -88,6 +90,11 @@ pub use shell::ShellTool;
 
 #[cfg(feature = "filesystem")]
 pub use filesystem::FilesystemTool;
+
+pub use patch::{
+    apply_patch, compute_diff, format_unified_diff, reverse_hunks, undo_write,
+    write_file_tracked, DiffLine, FileOpHistory, FileWriteResult, PatchError, PatchHunk,
+};
 
 #[cfg(feature = "web")]
 pub use web::WebTool;
