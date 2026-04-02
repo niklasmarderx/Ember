@@ -114,6 +114,7 @@ mod task_planner;
 pub mod thinking;
 pub mod tool_executor;
 mod tool_selector;
+pub mod usage_tracker;
 
 pub use error::{Error, Result};
 /// Alias for CoreError used by internal modules
@@ -145,6 +146,9 @@ pub use conversation::{
 pub use cost_predictor::{
     BudgetAlert, BudgetConfig, CostPredictor, CostRecommendation, PredictionResult, UsageRecord,
     UsageStats,
+};
+pub use usage_tracker::{
+    pricing_for_model, ModelPricing, SessionUsageTracker, TurnUsage, UsageCostEstimate,
 };
 pub use knowledge_graph::{
     Entity, EntityId, FilterOperation, GraphConfig, GraphExport, GraphQuery, GraphStats,
