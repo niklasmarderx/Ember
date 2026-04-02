@@ -89,6 +89,7 @@
 
 mod agent;
 mod cache;
+pub mod session_fork;
 pub mod compaction;
 mod checkpoint;
 mod collaboration;
@@ -196,6 +197,7 @@ pub use privacy::{
 pub use permissions::{
     PermissionMode, PermissionPolicy, PermissionResult, ToolAction, ToolPermission,
 };
+pub use session_fork::{ForkNode, SessionFork, SessionForkManager};
 pub use sandbox::{
     Capability, CommandRules, NetworkRules, PathRules, ResourceLimits, SecurityCheckResult,
     SecurityConfig, SecurityEvent, SecurityEventType, SecurityLevel, SecuritySandbox,
