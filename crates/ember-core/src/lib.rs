@@ -89,6 +89,7 @@
 
 mod agent;
 mod cache;
+pub mod compaction;
 mod checkpoint;
 mod collaboration;
 mod config;
@@ -132,6 +133,10 @@ pub use context::{Context, ContextManager};
 pub use context_manager::{
     ContextManager as ContextManagerV2, ContextManagerBuilder as ContextManagerV2Builder,
     ContextMessage, MessageRole, PriorityWeights, PruningStrategy, TokenCount,
+};
+pub use compaction::{
+    compact_conversation, estimate_tokens as estimate_conversation_tokens, should_compact,
+    CompactionConfig, CompactionResult,
 };
 pub use conversation::{
     Conversation, ConversationExport, ConversationId, ExportFormat, ExportMessage, ExportMetadata,
