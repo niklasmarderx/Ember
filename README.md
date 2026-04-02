@@ -2,278 +2,336 @@
 
 <img src="assets/logo.svg" alt="Ember Logo" width="128" height="128"/>
 
-# Ember
+# 🔥 Ember
 
-**An AI agent framework in Rust. Fast, small, runs everywhere.**
+> The open-source, provider-agnostic AI coding agent. Built in Rust.
 
 [![CI](https://github.com/niklasmarderx/Ember/actions/workflows/ci.yml/badge.svg)](https://github.com/niklasmarderx/Ember/actions/workflows/ci.yml)
 [![Crates.io](https://img.shields.io/crates/v/ember-cli)](https://crates.io/crates/ember-cli)
-[![Downloads](https://img.shields.io/crates/d/ember-cli)](https://crates.io/crates/ember-cli)
-[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE-MIT)
-[![Website](https://img.shields.io/badge/docs-ember.dev-orange)](https://niklasmarderx.github.io/Ember/)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE-MIT)
+[![Rust 1.75+](https://img.shields.io/badge/rust-1.75+-orange.svg)](https://www.rust-lang.org)
 
 </div>
 
 ---
 
-## What is Ember?
-
-Ember is a command-line tool and framework for working with AI models — for chatting, generating code, or automating tasks on your machine.
-
-What sets it apart: Ember is written in Rust and ships as a single executable. No Python, no Node.js, no dependencies. Download one file and it works.
-
----
-
-## Quick Start
-
-### With cloud APIs (OpenAI, Anthropic, etc.)
-
-```bash
-curl -fsSL https://ember.dev/install.sh | sh
-export OPENAI_API_KEY="sk-..."
-ember chat
-```
-
-### Fully offline and free
-
-```bash
-# Install Ollama (one-time setup)
-curl -fsSL https://ollama.ai/install.sh | sh
-ollama pull llama3.2
-
-# Install and use Ember
-curl -fsSL https://ember.dev/install.sh | sh
-ember chat --provider ollama
-```
-
-### As a Docker container
-
-```bash
-docker run -it --rm ghcr.io/niklasmarderx/Ember chat "Hello!"
-```
-
-### Web UI
-
-```bash
-ember serve
-# Open http://localhost:3000 in your browser
-```
+Ember is a command-line AI coding agent written in Rust. It runs an agentic loop — plan, use tools, observe results, repeat — against any LLM backend you configure. One binary, no Python runtime, no Node.js.
 
 ---
 
 ## Why Ember?
 
-### One binary, no dependencies
-
-Ember compiles to a single 15 MB file. Copy it to a server, a Raspberry Pi, or your laptop — and it runs. No `pip install`, no version conflicts, no `node_modules`.
-
-### Fast
-
-Rust programs start immediately. Ember takes about 80ms to start, not several seconds like Python-based tools. Memory usage is around 45 MB instead of several hundred.
-
-### Works offline
-
-With Ollama you can run local models like Llama, Qwen, or Mistral. Completely without internet, without API costs, without your data leaving your machine.
-
-### Many providers, one interface
-
-Ember supports OpenAI, Anthropic, Google Gemini, Mistral, Groq, DeepSeek, xAI, OpenRouter, and Ollama. Switch providers with a flag — the code stays the same.
+- **Provider-agnostic** — 10 LLM backends out of the box. Switch models mid-session with `/model`. Bring your own OpenAI-compatible endpoint.
+- **Session forking** — branch a conversation like a git branch. Explore an alternative approach, then restore to the fork point if it doesn't work out.
+- **Plugin hooks** — intercept any tool call before or after execution. Approve, deny, log, or transform output from your own code.
+- **Auto-compaction** — when the context window fills up, the oldest turns are summarised in-place. The session continues without interruption.
+- **Cost tracking** — every API call records token counts and a USD estimate. `/cost` shows the running total for the session.
+- **Granular permissions** — restrict what paths a tool may read or write, which commands it may run, and whether writes are allowed at all.
+- **MCP support** — connect external tool servers over stdio, HTTP, or WebSocket. Tools are namespaced and auto-discovered.
+- **Single binary** — `cargo build --release` produces one ~15 MB executable with no runtime dependencies.
 
 ---
 
-## Supported LLM Providers
+## Quick Start
 
-| Provider | Example Models | Cost |
-|----------|----------------|------|
-| OpenAI | GPT-4o, GPT-4o-mini, o1 | Paid |
-| Anthropic | Claude 3.5 Sonnet, Haiku | Paid |
-| Google Gemini | Gemini 2.0, 1.5 Pro | Free tier available |
-| Groq | Llama 3.3 70B, Mixtral | Free tier available |
-| DeepSeek | V3, R1 | Low cost |
-| Mistral | Large, Codestral | Paid |
-| xAI | Grok 2 | Paid |
-| OpenRouter | 200+ models | Varies |
-| Ollama | Llama, Qwen, etc. | Free (local) |
+```bash
+# Install
+cargo install ember-cli
+# or: curl -fsSL https://ember.dev/install.sh | sh
+
+# Set your API key
+export ANTHROPIC_API_KEY="..."   # or OPENAI_API_KEY, etc.
+
+# One-shot task
+ember chat "Refactor this function to use iterators" --tools filesystem
+
+# Interactive mode
+ember chat
+```
+
+Once in interactive mode:
+
+```
+You: explain what this crate does
+Ember: …
+
+/model claude-3-5-sonnet   # switch model
+/cost                       # show session cost
+/fork before-refactor       # create a branch point
+/compact                    # force context compaction
+/forks                      # list branches
+/restore <id>               # go back
+```
 
 ---
 
-## What can Ember do?
+## Features
 
-### Chat and code generation
+### 🧠 Agentic Runtime
 
-```bash
-ember chat "Explain recursion"
-ember chat "Write a Python function that finds prime numbers"
+The core loop in `ember-core` drives a ReAct-style agent:
+
+```
+user message → LLM call → [tool calls → tool results → LLM call …] → response
 ```
 
-### Enable tools
+- Configurable max tool rounds per turn (default: 25)
+- Tool timeout per call (default: 120 s)
+- Max output tokens per completion (default: 4096)
+- Auto-compact when token count exceeds 80% of the context window
 
-Ember can execute commands, read and write files, use Git, and search the web:
+The loop is backend-agnostic: `LlmBackend` and `ToolBackend` are traits. Swap in any provider or a mock for testing.
 
-```bash
-ember chat --tools shell,fs "Create a new folder 'project' and initialize Git"
-ember chat --tools web "What is the current Bitcoin price?"
+### 🔀 Session Forking
+
+Branch a conversation at any point. Each fork stores a snapshot of the full turn history.
+
+```
+/fork try-different-prompt   → creates a named branch
+/forks                        → lists all forks with turn counts
+/restore <fork-id>            → replaces current history with the snapshot
 ```
 
-### Web UI
+Forks are ordered by creation time. The most recently created fork is marked active in the list.
 
-The web UI shows chat history, cost tracking, and lets you switch between models.
+### 💰 Cost Tracking
 
-### Checkpoints
+Every turn records input tokens, output tokens, cache-creation tokens, and cache-read tokens. Costs are looked up from a built-in pricing table:
 
-Ember saves every step. You can go back at any time if something goes wrong.
+| Model family | Input (per 1M) | Output (per 1M) |
+|---|---|---|
+| Claude Opus | $15.00 | $75.00 |
+| Claude Sonnet | $3.00 | $15.00 |
+| Claude Haiku | $1.00 | $5.00 |
+| GPT-4o | $2.50 | $10.00 |
+| GPT-4o mini | $0.15 | $0.60 |
 
-### Cost tracking
+Anthropic prompt-cache tokens (creation and read) are tracked separately. The `/cost` command shows per-turn breakdown and session total.
 
-With cloud providers, you see in real time what a chat costs. You can set budget limits.
+Unknown models return a zero-cost sentinel — the tracker never panics on an unrecognised model ID.
+
+### 📦 Plugin Hooks
+
+Plugins intercept tool calls at three points in the lifecycle:
+
+| Hook | When | What it can do |
+|---|---|---|
+| `PreToolUse` | Before execution | Approve or deny the call |
+| `PostToolUse` | After success | Replace the tool output |
+| `PostToolUseFailure` | After failure | Log errors, trigger fallbacks |
+
+Hooks are registered with a priority (lower = runs first). All hooks for an event are called even when one denies — messages from every handler are collected.
+
+```rust
+runner.register(HookHandler {
+    name: "policy".to_string(),
+    events: vec![HookEvent::PreToolUse],
+    priority: 0,
+    handler: Box::new(|ctx| {
+        if ctx.tool_name == "shell" && ctx.tool_input.contains("rm -rf") {
+            HookRunResult::deny("destructive shell command blocked")
+        } else {
+            HookRunResult::allow()
+        }
+    }),
+});
+```
+
+### 🔒 Permissions
+
+Three modes, configurable per-tool:
+
+- `Unrestricted` — allow everything (default, no breaking change to existing code)
+- `Interactive` — surface a `NeedsApproval` result for every action; the caller handles the prompt
+- `Policy` — evaluate actions against per-tool rules
+
+Per-tool rules include:
+- `allowed_paths` / `denied_paths` — component-level prefix matching (`/tmp` does not match `/tmp_other/foo`)
+- `read_only` — deny all writes regardless of path rules
+- `allowed_commands` — whitelist of executable names (bare name or full path, matched by basename)
+- `max_execution_time` — per-action timeout
+
+### 📝 Context Management & Compaction
+
+When a conversation grows large, `compact_conversation` replaces the oldest turns with a summary turn and returns metrics:
+
+- `turns_removed` — how many turns were merged
+- `original_tokens` / `compacted_tokens` — before/after estimates (4 chars ≈ 1 token heuristic)
+- `summary` — the text inserted at the front of the conversation
+
+`keep_recent_turns` (default: 4) and `summary_max_tokens` (default: 2000) are configurable. The compaction only fires when the estimated token count exceeds `compact_threshold × max_context_tokens` (defaults: 0.8 × 100k).
+
+### ⚡ CLI & Slash Commands
+
+The REPL recognises these slash commands:
+
+| Command | Aliases | What it does |
+|---|---|---|
+| `/help` | `/h` | List all commands |
+| `/status` | — | Turns, tokens, cost for this session |
+| `/compact` | — | Force context compaction now |
+| `/model [name]` | `/m` | Show or change the active model |
+| `/permissions [mode]` | `/perm` | Show or change permission mode |
+| `/config [section]` | `/cfg` | Display merged configuration |
+| `/memory` | `/mem` | Show context window usage |
+| `/clear [--yes]` | `/c` | Clear the conversation |
+| `/cost` | — | Cost breakdown for this session |
+| `/fork [name]` | — | Create a named fork point |
+| `/forks` | — | List all forks |
+| `/restore <id>` | — | Restore to a fork |
+
+Tab completion is handled by `SlashCompleter` — prefixes are matched against the registry, so `/mo` completes to `/model` and `/me` to `/memory`.
+
+### 🖥️ TUI Renderer
+
+The terminal renderer uses `pulldown-cmark` for Markdown parsing and `syntect` for syntax highlighting:
+
+- Fenced code blocks with a `┌─ rust ─────┐` border and 24-bit colour highlighting
+- Coloured headings (H1–H6), emphasis, strong, inline code, blockquotes, links
+- Animated Braille spinners (`⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏`) with success/failure finish states
+- Tool output formatter: header line (`⚡ Running: bash  ls -la`), output truncation, error display
+
+All rendering methods accept any `io::Write` so they are testable without a TTY.
+
+### ⚙️ Configuration Merge
+
+Three config sources are merged in order: User → Project → Local. Later sources override earlier ones. The merge is deep (nested tables are merged, not replaced) and every entry records which config file set it.
+
+```rust
+let config = ConfigLoader::new()
+    .add_user_config()
+    .add_project_config("./ember.toml")
+    .add_local_config("./.ember.local.toml")
+    .load()?;
+
+// Know which file set a value:
+let entry = config.get("model");
+println!("{:?}", entry.source); // ConfigSource::Project("./ember.toml")
+```
+
+### 🚀 Bootstrap Pipeline
+
+Startup is split into ordered phases so the critical path can be measured and optional phases can be skipped:
+
+```
+CliEntry → ConfigLoad → ProviderInit → PluginDiscovery →
+McpSetup → SystemPrompt → ToolRegistry → SessionInit → MainRuntime
+```
+
+`BootstrapTimer` records wall-clock time for each phase. `BootstrapPlan::fast_path(&[PluginDiscovery, McpSetup])` skips the two slowest phases for quick one-shot commands.
+
+---
+
+## Architecture
+
+```
+ember-cli          CLI entry, REPL, TUI rendering, slash commands
+ember-core         Agent runtime, compaction, permissions, forking, config merge, bootstrap
+ember-llm          10 LLM provider adapters, streaming, token usage
+ember-tools        File ops, shell, web, git, code execution
+ember-plugins      Plugin system, hook pipeline
+ember-mcp          MCP client, multi-transport (stdio/HTTP/WebSocket), tool registry
+ember-storage      Persistent storage, checkpoints
+ember-telemetry    Usage tracking, session logging
+ember-browser      Browser automation (chromiumoxide)
+ember-voice        Voice I/O
+ember-web          Web interface
+ember-desktop      Desktop app (Tauri)
+ember-i18n         Internationalization
+ember-enterprise   Enterprise features
+```
+
+---
+
+## Comparison
+
+| Feature | Ember | Claude Code | Codex CLI |
+|---|---|---|---|
+| Multi-Provider | ✅ 10 providers | ❌ Anthropic only | ❌ OpenAI only |
+| Session Forking | ✅ | ❌ | ❌ |
+| Plugin Hooks | ✅ Pre/Post/Failure | ❌ | ❌ |
+| MCP Support | ✅ Multi-transport | ✅ | ❌ |
+| Cost Tracking | ✅ Per-turn + session | Basic | Basic |
+| Prompt Cache Tracking | ✅ Creation + read | ✅ | N/A |
+| Auto-Compaction | ✅ Configurable | ✅ | ❌ |
+| Per-Tool Permissions | ✅ Path/command/time | ❌ | ❌ |
+| Config Merge (3 levels) | ✅ | ❌ | ❌ |
+| Single Binary | ✅ | ❌ | ❌ |
+| Open Source | ✅ MIT | Partial | ✅ |
 
 ---
 
 ## Installation
 
-### One command
-
-```bash
-curl -fsSL https://ember.dev/install.sh | sh
-```
-
-### With Cargo (if you have Rust installed)
+### From crates.io
 
 ```bash
 cargo install ember-cli
 ```
 
-### With Homebrew (macOS/Linux)
-
-```bash
-brew install ember-agent
-```
-
 ### From source
 
 ```bash
-git clone https://github.com/niklasmarderx/Ember
-cd Ember
+git clone https://github.com/niklasmarderx/ember
+cd ember
 cargo build --release
+./target/release/ember --version
+```
+
+### Docker
+
+```bash
+docker run -it --rm ghcr.io/niklasmarderx/ember chat "Hello"
 ```
 
 ---
 
 ## Configuration
 
-Ember reads API keys from environment variables:
+API keys are read from environment variables:
 
 ```bash
-# OpenAI
-export OPENAI_API_KEY="sk-..."
-
-# Anthropic
 export ANTHROPIC_API_KEY="..."
-
-# For other providers see the documentation
+export OPENAI_API_KEY="sk-..."
+export GOOGLE_API_KEY="..."
 ```
 
-Or create a `.env` file:
-
-```
-OPENAI_API_KEY=sk-...
-EMBER_DEFAULT_PROVIDER=openai
-EMBER_DEFAULT_MODEL=gpt-4o-mini
-```
+Or place them in `.env` at the project root. Run `ember config init` to create a starter config file, `ember config show` to inspect the merged result.
 
 ---
 
-## Examples
+## Supported Providers
 
-### Simple chat
+| Provider | Status |
+|---|---|
+| Anthropic (Claude) | ✅ |
+| OpenAI (GPT-4o, o1) | ✅ |
+| Google Gemini | ✅ |
+| Ollama (local) | ✅ |
+| Groq | ✅ |
+| DeepSeek | ✅ |
+| Mistral | ✅ |
+| OpenRouter | ✅ |
+| xAI (Grok) | ✅ |
+| AWS Bedrock | ✅ |
 
-```rust
-use ember::prelude::*;
-
-#[tokio::main]
-async fn main() -> Result<()> {
-    let agent = Agent::builder()
-        .provider(OpenAIProvider::from_env()?)
-        .build()?;
-
-    let response = agent.chat("What is the capital of France?").await?;
-    println!("{}", response);
-    Ok(())
-}
-```
-
-### With tools
-
-```rust
-use ember::prelude::*;
-
-#[tokio::main]
-async fn main() -> Result<()> {
-    let agent = Agent::builder()
-        .provider(OllamaProvider::new()?)
-        .tool(tools::Shell::new())
-        .tool(tools::Filesystem::sandboxed("./workspace"))
-        .build()?;
-
-    agent.chat("List all .rs files in the current directory").await?;
-    Ok(())
-}
-```
-
----
-
-## Project Structure
-
-```
-ember/
-├── crates/
-│   ├── ember-core/      # Agent, memory, configuration
-│   ├── ember-llm/       # LLM providers
-│   ├── ember-tools/     # Shell, filesystem, Git, web
-│   ├── ember-storage/   # SQLite, vector DB, RAG
-│   ├── ember-cli/       # Command-line interface
-│   ├── ember-web/       # Web server and React frontend
-│   └── ...
-├── examples/            # Code examples
-├── docs/                # Documentation
-└── extensions/          # VS Code extension
-```
-
----
-
-## Documentation
-
-- [Getting Started](https://ember.dev/docs/getting-started)
-- [CLI Reference](https://ember.dev/docs/cli)
-- [Configure Providers](https://ember.dev/docs/providers)
-- [Build Custom Tools](https://ember.dev/docs/custom-tools)
-- [API Documentation (Rust)](https://docs.rs/ember)
+Any OpenAI-compatible API endpoint also works via the OpenAI provider with a custom base URL.
 
 ---
 
 ## Contributing
 
-Contributions are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for details.
-
 ```bash
-git clone https://github.com/niklasmarderx/Ember
-cd Ember
+git clone https://github.com/niklasmarderx/ember
+cd ember
 cargo test --workspace
-cargo run -p ember-cli -- chat "Test"
+cargo run -p ember-cli -- chat "Hello"
 ```
+
+Issues and PRs are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
 ---
 
 ## License
 
 MIT — see [LICENSE-MIT](LICENSE-MIT)
-
----
-
-<div align="center">
-
-**Questions?** [niklas.marder@gmail.com](mailto:niklas.marder@gmail.com)
-
-[![GitHub](https://img.shields.io/github/stars/niklasmarderx/Ember?style=social)](https://github.com/niklasmarderx/Ember)
-
-</div>
