@@ -71,6 +71,7 @@
 #![deny(unsafe_code)]
 
 pub mod error;
+pub mod hooks;
 pub mod manifest;
 pub mod runtime;
 
@@ -85,6 +86,7 @@ pub mod sdk;
 
 // Re-exports
 pub use error::{PluginError, Result};
+pub use hooks::{HookContext, HookEvent, HookHandler, HookRunResult, HookRunner};
 pub use manifest::{PluginCapabilities, PluginExport, PluginManifest, PluginParameter};
 pub use runtime::{LoadedPlugin, PluginInput, PluginOutput, PluginRuntime, RuntimeConfig};
 
@@ -111,6 +113,7 @@ pub use sdk::{
 /// Prelude module for convenient imports.
 pub mod prelude {
     pub use crate::error::{PluginError, Result};
+    pub use crate::hooks::{HookContext, HookEvent, HookHandler, HookRunResult, HookRunner};
     pub use crate::manifest::{PluginCapabilities, PluginExport, PluginManifest, PluginParameter};
     pub use crate::runtime::{
         LoadedPlugin, PluginInput, PluginOutput, PluginRuntime, RuntimeConfig,
