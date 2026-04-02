@@ -90,6 +90,7 @@
 pub mod bootstrap;
 pub mod config_merge;
 pub mod oauth;
+pub mod runtime;
 mod agent;
 mod cache;
 pub mod session_fork;
@@ -121,6 +122,10 @@ mod tool_selector;
 pub mod usage_tracker;
 
 pub use bootstrap::{BootstrapPhase, BootstrapPlan, BootstrapTimer};
+pub use runtime::{
+    CompactionSummary, ConversationRuntime, LlmBackend, LlmResponse, ResponseBlock,
+    RuntimeConfig, RuntimeError, RuntimeEvent, RuntimeStats, TokenUsageUpdate, ToolBackend,
+};
 pub use error::{Error, Result};
 /// Alias for CoreError used by internal modules
 pub type CoreError = Error;
