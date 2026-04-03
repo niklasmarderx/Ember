@@ -5,7 +5,6 @@
 //! target (including `Vec<u8>`) so all rendering paths are unit-testable
 //! without a real TTY.
 
-
 use crossterm::style::{Color, ResetColor, SetForegroundColor};
 use crossterm::{cursor, queue};
 use pulldown_cmark::{Event as MdEvent, HeadingLevel, Options, Parser as MdParser, Tag, TagEnd};
