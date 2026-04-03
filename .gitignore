@@ -115,3 +115,6 @@ credentials/
 
 # Nischen-Analyse (development notes - German)
 nischen-analyse*.md
+
+# Kubernetes secrets (real values)
+deploy/kubernetes/secret.yaml
