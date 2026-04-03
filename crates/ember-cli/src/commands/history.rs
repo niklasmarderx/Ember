@@ -13,8 +13,11 @@ use ember_storage::{
     ConversationStats, MessageSearchResult, SearchOptions, SearchSortBy, SqliteConfig,
     SqliteSearchResult, SqliteStorage,
 };
+use serde_json;
 use std::path::PathBuf;
 use tracing::debug;
+
+use crate::commands::chat::PersistedSession;
 
 /// History command arguments.
 #[derive(Debug, Args)]
@@ -33,7 +36,7 @@ pub enum HistoryCommand {
     /// Search conversations and messages
     Search(SearchArgs),
 
-    /// List recent conversations
+    /// List recent conversations (SQLite-backed)
     List(ListArgs),
 
     /// Show conversation statistics
@@ -41,6 +44,21 @@ pub enum HistoryCommand {
 
     /// Delete old conversations
     Prune(PruneArgs),
+
+    /// List persisted interactive sessions from ~/.ember/sessions/
+    Sessions(SessionsArgs),
+}
+
+/// Arguments for the sessions subcommand.
+#[derive(Debug, Args)]
+pub struct SessionsArgs {
+    /// Maximum number of sessions to display
+    #[arg(long, short = 'n', default_value = "20")]
+    pub limit: usize,
+
+    /// Output format: text, json
+    #[arg(long, short = 'o', default_value = "text")]
+    pub format: String,
 }
 
 /// Arguments for the search subcommand.
@@ -140,6 +158,104 @@ pub async fn execute(args: HistoryArgs) -> Result<()> {
         HistoryCommand::List(list_args) => execute_list(&storage, list_args).await,
         HistoryCommand::Stats(stats_args) => execute_stats(&storage, stats_args).await,
         HistoryCommand::Prune(prune_args) => execute_prune(&storage, prune_args).await,
+        HistoryCommand::Sessions(sessions_args) => execute_sessions(sessions_args),
+    }
+}
+
+/// List persisted interactive sessions from `~/.ember/sessions/`.
+fn execute_sessions(args: SessionsArgs) -> Result<()> {
+    let home = dirs::home_dir().context("Cannot determine home directory")?;
+    let dir = home.join(".ember").join("sessions");
+
+    if !dir.exists() {
+        println!("{}", "No sessions directory found. Start a chat to create one.".dimmed());
+        return Ok(());
+    }
+
+    // Collect and sort by modification time (newest first)
+    let mut entries: Vec<_> = std::fs::read_dir(&dir)?
+        .filter_map(|e| e.ok())
+        .filter(|e| e.path().extension().and_then(|s| s.to_str()) == Some("json"))
+        .collect();
+
+    entries.sort_by_key(|e| {
+        std::cmp::Reverse(
+            e.metadata()
+                .and_then(|m| m.modified())
+                .unwrap_or(std::time::SystemTime::UNIX_EPOCH),
+        )
+    });
+
+    let entries: Vec<_> = entries.into_iter().take(args.limit).collect();
+
+    if entries.is_empty() {
+        println!("{}", "No sessions found.".dimmed());
+        return Ok(());
+    }
+
+    if args.format == "json" {
+        let mut sessions_json: Vec<serde_json::Value> = Vec::new();
+        for entry in &entries {
+            if let Ok(json) = std::fs::read_to_string(entry.path()) {
+                if let Ok(s) = serde_json::from_str::<PersistedSession>(&json) {
+                    sessions_json.push(serde_json::json!({
+                        "id": s.id,
+                        "provider": s.provider,
+                        "model": s.model,
+                        "turn_count": s.turn_count,
+                        "updated_at": s.updated_at,
+                    }));
+                }
+            }
+        }
+        println!("{}", serde_json::to_string_pretty(&sessions_json)?);
+    } else {
+        println!();
+        println!("{}", "Persisted Sessions:".bright_yellow().bold());
+        println!(
+            "  {:<12} {:<12} {:<28} {:<6} {}",
+            "ID".bright_blue(),
+            "Provider".bright_blue(),
+            "Model".bright_blue(),
+            "Turns".bright_blue(),
+            "Updated".bright_blue(),
+        );
+        println!("  {}", "-".repeat(72).dimmed());
+
+        for entry in &entries {
+            if let Ok(json) = std::fs::read_to_string(entry.path()) {
+                if let Ok(s) = serde_json::from_str::<PersistedSession>(&json) {
+                    println!(
+                        "  {:<12} {:<12} {:<28} {:<6} {}",
+                        s.id.bright_cyan(),
+                        s.provider,
+                        truncate_str(&s.model, 26),
+                        s.turn_count.to_string().bright_green(),
+                        s.updated_at.dimmed(),
+                    );
+                }
+            }
+        }
+        println!();
+        println!(
+            "  {} ember chat --resume <id>",
+            "Resume with:".bright_yellow()
+        );
+        println!(
+            "  {} ember chat --continue",
+            "Resume last:".bright_yellow()
+        );
+        println!();
+    }
+
+    Ok(())
+}
+
+fn truncate_str(s: &str, max_len: usize) -> String {
+    if s.len() <= max_len {
+        s.to_string()
+    } else {
+        format!("{}…", &s[..max_len.saturating_sub(1)])
     }
 }
 

@@ -122,7 +122,9 @@ pub use model_registry::{
     CostEstimate, ModelCapabilities, ModelMetadata, ModelRegistry, MODEL_REGISTRY,
 };
 pub use retry::{complete_with_retry, RetryConfig};
-pub use router::LLMRouter;
+pub use router::{
+    is_model_alias, resolve_model_alias, FallbackRouter, LLMRouter, ModelAlias, ModelCandidate,
+};
 pub use scorer::{
     ModelCapabilities as ScorerModelCapabilities, ModelScore, ModelScorer, UserPreferences,
 };

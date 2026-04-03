@@ -141,12 +141,23 @@ Supports multiple providers (OpenAI, Ollama), custom models,
 system prompts, temperature control, and optional tool usage.
 
 Use the --tools flag to enable agent mode, allowing the AI to execute
-shell commands, access the filesystem, and fetch web content.",
+shell commands, access the filesystem, and fetch web content.
+
+Sessions are persisted to ~/.ember/sessions/ automatically. Use
+--continue to resume the last session or --resume <id> for a specific one.
+
+Model aliases:
+  --model fast   cheapest available (haiku / gpt-4o-mini / gemini-flash)
+  --model smart  best quality       (opus / gpt-4o / gemini-pro)
+  --model code   code-optimised     (sonnet / gpt-4o / deepseek-coder)
+  --model local  local Ollama models only",
         after_help = "Examples:
   ember chat \"Explain Rust ownership\"
-  ember chat --model gpt-4
+  ember chat --model fast
   ember chat --provider ollama
-  ember chat --tools shell,filesystem"
+  ember chat --tools shell,filesystem
+  ember chat --continue
+  ember chat --resume abc12345"
     )]
     Chat {
         /// Message to send (omit for interactive mode)
@@ -156,7 +167,7 @@ shell commands, access the filesystem, and fetch web content.",
         #[arg(short, long)]
         provider: Option<String>,
 
-        /// Model to use (overrides config)
+        /// Model to use (overrides config); accepts aliases: fast, smart, code, local
         #[arg(short, long)]
         model: Option<String>,
 
@@ -179,6 +190,14 @@ shell commands, access the filesystem, and fetch web content.",
         /// Output format (text, json, markdown)
         #[arg(short, long, value_enum, default_value = "text")]
         format: ChatFormat,
+
+        /// Resume a specific session by id (e.g. from `ember history list`)
+        #[arg(long)]
+        resume: Option<String>,
+
+        /// Resume the most recent session
+        #[arg(long, conflicts_with = "resume")]
+        continue_session: bool,
     },
 
     /// Execute a task using the AI agent and exit.
@@ -486,6 +505,8 @@ async fn run() -> Result<()> {
             no_stream,
             tools,
             format,
+            resume,
+            continue_session,
         } => {
             chat::run(
                 config,
@@ -497,6 +518,8 @@ async fn run() -> Result<()> {
                 !no_stream,
                 tools,
                 format,
+                resume,
+                continue_session,
             )
             .await?;
         }
