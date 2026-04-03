@@ -199,7 +199,7 @@ impl FallbackRouter {
         self.providers.insert(name.into(), provider);
     }
 
-    /// Builder-style variant of [`register`].
+    /// Builder-style variant of [`Self::register`].
     pub fn with_provider(
         mut self,
         name: impl Into<String>,
@@ -619,7 +619,7 @@ impl CascadeRouter {
         self.providers.insert(name.into(), provider);
     }
 
-    /// Builder-style variant of [`register`].
+    /// Builder-style variant of [`Self::register`].
     pub fn with_provider(
         mut self,
         name: impl Into<String>,
