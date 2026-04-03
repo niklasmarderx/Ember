@@ -10,6 +10,7 @@ mod app;
 #[cfg(feature = "tui")]
 mod ui;
 
+#[allow(dead_code)]
 pub mod renderer;
 
 #[allow(unused_imports)]
