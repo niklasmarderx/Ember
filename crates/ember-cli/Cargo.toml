@@ -16,7 +16,7 @@ path = "src/main.rs"
 # Workspace crates
 ember-core = { path = "../ember-core" }
 ember-llm = { path = "../ember-llm", features = ["openai", "ollama"] }
-ember-tools = { path = "../ember-tools", features = ["shell", "filesystem", "web"] }
+ember-tools = { path = "../ember-tools", features = ["shell", "filesystem", "web", "git"] }
 ember-storage = { path = "../ember-storage", features = ["sqlite"] }
 ember-web = { path = "../ember-web" }
 ember-plugins = { path = "../ember-plugins", features = ["marketplace"] }

@@ -548,6 +548,14 @@ impl FileOpHistory {
         Some(undo_write(&last))
     }
 
+    /// Pop the most recent operation entry without performing the undo.
+    ///
+    /// Useful when the caller wants to inspect the entry (e.g. to report the
+    /// path) and then call [`undo_write`] itself.
+    pub fn pop_last(&mut self) -> Option<FileWriteResult> {
+        self.operations.pop()
+    }
+
     /// Read-only view of all recorded operations (oldest first).
     pub fn history(&self) -> &[FileWriteResult] {
         &self.operations

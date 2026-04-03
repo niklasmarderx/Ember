@@ -46,6 +46,24 @@ pub enum SlashCommand {
     Forks,
     /// Restore to a named / numbered fork point.
     Restore { fork_id: String },
+    /// Compare two providers on the same prompt.
+    /// `provider1` and `provider2` are optional; when absent, uses current +
+    /// next-cheapest.  `prompt` is the text to send.
+    Compare {
+        provider1: Option<String>,
+        provider2: Option<String>,
+        prompt: String,
+    },
+    /// Show or clear the semantic cache.
+    /// When `subcommand` is `Some("clear")`, clears the cache.
+    Cache { subcommand: Option<String> },
+    /// Undo the last file write performed by a tool.
+    Undo,
+    /// Create a git commit. `message` is the commit message; if `None` an
+    /// auto-generated message is used.
+    Commit { message: Option<String> },
+    /// Show the current `git diff` of unstaged (or staged) changes.
+    Diff { staged: bool },
     /// An unrecognised slash command — stores the raw name.
     Unknown(String),
 }
@@ -99,6 +117,37 @@ impl SlashCommand {
                 let fork_id = arg.unwrap_or("").to_owned();
                 SlashCommand::Restore { fork_id }
             }
+            "compare" => {
+                // Syntax variants:
+                //   /compare "prompt"
+                //   /compare provider1 provider2 "prompt"
+                //   /compare provider1 provider2 prompt text...
+                let rest = arg.unwrap_or("").trim().to_owned();
+                let (provider1, provider2, prompt) = parse_compare_args(&rest);
+                SlashCommand::Compare {
+                    provider1,
+                    provider2,
+                    prompt,
+                }
+            }
+            "cache" => SlashCommand::Cache {
+                subcommand: arg.map(|a| a.trim().to_lowercase()),
+            },
+            "undo" | "u" => SlashCommand::Undo,
+            "commit" => SlashCommand::Commit {
+                message: arg.map(str::to_owned),
+            },
+            "diff" => {
+                let staged = arg
+                    .map(|a| {
+                        matches!(
+                            a.to_lowercase().as_str(),
+                            "--staged" | "--cached" | "staged" | "cached"
+                        )
+                    })
+                    .unwrap_or(false);
+                SlashCommand::Diff { staged }
+            }
             other => SlashCommand::Unknown(other.to_owned()),
         };
 
@@ -121,6 +170,11 @@ impl SlashCommand {
             "fork",
             "forks",
             "restore",
+            "compare",
+            "cache",
+            "undo",
+            "commit",
+            "diff",
         ]
     }
 
@@ -141,8 +195,87 @@ impl SlashCommand {
             SlashCommand::Fork { .. } => "Fork the current session, optionally giving it a name",
             SlashCommand::Forks => "List all session forks",
             SlashCommand::Restore { .. } => "Restore the session to a previous fork point",
+            SlashCommand::Compare { .. } => {
+                "Compare two providers side-by-side on the same prompt"
+            }
+            SlashCommand::Cache { .. } => {
+                "Show semantic cache stats, or '/cache clear' to clear the cache"
+            }
+            SlashCommand::Undo => "Undo the last file write made by a tool",
+            SlashCommand::Commit { .. } => "Create a git commit with the given message (or auto-generate one)",
+            SlashCommand::Diff { .. } => "Show the current git diff of working-tree changes",
             SlashCommand::Unknown(_) => "Unknown command",
         }
+    }
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// parse_compare_args helper
+// ──────────────────────────────────────────────────────────────────────────────
+
+/// Parse the argument string of a `/compare` command into
+/// `(provider1, provider2, prompt)`.
+///
+/// Accepted forms (all tokens separated by whitespace):
+/// - `"prompt text"` — no providers, quoted prompt
+/// - `prompt text without quotes`
+/// - `openai ollama "prompt text"`
+/// - `openai ollama prompt text`
+fn parse_compare_args(rest: &str) -> (Option<String>, Option<String>, String) {
+    // If the whole rest is quoted, it's just a prompt.
+    if rest.starts_with('"') {
+        let prompt = rest.trim_matches('"').to_owned();
+        return (None, None, prompt);
+    }
+
+    let parts: Vec<&str> = rest.splitn(3, char::is_whitespace).collect();
+
+    // Known provider names (lowercase).
+    let known_providers = [
+        "openai", "ollama", "anthropic", "gemini", "groq", "deepseek", "mistral",
+    ];
+
+    let looks_like_provider = |s: &str| known_providers.contains(&s.to_lowercase().as_str());
+
+    match parts.as_slice() {
+        // No args → empty prompt, caller should warn
+        [] => (None, None, String::new()),
+        // Single token or single quoted string
+        [single] => (None, None, single.trim_matches('"').to_owned()),
+        // Two tokens — could be provider + prompt, or just two-word prompt
+        [a, b] => {
+            if looks_like_provider(a) {
+                // One provider + prompt
+                (Some((*a).to_owned()), None, b.trim_matches('"').to_owned())
+            } else {
+                (None, None, format!("{} {}", a, b.trim_matches('"')))
+            }
+        }
+        // Three (or more, due to splitn(3)) tokens
+        [a, b, c_rest] => {
+            if looks_like_provider(a) && looks_like_provider(b) {
+                (
+                    Some((*a).to_owned()),
+                    Some((*b).to_owned()),
+                    c_rest.trim_matches('"').to_owned(),
+                )
+            } else if looks_like_provider(a) {
+                (
+                    Some((*a).to_owned()),
+                    None,
+                    format!("{} {}", b, c_rest.trim_matches('"')),
+                )
+            } else {
+                (
+                    None,
+                    None,
+                    format!("{} {} {}", a, b, c_rest.trim_matches('"')),
+                )
+            }
+        }
+        // Fallback for any other shape (shouldn't happen with splitn(3) but
+        // keeps the compiler happy).
+        _ => (None, None, rest.to_owned()),
     }
 }
 
@@ -247,6 +380,36 @@ impl SlashCommandRegistry {
                 name: "restore",
                 description: "Restore the session to a previous fork point",
                 usage: "/restore <id>",
+                aliases: vec![],
+            },
+            SlashCommandEntry {
+                name: "compare",
+                description: "Compare two providers side-by-side on the same prompt",
+                usage: "/compare [provider1] [provider2] <prompt>",
+                aliases: vec![],
+            },
+            SlashCommandEntry {
+                name: "cache",
+                description: "Show semantic cache stats; '/cache clear' to clear the cache",
+                usage: "/cache [clear]",
+                aliases: vec![],
+            },
+            SlashCommandEntry {
+                name: "undo",
+                description: "Undo the last file write made by a tool",
+                usage: "/undo",
+                aliases: vec!["u"],
+            },
+            SlashCommandEntry {
+                name: "commit",
+                description: "Create a git commit with given message (auto-generates if omitted)",
+                usage: "/commit [message]",
+                aliases: vec![],
+            },
+            SlashCommandEntry {
+                name: "diff",
+                description: "Show the current git diff of working-tree changes",
+                usage: "/diff [--staged]",
                 aliases: vec![],
             },
         ];
@@ -418,10 +581,10 @@ mod tests {
         assert_eq!(SlashCommand::parse(""), None);
     }
 
-    // 8. all_commands returns the correct count (12 commands)
+    // 8. all_commands returns the correct count (14 commands)
     #[test]
     fn all_commands_count() {
-        assert_eq!(SlashCommand::all_commands().len(), 12);
+        assert_eq!(SlashCommand::all_commands().len(), 18);
     }
 
     // 9. Registry completions for "/he" → ["/help"]
@@ -469,6 +632,14 @@ mod tests {
             SlashCommand::Restore {
                 fork_id: "1".into(),
             },
+            SlashCommand::Compare {
+                provider1: None,
+                provider2: None,
+                prompt: "test".into(),
+            },
+            SlashCommand::Cache { subcommand: None },
+            SlashCommand::Commit { message: None },
+            SlashCommand::Diff { staged: false },
             SlashCommand::Unknown("xyz".into()),
         ];
         for variant in &variants {

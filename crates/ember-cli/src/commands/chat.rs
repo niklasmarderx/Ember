@@ -58,7 +58,11 @@ use colored::Colorize;
 use ember_core::usage_tracker::SessionUsageTracker;
 use ember_llm::{CompletionRequest, LLMProvider, Message, OllamaProvider, OpenAIProvider};
 use ember_llm::router::is_model_alias;
-use ember_tools::{FilesystemTool, ShellTool, ToolRegistry, WebTool};
+use ember_storage::semantic_cache::{
+    CacheContext, SemanticCache, SemanticCacheBuilder,
+};
+use ember_tools::filesystem::undo_last as filesystem_undo_last;
+use ember_tools::{FilesystemTool, GitTool, ShellTool, ToolRegistry, WebTool};
 use futures::StreamExt;
 use serde::{Deserialize, Serialize};
 use serde_json;
@@ -67,6 +71,9 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::sync::mpsc;
 use tracing::{debug, info, warn};
+
+/// Semantic cache similarity threshold for chat: treat >0.92 as a hit.
+const CACHE_SIMILARITY_THRESHOLD: f32 = 0.92;
 
 /// Maximum iterations for tool execution loop to prevent infinite loops.
 const MAX_TOOL_ITERATIONS: usize = 10;
@@ -383,7 +390,16 @@ pub async fn run(
         (provider_name, raw_model)
     };
 
-    let system_prompt = system.unwrap_or_else(|| config.agent.system_prompt.clone());
+    let base_system_prompt = system.unwrap_or_else(|| config.agent.system_prompt.clone());
+    let system_prompt = if let Some(ctx) = load_project_context() {
+        println!(
+            "{} Loaded project context from EMBER.md",
+            "📋 [ember]".bright_yellow()
+        );
+        format!("{}\n\n---\n\n{}", ctx, base_system_prompt)
+    } else {
+        base_system_prompt
+    };
     let temp = temperature.unwrap_or(config.agent.temperature);
     let llm_provider = create_provider(&config, &provider_name)?;
 
@@ -446,6 +462,7 @@ pub async fn run(
             .await?;
         } else {
             agent_interactive(
+                &config,
                 llm_provider,
                 &model_name,
                 &system_prompt,
@@ -469,6 +486,7 @@ pub async fn run(
         .await?;
     } else {
         interactive_chat(
+            &config,
             llm_provider,
             &model_name,
             &system_prompt,
@@ -554,6 +572,14 @@ fn create_provider(config: &AppConfig, provider_name: &str) -> Result<Arc<dyn LL
     }
 }
 
+/// Build a new semantic cache for chat sessions.
+fn new_semantic_cache() -> SemanticCache {
+    SemanticCacheBuilder::new()
+        .similarity_threshold(CACHE_SIMILARITY_THRESHOLD)
+        .context_aware(true)
+        .build()
+}
+
 /// Execute a single AI task and exit.
 pub async fn run_task(config: AppConfig, task: String, model: Option<String>) -> Result<()> {
     let provider_name = config.provider.default.clone();
@@ -593,6 +619,14 @@ enum SlashOutcome {
     Exit,
     /// Switch to a new model (returns new model name).
     SwitchModel(String),
+    /// Run /compare — handled asynchronously by the caller.
+    RunCompare {
+        provider1: Option<String>,
+        provider2: Option<String>,
+        prompt: String,
+    },
+    /// Show cache stats or clear the cache — handled by the caller.
+    HandleCache { subcommand: Option<String> },
 }
 
 /// Handle a parsed slash command, writing any output to stdout.
@@ -740,6 +774,115 @@ fn handle_slash(
             SlashOutcome::Continue
         }
 
+        SlashCommand::Compare { provider1, provider2, prompt } => {
+            // Signal to caller: run the async compare handler.
+            SlashOutcome::RunCompare {
+                provider1: provider1.clone(),
+                provider2: provider2.clone(),
+                prompt: prompt.clone(),
+            }
+        }
+
+        SlashCommand::Cache { subcommand } => {
+            // Signal to caller: handle cache stats/clear.
+            SlashOutcome::HandleCache {
+                subcommand: subcommand.clone(),
+            }
+        }
+
+        SlashCommand::Undo => {
+            match filesystem_undo_last() {
+                Ok(Some(path)) => {
+                    println!(
+                        "{} Restored {}",
+                        "[undo]".bright_yellow(),
+                        path.bright_cyan()
+                    );
+                }
+                Ok(None) => {
+                    println!("{}", "Nothing to undo.".dimmed());
+                }
+                Err(e) => {
+                    println!(
+                        "{} Undo failed: {}",
+                        "[error]".bright_red(),
+                        e
+                    );
+                }
+            }
+            SlashOutcome::Continue
+        }
+
+        SlashCommand::Commit { message } => {
+            // Run `git add -A && git commit -m "..."`
+            let msg = message.as_deref().unwrap_or("ember: auto-commit changes");
+            match std::process::Command::new("git")
+                .args(["add", "-A"])
+                .output()
+            {
+                Ok(_) => {
+                    match std::process::Command::new("git")
+                        .args(["commit", "-m", msg])
+                        .output()
+                    {
+                        Ok(out) => {
+                            let stdout = String::from_utf8_lossy(&out.stdout);
+                            if out.status.success() {
+                                println!(
+                                    "{} {}",
+                                    "[commit]".bright_green(),
+                                    stdout.trim()
+                                );
+                            } else {
+                                let stderr = String::from_utf8_lossy(&out.stderr);
+                                println!(
+                                    "{} {}",
+                                    "[info]".bright_blue(),
+                                    if stderr.contains("nothing to commit") {
+                                        "Nothing to commit."
+                                    } else {
+                                        stderr.trim().lines().next().unwrap_or("commit failed")
+                                    }
+                                );
+                            }
+                        }
+                        Err(e) => {
+                            println!("{} git commit failed: {}", "[error]".bright_red(), e);
+                        }
+                    }
+                }
+                Err(e) => {
+                    println!("{} git add failed: {}", "[error]".bright_red(), e);
+                }
+            }
+            SlashOutcome::Continue
+        }
+
+        SlashCommand::Diff { staged } => {
+            let mut args = vec!["diff"];
+            if *staged {
+                args.push("--cached");
+            }
+            args.push("--stat");
+            match std::process::Command::new("git").args(&args).output() {
+                Ok(out) => {
+                    let stdout = String::from_utf8_lossy(&out.stdout);
+                    if stdout.trim().is_empty() {
+                        println!("{}", "No changes.".dimmed());
+                    } else {
+                        println!();
+                        println!("{}", "Git Diff:".bright_yellow().bold());
+                        print!("{}", stdout);
+                        println!();
+                    }
+                }
+                Err(e) => {
+                    println!("{} git diff failed: {}", "[error]".bright_red(), e);
+                }
+            }
+            SlashOutcome::Continue
+        }
+
         SlashCommand::Unknown(name) => {
             // Legacy aliases kept for muscle memory
             match name.as_str() {
@@ -768,6 +911,199 @@ fn handle_slash(
                 }
             }
             SlashOutcome::Continue
+        }
+    }
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// /compare — side-by-side provider comparison
+// ──────────────────────────────────────────────────────────────────────────────
+
+/// Run a side-by-side comparison of two providers on the same prompt.
+///
+/// When `p1` / `p2` are `None` the function falls back to the current config
+/// provider and `"ollama"` respectively (simple heuristic; in a real build we
+/// would query a cost-sorted list).
+async fn compare_providers(
+    config: &AppConfig,
+    current_provider: &str,
+    current_model: &str,
+    temperature: f32,
+    p1_name: Option<&str>,
+    p2_name: Option<&str>,
+    prompt: &str,
+) -> Result<()> {
+    if prompt.trim().is_empty() {
+        eprintln!(
+            "{} Usage: /compare [provider1] [provider2] <prompt>",
+            "[error]".bright_red()
+        );
+        return Ok(());
+    }
+
+    // Resolve providers.
+    let name1 = p1_name.unwrap_or(current_provider);
+    // Default second provider: pick something different from the first.
+    let name2 = p2_name.unwrap_or_else(|| {
+        if name1 == "ollama" { "openai" } else { "ollama" }
+    });
+
+    // Resolve models: use configured defaults per provider.
+    let model1 = if name1 == current_provider {
+        current_model.to_owned()
+    } else {
+        match name1 {
+            "ollama" => config.provider.ollama.model.clone(),
+            _ => config.provider.openai.model.clone(),
+        }
+    };
+    let model2 = match name2 {
+        "ollama" => config.provider.ollama.model.clone(),
+        _ => config.provider.openai.model.clone(),
+    };
+
+    let provider1 = match create_provider(config, name1) {
+        Ok(p) => p,
+        Err(e) => {
+            eprintln!("{} Provider '{}' unavailable: {}", "[error]".bright_red(), name1, e);
+            return Ok(());
+        }
+    };
+    let provider2 = match create_provider(config, name2) {
+        Ok(p) => p,
+        Err(e) => {
+            eprintln!("{} Provider '{}' unavailable: {}", "[error]".bright_red(), name2, e);
+            return Ok(());
+        }
+    };
+
+    println!();
+    println!(
+        "{} Comparing {} ({}) vs {} ({})",
+        "[compare]".bright_magenta().bold(),
+        name1.bright_blue(),
+        model1.dimmed(),
+        name2.bright_blue(),
+        model2.dimmed(),
+    );
+    println!("  Prompt: {}", prompt.bright_white());
+    println!();
+
+    let req1 = CompletionRequest::new(&model1)
+        .with_message(Message::user(prompt))
+        .with_temperature(temperature);
+    let req2 = CompletionRequest::new(&model2)
+        .with_message(Message::user(prompt))
+        .with_temperature(temperature);
+
+    // Send both requests concurrently.
+    let start = Instant::now();
+    let (res1, res2) = tokio::join!(provider1.complete(req1), provider2.complete(req2));
+    let elapsed = start.elapsed();
+
+    let content1 = match res1 {
+        Ok(r) => r.content,
+        Err(e) => format!("[error: {}]", e),
+    };
+    let content2 = match res2 {
+        Ok(r) => r.content,
+        Err(e) => format!("[error: {}]", e),
+    };
+
+    // Display side-by-side (sequential, labelled).
+    let divider = "─".repeat(60);
+    println!("{}", divider.dimmed());
+    println!(
+        "{} {} ({})",
+        "[1]".bright_cyan().bold(),
+        name1.bright_blue(),
+        model1.dimmed()
+    );
+    println!("{}", divider.dimmed());
+    println!("{}", content1);
+    println!();
+    println!("{}", divider.dimmed());
+    println!(
+        "{} {} ({})",
+        "[2]".bright_cyan().bold(),
+        name2.bright_blue(),
+        model2.dimmed()
+    );
+    println!("{}", divider.dimmed());
+    println!("{}", content2);
+    println!();
+    println!(
+        "  {} Total round-trip: {:.1}s",
+        "⏱".dimmed(),
+        elapsed.as_secs_f64()
+    );
+    println!();
+
+    // Prompt the user to pick a response.
+    print!(
+        "{} Keep which response? ({}/{}/{}) ",
+        "[compare]".bright_magenta(),
+        "1".bright_cyan(),
+        "2".bright_cyan(),
+        "n".dimmed()
+    );
+    io::stdout().flush()?;
+
+    let choice = read_line()?;
+    match choice.trim() {
+        "1" => {
+            println!("{} Keeping response from {}.", "[compare]".bright_magenta(), name1.bright_blue());
+        }
+        "2" => {
+            println!("{} Keeping response from {}.", "[compare]".bright_magenta(), name2.bright_blue());
+        }
+        _ => {
+            println!("{} Neither response kept.", "[compare]".bright_magenta());
+        }
+    }
+    println!();
+
+    Ok(())
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// /cache — show stats or clear
+// ──────────────────────────────────────────────────────────────────────────────
+
+/// Display cache stats or clear the cache.
+fn handle_cache_command(cache: &SemanticCache, subcommand: Option<&str>) {
+    match subcommand {
+        Some("clear") => {
+            cache.clear();
+            println!("{} Semantic cache cleared.", "[cache]".bright_cyan().bold());
+        }
+        _ => {
+            let stats = cache.stats();
+            let total = stats.hits + stats.misses;
+            println!();
+            println!("{}", "Semantic Cache:".bright_yellow().bold());
+            println!("  Entries:    {}", cache.len().to_string().bright_green());
+            println!("  Hits:       {}", stats.hits.to_string().bright_green());
+            println!("  Misses:     {}", stats.misses.to_string().bright_yellow());
+            println!(
+                "  Hit rate:   {:.1}%",
+                if total > 0 { stats.hit_rate * 100.0 } else { 0.0 }
+            );
+            println!(
+                "  Avg sim:    {:.3}",
+                stats.average_similarity
+            );
+            println!(
+                "  Tokens saved: {}",
+                stats.tokens_saved.to_string().bright_green()
+            );
+            println!(
+                "  Est. savings: ${:.4}",
+                stats.estimated_savings_usd
+            );
+            println!();
+            println!("  Use {} to clear the cache.", "/cache clear".bright_cyan());
+            println!();
         }
     }
 }
@@ -892,6 +1228,7 @@ async fn agent_one_shot(
 // ──────────────────────────────────────────────────────────────────────────────
 
 async fn agent_interactive(
+    config: &AppConfig,
     provider: Arc<dyn LLMProvider>,
     model: &str,
     system_prompt: &str,
@@ -941,6 +1278,9 @@ async fn agent_interactive(
     // Usage tracker (approximation: we record by token count from response)
     let mut tracker = SessionUsageTracker::new(&active_model);
 
+    // Semantic cache for agent REPL.
+    let sem_cache = new_semantic_cache();
+
     loop {
         print!("{} ", "You:".bright_green().bold());
         io::stdout().flush()?;
@@ -963,6 +1303,23 @@ async fn agent_interactive(
                     SlashOutcome::SwitchModel(new_model) => {
                         active_model = new_model;
                         tracker = SessionUsageTracker::new(&active_model);
+                        continue;
+                    }
+                    SlashOutcome::RunCompare { provider1, provider2, prompt } => {
+                        compare_providers(
+                            config,
+                            provider.name(),
+                            &active_model,
+                            temperature,
+                            provider1.as_deref(),
+                            provider2.as_deref(),
+                            &prompt,
+                        )
+                        .await?;
+                        continue;
+                    }
+                    SlashOutcome::HandleCache { subcommand } => {
+                        handle_cache_command(&sem_cache, subcommand.as_deref());
                         continue;
                     }
                     SlashOutcome::Continue => {
@@ -1191,6 +1548,7 @@ async fn one_shot_chat(
 // ──────────────────────────────────────────────────────────────────────────────
 
 async fn interactive_chat(
+    config: &AppConfig,
     provider: Arc<dyn LLMProvider>,
     model: &str,
     system_prompt: &str,
@@ -1228,6 +1586,9 @@ async fn interactive_chat(
     let mut active_model = model.to_owned();
     let mut tracker = SessionUsageTracker::new(&active_model);
 
+    // Semantic cache shared across turns.
+    let sem_cache = new_semantic_cache();
+
     loop {
         print!("{} ", "You:".bright_green().bold());
         io::stdout().flush()?;
@@ -1252,6 +1613,23 @@ async fn interactive_chat(
                         tracker = SessionUsageTracker::new(&active_model);
                         continue;
                     }
+                    SlashOutcome::RunCompare { provider1, provider2, prompt } => {
+                        compare_providers(
+                            config,
+                            provider.name(),
+                            &active_model,
+                            temperature,
+                            provider1.as_deref(),
+                            provider2.as_deref(),
+                            &prompt,
+                        )
+                        .await?;
+                        continue;
+                    }
+                    SlashOutcome::HandleCache { subcommand } => {
+                        handle_cache_command(&sem_cache, subcommand.as_deref());
+                        continue;
+                    }
                     SlashOutcome::Continue => {
                         if matches!(cmd, SlashCommand::Clear { .. }) {
                             history = vec![Message::system(system_prompt)];
@@ -1266,6 +1644,42 @@ async fn interactive_chat(
         if matches!(input, "exit" | "quit") {
             println!("{}", "Goodbye!".bright_yellow());
             break;
+        }
+
+        // ── Semantic cache lookup ──────────────────────────────────────────
+        let cache_ctx = CacheContext {
+            system_prompt: Some(system_prompt.to_owned()),
+            model: Some(active_model.clone()),
+            temperature: Some(temperature),
+            ..Default::default()
+        };
+
+        if let Some(hit) = sem_cache.get(input, &cache_ctx) {
+            print!("{} ", "Ember:".bright_blue().bold());
+            println!(
+                "{} {}",
+                hit.response,
+                format!("(cached {:.0}%)", hit.similarity * 100.0).dimmed()
+            );
+            history.push(Message::user(input));
+            history.push(Message::assistant(&hit.response));
+            println!();
+
+            // Persist session
+            let turn_count = history.iter().filter(|m| matches!(m.role, ember_llm::Role::User)).count();
+            let session = PersistedSession {
+                id: session_id.clone(),
+                provider: provider.name().to_owned(),
+                model: active_model.clone(),
+                created_at: now_iso8601(),
+                updated_at: now_iso8601(),
+                messages: history.iter().map(PersistedMessage::from_message).collect(),
+                turn_count,
+            };
+            if let Err(e) = save_session(&session) {
+                warn!("Could not save session: {}", e);
+            }
+            continue;
         }
 
         history.push(Message::user(input));
@@ -1304,6 +1718,10 @@ async fn interactive_chat(
                     println!();
 
                     if !full_response.is_empty() {
+                        // Store in semantic cache.
+                        if let Err(e) = sem_cache.put(input, &full_response, &cache_ctx, &active_model) {
+                            debug!("Cache put failed: {}", e);
+                        }
                         // Approximate usage for streaming responses
                         let approx_tokens = (full_response.len() + 3) / 4;
                         let approx_input = history.iter().map(|m| (m.content.len() + 3) / 4).sum::<usize>();
@@ -1322,6 +1740,10 @@ async fn interactive_chat(
             match provider.complete(request).await {
                 Ok(response) => {
                     println!("{}", response.content);
+                    // Store in semantic cache.
+                    if let Err(e) = sem_cache.put(input, &response.content, &cache_ctx, &active_model) {
+                        debug!("Cache put failed: {}", e);
+                    }
                     tracker.record_turn(response.usage.clone());
                     history.push(Message::assistant(&response.content));
                 }
@@ -1414,4 +1836,28 @@ fn truncate_str(s: &str, max_len: usize) -> String {
 fn truncate_json(value: &serde_json::Value, max_len: usize) -> String {
     let s = value.to_string();
     truncate_str(&s, max_len)
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Project context (EMBER.md)
+// ──────────────────────────────────────────────────────────────────────────────
+
+/// Walk up from the current working directory looking for an `EMBER.md` file,
+/// mirroring how tools like Claude Code discover `CLAUDE.md` and how Git
+/// discovers `.git/`.
+///
+/// Returns the file contents when found, or `None` when no `EMBER.md` exists
+/// anywhere in the directory hierarchy.
+fn load_project_context() -> Option<String> {
+    let mut dir = std::env::current_dir().ok()?;
+    loop {
+        let candidate = dir.join("EMBER.md");
+        if candidate.exists() {
+            return std::fs::read_to_string(&candidate).ok();
+        }
+        if !dir.pop() {
+            break;
+        }
+    }
+    None
 }
