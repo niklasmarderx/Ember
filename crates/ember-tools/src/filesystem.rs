@@ -1,12 +1,49 @@
 //! Filesystem operations tool.
 
+use crate::patch::{write_file_tracked, FileOpHistory};
 use crate::{registry::ToolOutput, Error, Result, ToolDefinition, ToolHandler};
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::path::{Path, PathBuf};
+use std::sync::Mutex;
 use tokio::fs;
 use tracing::debug;
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Global undo history
+// ──────────────────────────────────────────────────────────────────────────────
+
+/// Process-wide history of tracked filesystem writes, used by `/undo`.
+///
+/// Guarded by a `Mutex` so it is safe to share across async tasks.
+static FILE_OP_HISTORY: Mutex<Option<FileOpHistory>> = Mutex::new(None);
+
+/// Access the process-wide [`FileOpHistory`], initialising it on first use.
+fn with_history<T>(f: impl FnOnce(&mut FileOpHistory) -> T) -> T {
+    let mut guard = FILE_OP_HISTORY.lock().expect("FILE_OP_HISTORY poisoned");
+    let history = guard.get_or_insert_with(|| FileOpHistory::new(50));
+    f(history)
+}
+
+/// Undo the last file write recorded in the process-wide history.
+///
+/// Returns:
+/// - `Ok(Some(path))` — the file at `path` was successfully restored.
+/// - `Ok(None)`       — there is nothing to undo.
+/// - `Err(_)`         — the restoration failed.
+pub fn undo_last() -> anyhow::Result<Option<String>> {
+    // Pull the last entry out of history and grab its path before restoring.
+    let entry = with_history(|h| h.pop_last());
+    match entry {
+        None => Ok(None),
+        Some(result) => {
+            let path = result.file_path.to_string_lossy().to_string();
+            crate::patch::undo_write(&result).map_err(anyhow::Error::from)?;
+            Ok(Some(path))
+        }
+    }
+}
 
 /// Configuration for the filesystem tool.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -180,7 +217,9 @@ impl FilesystemTool {
             }
         }
 
-        fs::write(&path, content).await?;
+        // Use tracked write so the change can be undone via /undo.
+        let write_result = write_file_tracked(&path, content)?;
+        with_history(|h| h.record(write_result));
         Ok(())
     }
 

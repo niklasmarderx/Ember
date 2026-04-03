@@ -123,7 +123,8 @@ pub use model_registry::{
 };
 pub use retry::{complete_with_retry, RetryConfig};
 pub use router::{
-    is_model_alias, resolve_model_alias, FallbackRouter, LLMRouter, ModelAlias, ModelCandidate,
+    is_model_alias, resolve_model_alias, CascadeRouter, FallbackRouter, LLMRouter, ModelAlias,
+    ModelCandidate, PromptComplexity, PromptComplexityAnalyzer,
 };
 pub use scorer::{
     ModelCapabilities as ScorerModelCapabilities, ModelScore, ModelScorer, UserPreferences,
