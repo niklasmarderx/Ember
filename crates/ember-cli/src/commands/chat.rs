@@ -13,6 +13,16 @@
 //!      - filesystem: read/write files
 //!      - web: fetch web pages
 //!
+//! ## Session Persistence
+//!
+//! Interactive sessions are saved to `~/.ember/sessions/<id>.json`.
+//! Use `--continue` to resume the last session or `--resume <id>` for a
+//! specific one.
+//!
+//! ## Slash Commands
+//!
+//! Type `/help` inside any REPL to see available slash commands.
+//!
 //! ## Examples
 //!
 //! Basic chat:
@@ -25,23 +35,32 @@
 //! ember chat
 //! ```
 //!
+//! Resume last session:
+//! ```bash
+//! ember chat --continue
+//! ```
+//!
 //! Using tools:
 //! ```bash
 //! ember chat --tools shell,filesystem
 //! ```
 //!
-//! Custom model:
+//! Custom model alias:
 //! ```bash
-//! ember chat --model gpt-4
+//! ember chat --model fast
 //! ```
 
+use crate::commands::slash::{SlashCommand, SlashCommandRegistry};
 use crate::config::AppConfig;
 use crate::ChatFormat;
 use anyhow::{Context, Result};
 use colored::Colorize;
+use ember_core::usage_tracker::SessionUsageTracker;
 use ember_llm::{CompletionRequest, LLMProvider, Message, OllamaProvider, OpenAIProvider};
+use ember_llm::router::is_model_alias;
 use ember_tools::{FilesystemTool, ShellTool, ToolRegistry, WebTool};
 use futures::StreamExt;
+use serde::{Deserialize, Serialize};
 use serde_json;
 use std::io::{self, Write};
 use std::sync::Arc;
@@ -58,6 +77,168 @@ const LLM_TIMEOUT_SECS: u64 = 120;
 
 /// Spinner frames for progress indicator.
 const SPINNER_FRAMES: &[&str] = &["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Session Persistence
+// ──────────────────────────────────────────────────────────────────────────────
+
+/// A persisted chat session stored as JSON in `~/.ember/sessions/`.
+#[derive(Debug, Serialize, Deserialize)]
+pub struct PersistedSession {
+    /// Unique session identifier (UUIDv4-style hex string).
+    pub id: String,
+    /// Provider name used for this session.
+    pub provider: String,
+    /// Model name used for this session.
+    pub model: String,
+    /// ISO-8601 timestamp when the session was created.
+    pub created_at: String,
+    /// ISO-8601 timestamp of the last message.
+    pub updated_at: String,
+    /// Message history (serialised form of `ember_llm::Message`).
+    pub messages: Vec<PersistedMessage>,
+    /// Total turn count (system message excluded).
+    pub turn_count: usize,
+}
+
+/// A single serialised message in a persisted session.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PersistedMessage {
+    /// Role: "system" | "user" | "assistant" | "tool"
+    pub role: String,
+    /// Message text content.
+    pub content: String,
+    /// Tool-call id (only set for tool-result messages).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tool_call_id: Option<String>,
+}
+
+impl PersistedMessage {
+    fn from_message(msg: &Message) -> Self {
+        let role = format!("{:?}", msg.role).to_lowercase();
+        Self {
+            role,
+            content: msg.content.clone(),
+            tool_call_id: msg.tool_call_id.clone(),
+        }
+    }
+
+    fn to_message(&self) -> Message {
+        match self.role.as_str() {
+            "system" => Message::system(&self.content),
+            "user" => Message::user(&self.content),
+            "assistant" => Message::assistant(&self.content),
+            "tool" => {
+                let id = self.tool_call_id.as_deref().unwrap_or("unknown");
+                Message::tool_result(id, &self.content)
+            }
+            _ => Message::user(&self.content),
+        }
+    }
+}
+
+/// Return the path to the sessions directory, creating it if needed.
+fn sessions_dir() -> Result<std::path::PathBuf> {
+    let home = dirs::home_dir().context("Cannot determine home directory")?;
+    let dir = home.join(".ember").join("sessions");
+    std::fs::create_dir_all(&dir)?;
+    Ok(dir)
+}
+
+/// Generate a short random hex session id.
+fn new_session_id() -> String {
+    use std::time::SystemTime;
+    let t = SystemTime::now()
+        .duration_since(SystemTime::UNIX_EPOCH)
+        .unwrap_or_default()
+        .subsec_nanos();
+    format!("{:08x}", t ^ std::process::id())
+}
+
+/// Save a session to disk.
+fn save_session(session: &PersistedSession) -> Result<()> {
+    let dir = sessions_dir()?;
+    let path = dir.join(format!("{}.json", session.id));
+    let json = serde_json::to_string_pretty(session)?;
+    std::fs::write(path, json)?;
+    Ok(())
+}
+
+/// Load a session by id.
+pub fn load_session(id: &str) -> Result<PersistedSession> {
+    let dir = sessions_dir()?;
+    let path = dir.join(format!("{}.json", id));
+    let json = std::fs::read_to_string(&path)
+        .with_context(|| format!("Session '{}' not found", id))?;
+    let session: PersistedSession = serde_json::from_str(&json)?;
+    Ok(session)
+}
+
+/// Find the most recently modified session file and return its id.
+pub fn latest_session_id() -> Option<String> {
+    let dir = sessions_dir().ok()?;
+    let mut entries: Vec<_> = std::fs::read_dir(&dir)
+        .ok()?
+        .filter_map(|e| e.ok())
+        .filter(|e| {
+            e.path().extension().and_then(|s| s.to_str()) == Some("json")
+        })
+        .collect();
+
+    entries.sort_by_key(|e| {
+        e.metadata()
+            .and_then(|m| m.modified())
+            .unwrap_or(std::time::SystemTime::UNIX_EPOCH)
+    });
+
+    entries
+        .last()
+        .and_then(|e| e.path().file_stem()?.to_str().map(str::to_owned))
+}
+
+/// Current time as a simple ISO-8601 string (without external dependencies).
+fn now_iso8601() -> String {
+    use std::time::SystemTime;
+    let secs = SystemTime::now()
+        .duration_since(SystemTime::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs();
+    // Produce a compact UTC timestamp: YYYY-MM-DDTHH:MM:SSZ
+    let s = secs;
+    let (y, mo, d, h, mi, sec) = seconds_to_ymd_hms(s);
+    format!("{:04}-{:02}-{:02}T{:02}:{:02}:{:02}Z", y, mo, d, h, mi, sec)
+}
+
+fn seconds_to_ymd_hms(mut s: u64) -> (u32, u32, u32, u32, u32, u32) {
+    let sec = (s % 60) as u32;
+    s /= 60;
+    let min = (s % 60) as u32;
+    s /= 60;
+    let hour = (s % 24) as u32;
+    s /= 24;
+    // Days since 1970-01-01 → Gregorian date (simplified, good until ~2100)
+    let mut days = s as u32;
+    let mut y = 1970u32;
+    loop {
+        let dy = if (y % 4 == 0 && y % 100 != 0) || y % 400 == 0 { 366 } else { 365 };
+        if days < dy { break; }
+        days -= dy;
+        y += 1;
+    }
+    let leap = (y % 4 == 0 && y % 100 != 0) || y % 400 == 0;
+    let month_days = [31u32, if leap { 29 } else { 28 }, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+    let mut mo = 0u32;
+    for md in &month_days {
+        if days < *md { break; }
+        days -= md;
+        mo += 1;
+    }
+    (y, mo + 1, days + 1, hour, min, sec)
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Response statistics
+// ──────────────────────────────────────────────────────────────────────────────
 
 /// Response statistics for token counting and timing.
 #[derive(Debug, Default)]
@@ -85,6 +266,10 @@ impl ResponseStats {
     }
 }
 
+// ──────────────────────────────────────────────────────────────────────────────
+// Progress indicator
+// ──────────────────────────────────────────────────────────────────────────────
+
 /// Progress indicator that shows a spinner while waiting.
 struct ProgressIndicator {
     message: String,
@@ -111,10 +296,8 @@ impl ProgressIndicator {
             let start = Instant::now();
 
             loop {
-                // Check if we should stop
                 tokio::select! {
                     _ = rx.recv() => {
-                        // Clear the spinner line
                         print!("\r{}\r", " ".repeat(60));
                         let _ = io::stdout().flush();
                         break;
@@ -149,26 +332,12 @@ impl ProgressIndicator {
     }
 }
 
+// ──────────────────────────────────────────────────────────────────────────────
+// Public run() entry point
+// ──────────────────────────────────────────────────────────────────────────────
+
 /// Execute the `ember chat` command.
-///
-/// This function determines whether to run:
-/// - **Simple chat mode** (no tools)
-/// - **Agent mode** (tools enabled)
-///
-/// Behavior:
-/// - If a message is provided → one-shot response
-/// - If no message is provided → interactive session
-///
-/// # Arguments
-///
-/// - `config` – Loaded application configuration
-/// - `message` – Optional message for one-shot chat
-/// - `provider` – LLM provider override
-/// - `model` – Model override
-/// - `system` – Custom system prompt
-/// - `temperature` – Sampling temperature
-/// - `streaming` – Enable streaming output
-/// - `tools` – Optional list of tools to enable
+#[allow(clippy::too_many_arguments)]
 pub async fn run(
     config: AppConfig,
     message: Option<String>,
@@ -179,32 +348,91 @@ pub async fn run(
     streaming: bool,
     tools: Option<Vec<String>>,
     format: ChatFormat,
+    resume_id: Option<String>,
+    continue_last: bool,
 ) -> Result<()> {
-    // Determine the provider to use (CLI override or config default)
     let provider_name = provider.unwrap_or_else(|| config.provider.default.clone());
 
-    // Determine the model to use
-    let model_name = model.unwrap_or_else(|| match provider_name.as_str() {
+    // Resolve model aliases: "fast" / "smart" / "code" / "local"
+    let raw_model = model.unwrap_or_else(|| match provider_name.as_str() {
         "ollama" => config.provider.ollama.model.clone(),
         _ => config.provider.openai.model.clone(),
     });
 
-    // Determine system prompt
+    // When the user passes an alias, pick the provider from the first candidate
+    // that has a registered provider. For simplicity we just use the alias as-is
+    // in the CLI path and let FallbackRouter handle it when we have one; here we
+    // resolve to the first candidate's concrete model + provider names.
+    let (provider_name, model_name) = if is_model_alias(&raw_model) {
+        use ember_llm::router::resolve_model_alias;
+        let candidates = resolve_model_alias(&raw_model);
+        // Use the first candidate whose provider matches one we support in create_provider
+        let candidate = candidates
+            .into_iter()
+            .find(|c| matches!(c.provider, "openai" | "anthropic" | "ollama" | "gemini" | "groq" | "deepseek" | "mistral"))
+            .unwrap_or_else(|| ember_llm::router::ModelCandidate::new("openai", "gpt-4o-mini", 0.15));
+        eprintln!(
+            "{} Model alias '{}' → {} ({})",
+            "[ember]".bright_yellow(),
+            raw_model,
+            candidate.model.bright_green(),
+            candidate.provider.bright_blue()
+        );
+        (candidate.provider.to_owned(), candidate.model.clone())
+    } else {
+        (provider_name, raw_model)
+    };
+
     let system_prompt = system.unwrap_or_else(|| config.agent.system_prompt.clone());
-
-    // Determine temperature
     let temp = temperature.unwrap_or(config.agent.temperature);
-
-    // Create the LLM provider
     let llm_provider = create_provider(&config, &provider_name)?;
 
-    // Check if tools are enabled
-    if let Some(ref tool_names) = tools {
-        // Agent mode with tools
-        let registry = create_tool_registry(tool_names)?;
+    // Resolve session to resume (if any)
+    let resume_session: Option<PersistedSession> = if continue_last {
+        match latest_session_id() {
+            Some(id) => match load_session(&id) {
+                Ok(s) => {
+                    println!(
+                        "{} Resuming last session {} ({} turns)",
+                        "[ember]".bright_yellow(),
+                        s.id.bright_cyan(),
+                        s.turn_count
+                    );
+                    Some(s)
+                }
+                Err(e) => {
+                    warn!("Could not load last session: {}", e);
+                    None
+                }
+            },
+            None => {
+                println!("{} No previous session found, starting fresh.", "[ember]".bright_yellow());
+                None
+            }
+        }
+    } else if let Some(ref id) = resume_id {
+        match load_session(id) {
+            Ok(s) => {
+                println!(
+                    "{} Resuming session {} ({} turns)",
+                    "[ember]".bright_yellow(),
+                    s.id.bright_cyan(),
+                    s.turn_count
+                );
+                Some(s)
+            }
+            Err(e) => {
+                eprintln!("{} {}", "[error]".bright_red(), e);
+                None
+            }
+        }
+    } else {
+        None
+    };
 
+    if let Some(ref tool_names) = tools {
+        let registry = create_tool_registry(tool_names)?;
         if let Some(msg) = message {
-            // One-shot agent mode
             agent_one_shot(
                 llm_provider,
                 &model_name,
@@ -217,7 +445,6 @@ pub async fn run(
             )
             .await?;
         } else {
-            // Interactive agent mode
             agent_interactive(
                 llm_provider,
                 &model_name,
@@ -225,40 +452,41 @@ pub async fn run(
                 temp,
                 streaming,
                 registry,
+                resume_session,
             )
             .await?;
         }
+    } else if let Some(msg) = message {
+        one_shot_chat(
+            llm_provider,
+            &model_name,
+            &system_prompt,
+            temp,
+            &msg,
+            streaming,
+            format,
+        )
+        .await?;
     } else {
-        // Simple chat mode (no tools)
-        if let Some(msg) = message {
-            one_shot_chat(
-                llm_provider,
-                &model_name,
-                &system_prompt,
-                temp,
-                &msg,
-                streaming,
-                format,
-            )
-            .await?;
-        } else {
-            interactive_chat(llm_provider, &model_name, &system_prompt, temp, streaming).await?;
-        }
+        interactive_chat(
+            llm_provider,
+            &model_name,
+            &system_prompt,
+            temp,
+            streaming,
+            resume_session,
+        )
+        .await?;
     }
 
     Ok(())
 }
 
+// ──────────────────────────────────────────────────────────────────────────────
+// Helpers
+// ──────────────────────────────────────────────────────────────────────────────
+
 /// Build a registry of enabled tools.
-///
-/// The registry is used by the agent to discover and execute tools.
-/// Supported tools:
-///
-/// - `shell` → run shell commands
-/// - `filesystem` → file operations
-/// - `web` → fetch web content
-///
-/// Invalid tools are ignored with a warning.
 fn create_tool_registry(tool_names: &[String]) -> Result<ToolRegistry> {
     let mut registry = ToolRegistry::new();
 
@@ -327,13 +555,6 @@ fn create_provider(config: &AppConfig, provider_name: &str) -> Result<Arc<dyn LL
 }
 
 /// Execute a single AI task and exit.
-///
-/// This command is optimized for scripting and automation.
-///
-/// Example:
-/// ```bash
-/// ember run "Write a bash script that backs up files"
-/// ```
 pub async fn run_task(config: AppConfig, task: String, model: Option<String>) -> Result<()> {
     let provider_name = config.provider.default.clone();
 
@@ -360,7 +581,201 @@ pub async fn run_task(config: AppConfig, task: String, model: Option<String>) ->
     .await
 }
 
-/// Agent one-shot mode: execute a single message with tool support.
+// ──────────────────────────────────────────────────────────────────────────────
+// Slash command handler (shared between both REPL modes)
+// ──────────────────────────────────────────────────────────────────────────────
+
+/// Result of handling a slash command inside the REPL.
+enum SlashOutcome {
+    /// Continue the loop normally.
+    Continue,
+    /// Exit the REPL.
+    Exit,
+    /// Switch to a new model (returns new model name).
+    SwitchModel(String),
+}
+
+/// Handle a parsed slash command, writing any output to stdout.
+///
+/// Returns a `SlashOutcome` so the REPL loop can react appropriately.
+fn handle_slash(
+    cmd: &SlashCommand,
+    history: &[Message],
+    tracker: &SessionUsageTracker,
+    current_model: &str,
+    registry: Option<&ToolRegistry>,
+) -> SlashOutcome {
+    match cmd {
+        SlashCommand::Help => {
+            let reg = SlashCommandRegistry::new();
+            println!();
+            print!("{}", reg.format_help());
+            println!("{}", "Tips:".bright_yellow().bold());
+            println!("  - Press Ctrl+C to cancel a request");
+            println!("  - Type 'exit' or 'quit' to leave");
+            println!("  - /model fast|smart|code|local  — switch to an alias group");
+            println!();
+            SlashOutcome::Continue
+        }
+
+        SlashCommand::Status => {
+            let turn_count = history.iter().filter(|m| {
+                matches!(m.role, ember_llm::Role::User)
+            }).count();
+            let (inp, out) = tracker.total_tokens();
+            println!();
+            println!("{}", "Session Status:".bright_yellow().bold());
+            println!("  Turns:         {}", turn_count.to_string().bright_green());
+            println!("  Input tokens:  {}", inp.to_string().bright_green());
+            println!("  Output tokens: {}", out.to_string().bright_green());
+            println!("  Model:         {}", current_model.bright_blue());
+            println!();
+            SlashOutcome::Continue
+        }
+
+        SlashCommand::Cost => {
+            println!();
+            println!("{}", "Cost Summary:".bright_yellow().bold());
+            println!("  {}", tracker.format_summary().bright_green());
+            let cost = tracker.total_cost();
+            println!("  Input:  ${:.4}", cost.input_cost_usd);
+            println!("  Output: ${:.4}", cost.output_cost_usd);
+            if cost.cache_read_cost_usd > 0.0 || cost.cache_creation_cost_usd > 0.0 {
+                println!("  Cache:  ${:.4}", cost.cache_read_cost_usd + cost.cache_creation_cost_usd);
+            }
+            println!("  Total:  ${:.4}", cost.total_cost_usd());
+            println!();
+            SlashOutcome::Continue
+        }
+
+        SlashCommand::Model { model } => {
+            match model {
+                None => {
+                    println!("Current model: {}", current_model.bright_green());
+                    println!("Aliases: fast, smart, code, local");
+                    println!("Usage: /model <name or alias>");
+                    SlashOutcome::Continue
+                }
+                Some(new_model) => {
+                    println!(
+                        "{} Switching model to {}",
+                        "[ember]".bright_yellow(),
+                        new_model.bright_green()
+                    );
+                    SlashOutcome::SwitchModel(new_model.clone())
+                }
+            }
+        }
+
+        SlashCommand::Memory => {
+            let msg_count = history.len();
+            // Rough token estimate: 4 chars per token
+            let approx_tokens: usize = history.iter()
+                .map(|m| (m.content.len() + 3) / 4)
+                .sum();
+            println!();
+            println!("{}", "Context Window:".bright_yellow().bold());
+            println!("  Messages: {}", msg_count.to_string().bright_green());
+            println!("  ~Tokens:  {} (estimate)", approx_tokens.to_string().bright_green());
+            println!();
+            SlashOutcome::Continue
+        }
+
+        SlashCommand::Clear { confirm } => {
+            if *confirm {
+                println!("{}", "Conversation cleared.".bright_yellow());
+                // Caller must handle resetting history; we signal via Continue
+                // and the caller checks this specially. For now just signal.
+                SlashOutcome::Continue
+            } else {
+                print!(
+                    "{} Clear conversation history? ({}/{}) ",
+                    "[confirm]".bright_yellow(),
+                    "y".bright_green(),
+                    "n".bright_red()
+                );
+                let _ = io::stdout().flush();
+                let mut line = String::new();
+                let _ = io::stdin().read_line(&mut line);
+                if matches!(line.trim().to_lowercase().as_str(), "y" | "yes") {
+                    println!("{}", "Conversation cleared.".bright_yellow());
+                }
+                SlashOutcome::Continue
+            }
+        }
+
+        SlashCommand::Config { section } => {
+            println!();
+            match section {
+                None => println!("{}", "Run 'ember config show' for full config.".dimmed()),
+                Some(s) => println!("{}", format!("Config section '{}' — run 'ember config show'.", s).dimmed()),
+            }
+            println!();
+            SlashOutcome::Continue
+        }
+
+        SlashCommand::Compact => {
+            println!("{}", "Context compaction not available in CLI mode.".dimmed());
+            SlashOutcome::Continue
+        }
+
+        SlashCommand::Permissions { .. } => {
+            println!("{}", "Permission management not available in CLI mode.".dimmed());
+            SlashOutcome::Continue
+        }
+
+        SlashCommand::Fork { name } => {
+            let label = name.as_deref().unwrap_or("unnamed");
+            println!("{} Fork '{}' — session forks require the TUI.", "[info]".bright_blue(), label);
+            SlashOutcome::Continue
+        }
+
+        SlashCommand::Forks => {
+            println!("{}", "Session forks require the TUI mode.".dimmed());
+            SlashOutcome::Continue
+        }
+
+        SlashCommand::Restore { fork_id } => {
+            println!("{} Restore '{}' — session forks require the TUI.", "[info]".bright_blue(), fork_id);
+            SlashOutcome::Continue
+        }
+
+        SlashCommand::Unknown(name) => {
+            // Legacy aliases kept for muscle memory
+            match name.as_str() {
+                "tools" => {
+                    if let Some(reg) = registry {
+                        println!();
+                        println!("{}", "Available Tools:".bright_yellow().bold());
+                        for tool in reg.tool_definitions() {
+                            println!("  {} - {}", tool.name.bright_cyan(), tool.description);
+                        }
+                        println!();
+                    } else {
+                        println!("{}", "No tools enabled.".dimmed());
+                    }
+                }
+                "history" => {
+                    print_history(history);
+                }
+                "exit" | "quit" | "q" => return SlashOutcome::Exit,
+                _ => {
+                    println!(
+                        "{} Unknown command '{}'. Type /help for available commands.",
+                        "[warn]".bright_yellow(),
+                        name.bright_red()
+                    );
+                }
+            }
+            SlashOutcome::Continue
+        }
+    }
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Agent one-shot
+// ──────────────────────────────────────────────────────────────────────────────
+
 async fn agent_one_shot(
     provider: Arc<dyn LLMProvider>,
     model: &str,
@@ -371,7 +786,6 @@ async fn agent_one_shot(
     registry: ToolRegistry,
     format: ChatFormat,
 ) -> Result<()> {
-    // Only show progress info in text mode
     if format == ChatFormat::Text {
         println!(
             "{} Agent mode with {} tool(s): {}",
@@ -387,40 +801,28 @@ async fn agent_one_shot(
         println!();
     }
 
-    // Get tool definitions for the LLM
     let tools = registry.llm_tool_definitions();
-
-    // Build initial conversation
     let mut history: Vec<Message> = vec![Message::system(system_prompt), Message::user(message)];
 
-    // Tool execution loop
     for iteration in 0..MAX_TOOL_ITERATIONS {
         debug!("Tool iteration {}", iteration + 1);
 
-        // Build request with tools
         let mut request = CompletionRequest::new(model).with_temperature(temperature);
-
         for msg in &history {
             request = request.with_message(msg.clone());
         }
-
-        // Add tool definitions
         request = request.with_tools(tools.clone());
 
-        // Get LLM response
         let response = provider
             .complete(request)
             .await
             .context("Failed to get response from LLM")?;
 
-        // Check for tool calls
         if !response.tool_calls.is_empty() {
-            // Add assistant message with tool calls to history
             let mut assistant_msg = Message::assistant(&response.content);
             assistant_msg.tool_calls = response.tool_calls.clone();
             history.push(assistant_msg);
 
-            // Execute each tool call
             for call in &response.tool_calls {
                 println!(
                     "{} Executing tool: {} {}",
@@ -430,7 +832,6 @@ async fn agent_one_shot(
                 );
 
                 let result = registry.execute_tool_call(call).await;
-
                 match &result {
                     Ok(tool_result) => {
                         let preview = truncate_str(&tool_result.output, 100);
@@ -439,7 +840,6 @@ async fn agent_one_shot(
                         } else {
                             println!("{} {}", "[error]".bright_red(), preview);
                         }
-                        // Add tool result to history
                         history.push(Message::tool_result(&call.id, &tool_result.output));
                     }
                     Err(e) => {
@@ -449,17 +849,13 @@ async fn agent_one_shot(
                     }
                 }
             }
-
-            // Continue loop to get next response
             continue;
         }
 
-        // No tool calls - this is the final response
         match format {
             ChatFormat::Text => {
                 println!();
                 if streaming {
-                    // For final response, use streaming if available
                     print_final_response(&response.content);
                 } else {
                     println!("{}", response.content);
@@ -483,25 +879,18 @@ async fn agent_one_shot(
         return Ok(());
     }
 
-    // Reached max iterations
     eprintln!(
         "{} Reached maximum tool iterations ({}). Stopping.",
         "[warn]".bright_yellow(),
         MAX_TOOL_ITERATIONS
     );
-
     Ok(())
 }
 
-/// Interactive agent mode with tool execution.
-///
-/// In this mode the AI can automatically:
-///
-/// - run shell commands
-/// - read/write files
-/// - fetch web content
-///
-/// Tool usage is displayed inline in the terminal.
+// ──────────────────────────────────────────────────────────────────────────────
+// Agent interactive (with tools + slash commands + session persistence)
+// ──────────────────────────────────────────────────────────────────────────────
+
 async fn agent_interactive(
     provider: Arc<dyn LLMProvider>,
     model: &str,
@@ -509,6 +898,7 @@ async fn agent_interactive(
     temperature: f32,
     streaming: bool,
     registry: ToolRegistry,
+    resume: Option<PersistedSession>,
 ) -> Result<()> {
     println!(
         "{} {} agent mode",
@@ -535,93 +925,80 @@ async fn agent_interactive(
     }
     println!();
 
-    // Get tool definitions
     let tools = registry.llm_tool_definitions();
 
-    let mut history: Vec<Message> = vec![Message::system(system_prompt)];
+    // Restore history from persisted session or start fresh
+    let (session_id, mut history) = if let Some(ref s) = resume {
+        let msgs: Vec<Message> = s.messages.iter().map(|m| m.to_message()).collect();
+        (s.id.clone(), msgs)
+    } else {
+        (new_session_id(), vec![Message::system(system_prompt)])
+    };
+
+    // Active model (can be changed mid-session via /model)
+    let mut active_model = model.to_owned();
+
+    // Usage tracker (approximation: we record by token count from response)
+    let mut tracker = SessionUsageTracker::new(&active_model);
 
     loop {
-        // Print prompt
         print!("{} ", "You:".bright_green().bold());
         io::stdout().flush()?;
 
-        // Read input
         let input = read_line()?;
         let input = input.trim();
 
-        // Handle empty input
         if input.is_empty() {
             continue;
         }
 
-        // Handle special commands
+        // Handle slash commands
         if input.starts_with('/') {
-            match input {
-                "/help" | "/h" => {
-                    print_agent_help(&registry);
-                    continue;
-                }
-                "/clear" | "/c" => {
-                    history = vec![Message::system(system_prompt)];
-                    println!("{}", "Conversation cleared.".bright_yellow());
-                    continue;
-                }
-                "/tools" => {
-                    print_tools(&registry);
-                    continue;
-                }
-                "/history" => {
-                    print_history(&history);
-                    continue;
-                }
-                "/model" => {
-                    println!("Current model: {}", model.bright_green());
-                    continue;
-                }
-                "/exit" | "/quit" | "/q" => {
-                    println!("{}", "Goodbye!".bright_yellow());
-                    break;
-                }
-                _ => {
-                    println!(
-                        "{} Unknown command: {}",
-                        "[warn]".bright_yellow(),
-                        input.bright_red()
-                    );
-                    continue;
+            if let Some(cmd) = SlashCommand::parse(input) {
+                match handle_slash(&cmd, &history, &tracker, &active_model, Some(&registry)) {
+                    SlashOutcome::Exit => {
+                        println!("{}", "Goodbye!".bright_yellow());
+                        break;
+                    }
+                    SlashOutcome::SwitchModel(new_model) => {
+                        active_model = new_model;
+                        tracker = SessionUsageTracker::new(&active_model);
+                        continue;
+                    }
+                    SlashOutcome::Continue => {
+                        // Handle /clear specially: reset history
+                        if matches!(cmd, SlashCommand::Clear { .. }) {
+                            history = vec![Message::system(system_prompt)];
+                        }
+                        continue;
+                    }
                 }
             }
+            continue;
         }
 
-        // Handle exit commands
-        if input == "exit" || input == "quit" {
+        // Bare "exit" / "quit"
+        if matches!(input, "exit" | "quit") {
             println!("{}", "Goodbye!".bright_yellow());
             break;
         }
 
-        // Add user message to history
         history.push(Message::user(input));
 
-        // Agent loop for this turn
         for iteration in 0..MAX_TOOL_ITERATIONS {
             debug!("Interactive tool iteration {}", iteration + 1);
 
-            // Build request with tools
-            let mut request = CompletionRequest::new(model).with_temperature(temperature);
-
+            let mut request = CompletionRequest::new(&active_model).with_temperature(temperature);
             for msg in &history {
                 request = request.with_message(msg.clone());
             }
-
             request = request.with_tools(tools.clone());
 
-            // Print thinking indicator on first iteration
             if iteration == 0 {
                 print!("{} ", "Ember:".bright_blue().bold());
                 io::stdout().flush()?;
             }
 
-            // Get response
             let response = match provider.complete(request).await {
                 Ok(r) => r,
                 Err(e) => {
@@ -630,19 +1007,18 @@ async fn agent_interactive(
                 }
             };
 
-            // Check for tool calls
+            // Record token usage
+            tracker.record_turn(response.usage.clone());
+
             if !response.tool_calls.is_empty() {
-                // Clear the thinking line if this is the first iteration
                 if iteration == 0 {
                     println!();
                 }
 
-                // Add assistant message to history
                 let mut assistant_msg = Message::assistant(&response.content);
                 assistant_msg.tool_calls = response.tool_calls.clone();
                 history.push(assistant_msg);
 
-                // Execute tools
                 for call in &response.tool_calls {
                     println!(
                         "  {} {} {}",
@@ -652,7 +1028,6 @@ async fn agent_interactive(
                     );
 
                     let result = registry.execute_tool_call(call).await;
-
                     match &result {
                         Ok(tool_result) => {
                             let preview = truncate_str(&tool_result.output, 80);
@@ -670,21 +1045,12 @@ async fn agent_interactive(
                         }
                     }
                 }
-
-                // Continue to next iteration
                 continue;
             }
 
-            // Final response (no tool calls)
             if iteration == 0 {
-                // Response on same line
-                if streaming {
-                    println!("{}", response.content);
-                } else {
-                    println!("{}", response.content);
-                }
+                println!("{}", response.content);
             } else {
-                // Response after tool calls
                 print!("{} ", "Ember:".bright_blue().bold());
                 println!("{}", response.content);
             }
@@ -694,12 +1060,30 @@ async fn agent_interactive(
         }
 
         println!();
+
+        // Persist session after each turn
+        let turn_count = history.iter().filter(|m| matches!(m.role, ember_llm::Role::User)).count();
+        let session = PersistedSession {
+            id: session_id.clone(),
+            provider: provider.name().to_owned(),
+            model: active_model.clone(),
+            created_at: now_iso8601(),
+            updated_at: now_iso8601(),
+            messages: history.iter().map(PersistedMessage::from_message).collect(),
+            turn_count,
+        };
+        if let Err(e) = save_session(&session) {
+            warn!("Could not save session: {}", e);
+        }
     }
 
     Ok(())
 }
 
-/// One-shot chat: send a single message and print the response (no tools).
+// ──────────────────────────────────────────────────────────────────────────────
+// One-shot chat
+// ──────────────────────────────────────────────────────────────────────────────
+
 async fn one_shot_chat(
     provider: Arc<dyn LLMProvider>,
     model: &str,
@@ -709,14 +1093,12 @@ async fn one_shot_chat(
     streaming: bool,
     format: ChatFormat,
 ) -> Result<()> {
-    // Build the request
     let request = CompletionRequest::new(model)
         .with_message(Message::system(system_prompt))
         .with_message(Message::user(message))
         .with_temperature(temperature);
 
     if streaming && format == ChatFormat::Text {
-        // Only show progress indicator and stats in text mode
         println!(
             "{} Using {} with {}",
             "[ember]".bright_yellow(),
@@ -725,21 +1107,16 @@ async fn one_shot_chat(
         );
         println!();
 
-        // Start progress indicator
         let mut progress = ProgressIndicator::new("Thinking");
         progress.start();
 
-        // Streaming mode
         let stream_result = provider.complete_stream(request).await;
-
-        // Stop progress indicator
         progress.stop().await;
 
         let mut stream = stream_result.context("Failed to start streaming response")?;
 
         let start_time = Instant::now();
         let mut token_count = 0usize;
-        let mut full_response = String::new();
 
         while let Some(chunk_result) = stream.next().await {
             match chunk_result {
@@ -747,8 +1124,6 @@ async fn one_shot_chat(
                     if let Some(content) = chunk.content {
                         print!("{}", content);
                         io::stdout().flush()?;
-                        full_response.push_str(&content);
-                        // Approximate token count (rough estimate: ~4 chars per token)
                         token_count += (content.len() + 3) / 4;
                     }
                     if chunk.done {
@@ -762,7 +1137,6 @@ async fn one_shot_chat(
             }
         }
 
-        // Print stats
         let stats = ResponseStats {
             tokens: token_count,
             duration: start_time.elapsed(),
@@ -770,10 +1144,8 @@ async fn one_shot_chat(
         println!();
         println!("{}", stats.format().dimmed());
     } else {
-        // Non-streaming mode (or streaming with non-text format)
         let start_time = Instant::now();
         let result = provider.complete(request).await;
-
         let response = result.context("Failed to get response from LLM")?;
         let token_count = (response.content.len() + 3) / 4;
 
@@ -814,22 +1186,17 @@ async fn one_shot_chat(
     Ok(())
 }
 
-/// Start interactive chat mode.
-///
-/// Users can continuously send prompts and receive responses.
-/// Special commands available during chat:
-///
-/// - `/help`    – show commands
-/// - `/clear`   – reset conversation
-/// - `/history` – show conversation history
-/// - `/model`   – show active model
-/// - `/exit`    – exit chat
+// ──────────────────────────────────────────────────────────────────────────────
+// Interactive chat (no tools, with slash commands + session persistence)
+// ──────────────────────────────────────────────────────────────────────────────
+
 async fn interactive_chat(
     provider: Arc<dyn LLMProvider>,
     model: &str,
     system_prompt: &str,
     temperature: f32,
     streaming: bool,
+    resume: Option<PersistedSession>,
 ) -> Result<()> {
     println!(
         "{} {} interactive mode",
@@ -851,79 +1218,67 @@ async fn interactive_chat(
     }
     println!();
 
-    let mut history: Vec<Message> = vec![Message::system(system_prompt)];
+    let (session_id, mut history) = if let Some(ref s) = resume {
+        let msgs: Vec<Message> = s.messages.iter().map(|m| m.to_message()).collect();
+        (s.id.clone(), msgs)
+    } else {
+        (new_session_id(), vec![Message::system(system_prompt)])
+    };
+
+    let mut active_model = model.to_owned();
+    let mut tracker = SessionUsageTracker::new(&active_model);
 
     loop {
-        // Print prompt
         print!("{} ", "You:".bright_green().bold());
         io::stdout().flush()?;
 
-        // Read input
         let input = read_line()?;
         let input = input.trim();
 
-        // Handle empty input
         if input.is_empty() {
             continue;
         }
 
-        // Handle special commands
+        // Slash commands
         if input.starts_with('/') {
-            match input {
-                "/help" | "/h" => {
-                    print_help();
-                    continue;
-                }
-                "/clear" | "/c" => {
-                    history = vec![Message::system(system_prompt)];
-                    println!("{}", "Conversation cleared.".bright_yellow());
-                    continue;
-                }
-                "/history" => {
-                    print_history(&history);
-                    continue;
-                }
-                "/model" => {
-                    println!("Current model: {}", model.bright_green());
-                    continue;
-                }
-                "/exit" | "/quit" | "/q" => {
-                    println!("{}", "Goodbye!".bright_yellow());
-                    break;
-                }
-                _ => {
-                    println!(
-                        "{} Unknown command: {}",
-                        "[warn]".bright_yellow(),
-                        input.bright_red()
-                    );
-                    continue;
+            if let Some(cmd) = SlashCommand::parse(input) {
+                match handle_slash(&cmd, &history, &tracker, &active_model, None) {
+                    SlashOutcome::Exit => {
+                        println!("{}", "Goodbye!".bright_yellow());
+                        break;
+                    }
+                    SlashOutcome::SwitchModel(new_model) => {
+                        active_model = new_model;
+                        tracker = SessionUsageTracker::new(&active_model);
+                        continue;
+                    }
+                    SlashOutcome::Continue => {
+                        if matches!(cmd, SlashCommand::Clear { .. }) {
+                            history = vec![Message::system(system_prompt)];
+                        }
+                        continue;
+                    }
                 }
             }
+            continue;
         }
 
-        // Handle exit commands
-        if input == "exit" || input == "quit" {
+        if matches!(input, "exit" | "quit") {
             println!("{}", "Goodbye!".bright_yellow());
             break;
         }
 
-        // Add user message to history
         history.push(Message::user(input));
 
-        // Build request with full history
-        let mut request = CompletionRequest::new(model).with_temperature(temperature);
-
+        let mut request = CompletionRequest::new(&active_model).with_temperature(temperature);
         for msg in &history {
             request = request.with_message(msg.clone());
         }
 
-        // Print thinking indicator
         print!("{} ", "Ember:".bright_blue().bold());
         io::stdout().flush()?;
 
         if streaming {
-            // Streaming response
             match provider.complete_stream(request).await {
                 Ok(mut stream) => {
                     let mut full_response = String::new();
@@ -948,8 +1303,14 @@ async fn interactive_chat(
                     }
                     println!();
 
-                    // Add assistant response to history
                     if !full_response.is_empty() {
+                        // Approximate usage for streaming responses
+                        let approx_tokens = (full_response.len() + 3) / 4;
+                        let approx_input = history.iter().map(|m| (m.content.len() + 3) / 4).sum::<usize>();
+                        tracker.record_turn(ember_llm::TokenUsage::new(
+                            approx_input as u32,
+                            approx_tokens as u32,
+                        ));
                         history.push(Message::assistant(&full_response));
                     }
                 }
@@ -958,10 +1319,10 @@ async fn interactive_chat(
                 }
             }
         } else {
-            // Non-streaming response
             match provider.complete(request).await {
                 Ok(response) => {
                     println!("{}", response.content);
+                    tracker.record_turn(response.usage.clone());
                     history.push(Message::assistant(&response.content));
                 }
                 Err(e) => {
@@ -971,74 +1332,36 @@ async fn interactive_chat(
         }
 
         println!();
+
+        // Persist session
+        let turn_count = history.iter().filter(|m| matches!(m.role, ember_llm::Role::User)).count();
+        let session = PersistedSession {
+            id: session_id.clone(),
+            provider: provider.name().to_owned(),
+            model: active_model.clone(),
+            created_at: now_iso8601(),
+            updated_at: now_iso8601(),
+            messages: history.iter().map(PersistedMessage::from_message).collect(),
+            turn_count,
+        };
+        if let Err(e) = save_session(&session) {
+            warn!("Could not save session: {}", e);
+        }
     }
 
     Ok(())
 }
 
-/// Read a line from stdin.
+// ──────────────────────────────────────────────────────────────────────────────
+// Small helpers
+// ──────────────────────────────────────────────────────────────────────────────
+
 fn read_line() -> Result<String> {
     let mut input = String::new();
     io::stdin().read_line(&mut input)?;
     Ok(input)
 }
 
-/// Print help information for simple chat mode.
-fn print_help() {
-    println!();
-    println!("{}", "Commands:".bright_yellow().bold());
-    println!("  {}  - Show this help", "/help".bright_cyan());
-    println!("  {} - Clear conversation history", "/clear".bright_cyan());
-    println!("  {} - Show conversation history", "/history".bright_cyan());
-    println!("  {} - Show current model", "/model".bright_cyan());
-    println!("  {}  - Exit the chat", "/exit".bright_cyan());
-    println!();
-    println!("{}", "Tips:".bright_yellow().bold());
-    println!("  - Press Ctrl+C to cancel a request");
-    println!("  - Type 'exit' or 'quit' to leave");
-    println!("  - Streaming shows responses in real-time");
-    println!("  - Use --tools flag to enable agent mode with tools");
-    println!();
-}
-
-/// Print help information for agent mode.
-fn print_agent_help(registry: &ToolRegistry) {
-    println!();
-    println!("{}", "Commands:".bright_yellow().bold());
-    println!("  {}  - Show this help", "/help".bright_cyan());
-    println!("  {} - Clear conversation history", "/clear".bright_cyan());
-    println!("  {} - Show available tools", "/tools".bright_cyan());
-    println!("  {} - Show conversation history", "/history".bright_cyan());
-    println!("  {} - Show current model", "/model".bright_cyan());
-    println!("  {}  - Exit the chat", "/exit".bright_cyan());
-    println!();
-    println!(
-        "{} ({} enabled)",
-        "Available Tools:".bright_yellow().bold(),
-        registry.len()
-    );
-    for tool in registry.tool_definitions() {
-        println!("  {} - {}", tool.name.bright_cyan(), tool.description);
-    }
-    println!();
-    println!("{}", "Tips:".bright_yellow().bold());
-    println!("  - The agent will automatically use tools when needed");
-    println!("  - You can ask to run shell commands, read/write files, or fetch web pages");
-    println!("  - Tool execution results are shown inline");
-    println!();
-}
-
-/// Print available tools.
-fn print_tools(registry: &ToolRegistry) {
-    println!();
-    println!("{}", "Available Tools:".bright_yellow().bold());
-    for tool in registry.tool_definitions() {
-        println!("  {} - {}", tool.name.bright_cyan(), tool.description);
-    }
-    println!();
-}
-
-/// Print conversation history.
 fn print_history(history: &[Message]) {
     if history.len() <= 1 {
         println!("{}", "No conversation history.".bright_yellow());
@@ -1050,7 +1373,6 @@ fn print_history(history: &[Message]) {
 
     let mut turn = 0;
     for msg in history.iter().skip(1) {
-        // Skip system prompt
         match msg.role {
             ember_llm::Role::User => {
                 turn += 1;
@@ -1077,12 +1399,10 @@ fn print_history(history: &[Message]) {
     println!();
 }
 
-/// Print final response with formatting.
 fn print_final_response(content: &str) {
     println!("{}", content);
 }
 
-/// Truncate a string to a maximum length.
 fn truncate_str(s: &str, max_len: usize) -> String {
     if s.len() <= max_len {
         s.to_string()
@@ -1091,7 +1411,6 @@ fn truncate_str(s: &str, max_len: usize) -> String {
     }
 }
 
-/// Truncate JSON value to a short preview.
 fn truncate_json(value: &serde_json::Value, max_len: usize) -> String {
     let s = value.to_string();
     truncate_str(&s, max_len)
