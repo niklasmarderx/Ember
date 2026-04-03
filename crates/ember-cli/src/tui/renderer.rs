@@ -165,7 +165,8 @@ impl TerminalRenderer {
 
                 MdEvent::Start(Tag::Paragraph) => {}
                 MdEvent::End(TagEnd::Paragraph) => {
-                    writeln!(w, "")?;
+                    writeln!(w)?;
+                    writeln!(w)?;
                 }
 
                 MdEvent::Start(Tag::BlockQuote(_)) => {
