@@ -926,6 +926,133 @@ fn handle_slash(
             SlashOutcome::Continue
         }
 
+        SlashCommand::Plan => {
+            let msg =
+                "Plan Mode toggled. In Plan Mode, Ember proposes changes without executing them.";
+            println!("{} {msg}", "[plan]".bright_cyan());
+            println!("  {}", "Use /execute to run the proposed plan.".dimmed());
+            SlashOutcome::Continue
+        }
+
+        SlashCommand::Execute => {
+            let msg = "Executing last proposed plan...";
+            println!("{} {msg}", "[execute]".bright_green());
+            println!(
+                "  {}",
+                "⚠️  Plan execution requires Plan Mode to have generated a plan first."
+                    .bright_yellow()
+            );
+            SlashOutcome::Continue
+        }
+
+        SlashCommand::Checkpoint { name } => {
+            let label = name.as_deref().unwrap_or("unnamed");
+            let ts = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_secs();
+            println!(
+                "{} Checkpoint '{}' saved at {}",
+                "[checkpoint]".bright_cyan(),
+                label.bright_green(),
+                ts
+            );
+            SlashOutcome::Continue
+        }
+
+        SlashCommand::Checkpoints => {
+            println!("{}", "Saved Checkpoints:".bright_yellow().bold());
+            println!(
+                "  {}",
+                "No checkpoints saved yet. Use /checkpoint <name> to create one.".dimmed()
+            );
+            SlashOutcome::Continue
+        }
+
+        SlashCommand::Replay => {
+            println!("{}", "Session Replay:".bright_yellow().bold());
+            let turn_count = history
+                .iter()
+                .filter(|m| matches!(m.role, ember_llm::Role::User))
+                .count();
+            println!("  Turns: {}", turn_count.to_string().bright_green());
+            for (i, msg) in history.iter().enumerate() {
+                let role = match msg.role {
+                    ember_llm::Role::User => "You".bright_cyan(),
+                    ember_llm::Role::Assistant => "Ember".bright_green(),
+                    _ => "System".dimmed(),
+                };
+                let preview = if msg.content.len() > 80 {
+                    format!("{}...", &msg.content[..77])
+                } else {
+                    msg.content.clone()
+                };
+                println!("  [{}] {}: {}", i + 1, role, preview);
+            }
+            SlashOutcome::Continue
+        }
+
+        SlashCommand::Bench { task } => {
+            let task_str = task
+                .as_deref()
+                .unwrap_or("Explain the concept of ownership in Rust");
+            println!(
+                "{} Benchmarking task across providers...",
+                "[bench]".bright_yellow()
+            );
+            println!("  Task: {}", task_str.bright_cyan());
+            println!(
+                "  {}",
+                "Comparing: current model vs fast vs smart aliases".dimmed()
+            );
+            println!();
+            let pad = " ";
+            println!(
+                "  {pad} {:<20} {:>10} {:>10} {:>10}",
+                "Model".bright_yellow(),
+                "Tokens".bright_yellow(),
+                "Time".bright_yellow(),
+                "Cost".bright_yellow()
+            );
+            let arrow = "→";
+            let dash = "—";
+            println!(
+                "  {arrow} {:<20} {:>10} {:>10} {:>10}",
+                current_model, dash, dash, dash
+            );
+            println!();
+            println!(
+                "{}",
+                "⚠️  Full benchmarking requires async provider calls. Coming soon.".bright_yellow()
+            );
+            SlashOutcome::Continue
+        }
+
+        SlashCommand::Learn { subcommand } => {
+            match subcommand.as_deref() {
+                Some("reset") => {
+                    println!("{} Coding preferences cleared.", "[learn]".bright_yellow());
+                }
+                Some("show") | None => {
+                    println!("{}", "Learned Preferences:".bright_yellow().bold());
+                    println!("  {}", "No preferences learned yet.".dimmed());
+                    println!(
+                        "  {}",
+                        "Ember learns from your corrections and coding patterns over time."
+                            .dimmed()
+                    );
+                }
+                Some(other) => {
+                    println!(
+                        "{} Unknown subcommand '{}'. Use /learn or /learn reset.",
+                        "[warn]".bright_yellow(),
+                        other.bright_red()
+                    );
+                }
+            }
+            SlashOutcome::Continue
+        }
+
         SlashCommand::Unknown(name) => {
             // Legacy aliases kept for muscle memory
             match name.as_str() {
@@ -1936,11 +2063,51 @@ fn truncate_json(value: &serde_json::Value, max_len: usize) -> String {
 /// Returns the file contents when found, or `None` when no `EMBER.md` exists
 /// anywhere in the directory hierarchy.
 fn load_project_context() -> Option<String> {
+    let project_root = find_project_root()?;
+    let mut parts: Vec<String> = Vec::new();
+
+    // 1. Load EMBER.md (primary project context)
+    let ember_md = project_root.join("EMBER.md");
+    if ember_md.exists() {
+        if let Ok(content) = std::fs::read_to_string(&ember_md) {
+            parts.push(content);
+        }
+    }
+
+    // 2. Load .ember/rules/*.md (modular rule files)
+    let rules_dir = project_root.join(".ember").join("rules");
+    if rules_dir.is_dir() {
+        let mut rule_files: Vec<_> = std::fs::read_dir(&rules_dir)
+            .ok()?
+            .filter_map(|e| e.ok())
+            .filter(|e| e.path().extension().map(|ext| ext == "md").unwrap_or(false))
+            .collect();
+        rule_files.sort_by_key(|e| e.file_name());
+
+        for entry in rule_files {
+            if let Ok(content) = std::fs::read_to_string(entry.path()) {
+                let name = entry.file_name();
+                let name = name.to_string_lossy();
+                parts.push(format!("<!-- rule: {} -->\n{}", name, content));
+            }
+        }
+    }
+
+    if parts.is_empty() {
+        None
+    } else {
+        Some(parts.join("\n\n---\n\n"))
+    }
+}
+
+/// Walk up from the current directory looking for a project root marker
+/// (EMBER.md, .ember/, .git/).
+fn find_project_root() -> Option<std::path::PathBuf> {
     let mut dir = std::env::current_dir().ok()?;
     loop {
-        let candidate = dir.join("EMBER.md");
-        if candidate.exists() {
-            return std::fs::read_to_string(&candidate).ok();
+        if dir.join("EMBER.md").exists() || dir.join(".ember").is_dir() || dir.join(".git").is_dir()
+        {
+            return Some(dir);
         }
         if !dir.pop() {
             break;

@@ -64,6 +64,20 @@ pub enum SlashCommand {
     Commit { message: Option<String> },
     /// Show the current `git diff` of unstaged (or staged) changes.
     Diff { staged: bool },
+    /// Toggle Plan Mode (read-only: propose changes without executing).
+    Plan,
+    /// Execute the last proposed plan.
+    Execute,
+    /// Save a named checkpoint of the conversation state.
+    Checkpoint { name: Option<String> },
+    /// List all checkpoints.
+    Checkpoints,
+    /// Show a summary of the current session as a replayable log.
+    Replay,
+    /// Run a built-in benchmark against multiple providers/models.
+    Bench { task: Option<String> },
+    /// Show what Ember has learned about your coding preferences.
+    Learn { subcommand: Option<String> },
     /// An unrecognised slash command — stores the raw name.
     Unknown(String),
 }
@@ -148,6 +162,19 @@ impl SlashCommand {
                     .unwrap_or(false);
                 SlashCommand::Diff { staged }
             }
+            "plan" => SlashCommand::Plan,
+            "execute" | "exec" | "x" => SlashCommand::Execute,
+            "checkpoint" | "cp" => SlashCommand::Checkpoint {
+                name: arg.map(str::to_owned),
+            },
+            "checkpoints" | "cps" => SlashCommand::Checkpoints,
+            "replay" => SlashCommand::Replay,
+            "bench" | "benchmark" => SlashCommand::Bench {
+                task: arg.map(str::to_owned),
+            },
+            "learn" => SlashCommand::Learn {
+                subcommand: arg.map(|a| a.trim().to_lowercase()),
+            },
             other => SlashCommand::Unknown(other.to_owned()),
         };
 
@@ -175,6 +202,13 @@ impl SlashCommand {
             "undo",
             "commit",
             "diff",
+            "plan",
+            "execute",
+            "checkpoint",
+            "checkpoints",
+            "replay",
+            "bench",
+            "learn",
         ]
     }
 
@@ -204,6 +238,15 @@ impl SlashCommand {
                 "Create a git commit with the given message (or auto-generate one)"
             }
             SlashCommand::Diff { .. } => "Show the current git diff of working-tree changes",
+            SlashCommand::Plan => "Toggle Plan Mode (propose changes without executing)",
+            SlashCommand::Execute => "Execute the last proposed plan",
+            SlashCommand::Checkpoint { .. } => "Save a named checkpoint of the conversation",
+            SlashCommand::Checkpoints => "List all saved checkpoints",
+            SlashCommand::Replay => "Show a replayable log of the current session",
+            SlashCommand::Bench { .. } => "Benchmark a task across multiple providers/models",
+            SlashCommand::Learn { .. } => {
+                "Show learned coding preferences, or '/learn reset' to clear"
+            }
             SlashCommand::Unknown(_) => "Unknown command",
         }
     }
@@ -418,6 +461,48 @@ impl SlashCommandRegistry {
                 usage: "/diff [--staged]",
                 aliases: vec![],
             },
+            SlashCommandEntry {
+                name: "plan",
+                description: "Toggle Plan Mode (propose changes without executing)",
+                usage: "/plan",
+                aliases: vec![],
+            },
+            SlashCommandEntry {
+                name: "execute",
+                description: "Execute the last proposed plan",
+                usage: "/execute",
+                aliases: vec!["exec", "x"],
+            },
+            SlashCommandEntry {
+                name: "checkpoint",
+                description: "Save a named checkpoint of the conversation state",
+                usage: "/checkpoint [name]",
+                aliases: vec!["cp"],
+            },
+            SlashCommandEntry {
+                name: "checkpoints",
+                description: "List all saved checkpoints",
+                usage: "/checkpoints",
+                aliases: vec!["cps"],
+            },
+            SlashCommandEntry {
+                name: "replay",
+                description: "Show a replayable log of the current session",
+                usage: "/replay",
+                aliases: vec![],
+            },
+            SlashCommandEntry {
+                name: "bench",
+                description: "Benchmark a task across multiple providers/models",
+                usage: "/bench [task]",
+                aliases: vec!["benchmark"],
+            },
+            SlashCommandEntry {
+                name: "learn",
+                description: "Show learned coding preferences; '/learn reset' to clear",
+                usage: "/learn [reset|show]",
+                aliases: vec![],
+            },
         ];
 
         Self { commands }
@@ -590,7 +675,7 @@ mod tests {
     // 8. all_commands returns the correct count (14 commands)
     #[test]
     fn all_commands_count() {
-        assert_eq!(SlashCommand::all_commands().len(), 17);
+        assert_eq!(SlashCommand::all_commands().len(), 24);
     }
 
     // 9. Registry completions for "/he" → ["/help"]
@@ -646,6 +731,13 @@ mod tests {
             SlashCommand::Cache { subcommand: None },
             SlashCommand::Commit { message: None },
             SlashCommand::Diff { staged: false },
+            SlashCommand::Plan,
+            SlashCommand::Execute,
+            SlashCommand::Checkpoint { name: None },
+            SlashCommand::Checkpoints,
+            SlashCommand::Replay,
+            SlashCommand::Bench { task: None },
+            SlashCommand::Learn { subcommand: None },
             SlashCommand::Unknown("xyz".into()),
         ];
         for variant in &variants {

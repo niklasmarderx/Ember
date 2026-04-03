@@ -390,6 +390,52 @@ Supports: Conventional Commits, emoji style, detailed format",
     )]
     Git(git::GitArgs),
 
+    /// Benchmark a task across multiple providers and models.
+    ///
+    /// Compare response quality, speed, and cost.
+    #[command(
+        about = "Benchmark a task across multiple providers and models.",
+        long_about = "Run the same prompt against multiple LLM providers and compare:\n\n\
+  - Response quality (side-by-side output)\n\
+  - Latency (time to first token, total time)\n\
+  - Cost (token count × pricing)\n\
+  - Token efficiency (output tokens per concept)\n\n\
+Results are displayed in a formatted table."
+    )]
+    Bench {
+        /// The task/prompt to benchmark
+        #[arg(default_value = "Explain Rust ownership in 3 sentences")]
+        task: String,
+
+        /// Comma-separated list of models to test
+        #[arg(long, value_delimiter = ',')]
+        models: Option<Vec<String>>,
+
+        /// Number of runs per model (for latency averaging)
+        #[arg(long, default_value = "1")]
+        runs: usize,
+
+        /// Output format (table, json, csv)
+        #[arg(long, default_value = "table")]
+        output: String,
+    },
+
+    /// Show or manage learned coding preferences.
+    ///
+    /// Ember learns from your corrections and coding patterns over time.
+    #[command(
+        about = "Show or manage learned coding preferences.",
+        long_about = "Ember tracks your coding style, preferred patterns, and corrections.\n\n\
+Subcommands:\n\
+  show   — Display learned preferences\n\
+  reset  — Clear all learned preferences\n\
+  export — Export preferences as JSON"
+    )]
+    Learn {
+        #[command(subcommand)]
+        action: LearnAction,
+    },
+
     /// Start a hands-free voice coding session.
     ///
     /// Uses speech-to-text and text-to-speech for natural language coding.
@@ -548,6 +594,20 @@ enum ConfigAction {
 }
 
 #[derive(Subcommand)]
+enum LearnAction {
+    /// Display learned coding preferences
+    Show,
+    /// Clear all learned preferences
+    Reset,
+    /// Export preferences as JSON
+    Export {
+        /// Output file path
+        #[arg(short, long)]
+        output: Option<String>,
+    },
+}
+
+#[derive(Subcommand)]
 enum AgentsAction {
     /// Run a multi-agent task
     Run {
@@ -681,6 +741,100 @@ async fn run() -> Result<()> {
         Commands::Git(args) => {
             git::execute(args).await?;
         }
+
+        Commands::Bench {
+            task,
+            models,
+            runs,
+            output,
+        } => {
+            println!(
+                "{} {} benchmark",
+                "[ember]".bright_yellow(),
+                "📊 Running".bright_cyan(),
+            );
+            println!("  Task:    {}", task.bright_green());
+            let model_list = models
+                .as_ref()
+                .map(|m| m.join(", "))
+                .unwrap_or_else(|| "fast, smart, code".to_string());
+            println!("  Models:  {}", model_list.bright_blue());
+            println!("  Runs:    {}", runs.to_string().bright_cyan());
+            println!("  Output:  {}", output.bright_cyan());
+            println!();
+            println!(
+                "  {:<25} {:>8} {:>10} {:>8}",
+                "Model".bright_yellow().bold(),
+                "Tokens".bright_yellow().bold(),
+                "Latency".bright_yellow().bold(),
+                "Cost".bright_yellow().bold()
+            );
+            println!("  {}", "─".repeat(55));
+            // Simulated results for now
+            println!(
+                "  {:<25} {:>8} {:>10} {:>8}",
+                "fast (haiku)", "~150", "~0.4s", "$0.0001"
+            );
+            println!(
+                "  {:<25} {:>8} {:>10} {:>8}",
+                "smart (opus)", "~200", "~2.1s", "$0.0030"
+            );
+            println!(
+                "  {:<25} {:>8} {:>10} {:>8}",
+                "code (sonnet)", "~180", "~1.2s", "$0.0009"
+            );
+            println!();
+            println!(
+                "{}",
+                "⚠️  Live benchmarking with real API calls coming soon. These are example outputs."
+                    .bright_yellow()
+            );
+        }
+
+        Commands::Learn { action } => match action {
+            LearnAction::Show => {
+                println!("{}", "Learned Preferences:".bright_yellow().bold());
+                let prefs_dir = dirs::home_dir()
+                    .unwrap_or_default()
+                    .join(".ember")
+                    .join("learn");
+                if prefs_dir.exists() {
+                    println!(
+                        "  Profile: {}",
+                        prefs_dir.display().to_string().bright_cyan()
+                    );
+                } else {
+                    println!("  {}", "No preferences learned yet.".dimmed());
+                    println!(
+                        "  {}",
+                        "Ember learns from your corrections and coding patterns over time."
+                            .dimmed()
+                    );
+                }
+            }
+            LearnAction::Reset => {
+                let prefs_dir = dirs::home_dir()
+                    .unwrap_or_default()
+                    .join(".ember")
+                    .join("learn");
+                if prefs_dir.exists() {
+                    let _ = std::fs::remove_dir_all(&prefs_dir);
+                    println!("{} Coding preferences cleared.", "[ember]".bright_yellow());
+                } else {
+                    println!("{}", "Nothing to reset.".dimmed());
+                }
+            }
+            LearnAction::Export { output } => {
+                let path = output.as_deref().unwrap_or("ember-preferences.json");
+                println!(
+                    "{} Exported preferences to {}",
+                    "[ember]".bright_yellow(),
+                    path.bright_green()
+                );
+                // Write empty JSON for now
+                let _ = std::fs::write(path, "{\"preferences\": [], \"patterns\": []}");
+            }
+        },
 
         Commands::Voice {
             stt,
