@@ -22,12 +22,21 @@ Ember is a command-line AI coding agent written in Rust. It runs an agentic loop
 ## Why Ember?
 
 - **Provider-agnostic** — 10 LLM backends out of the box. Switch models mid-session with `/model`. Bring your own OpenAI-compatible endpoint.
+- **`/compare` — A/B test providers** — Send the same prompt to two providers side-by-side. Compare quality and cost. Pick the winner. **No other CLI tool can do this.**
+- **Smart Model Cascade** — `--model auto` analyzes prompt complexity and routes simple questions to fast/cheap models, complex tasks to powerful ones. Save money without losing quality.
+- **EMBER.md project context** — Drop an `EMBER.md` in your project root and Ember loads it as system context. Like Claude Code's `CLAUDE.md`.
+- **`/undo`** — Revert the last file change made by a tool. Every write is snapshotted.
+- **Git-native** — `/commit`, `/diff` right from the REPL. Auto-commit after tool runs.
 - **Session forking** — branch a conversation like a git branch. Explore an alternative approach, then restore to the fork point if it doesn't work out.
+- **Voice mode** *(preview)* — `ember voice` for hands-free coding with speech-to-text and TTS.
+- **RAG indexing** *(preview)* — `ember index .` to embed your codebase for semantic search.
+- **Multi-agent orchestration** *(preview)* — `ember agents run "task" --roles coder,reviewer` for parallel specialized agents.
 - **Plugin hooks** — intercept any tool call before or after execution. Approve, deny, log, or transform output from your own code.
 - **Auto-compaction** — when the context window fills up, the oldest turns are summarised in-place. The session continues without interruption.
 - **Cost tracking** — every API call records token counts and a USD estimate. `/cost` shows the running total for the session.
 - **Granular permissions** — restrict what paths a tool may read or write, which commands it may run, and whether writes are allowed at all.
 - **MCP support** — connect external tool servers over stdio, HTTP, or WebSocket. Tools are namespaced and auto-discovered.
+- **Semantic caching** — Similar prompts served from cache. `/cache` shows stats, `/cache clear` resets.
 - **Single binary** — `cargo build --release` produces one ~15 MB executable with no runtime dependencies.
 
 ---

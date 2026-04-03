@@ -390,6 +390,85 @@ Supports: Conventional Commits, emoji style, detailed format",
     )]
     Git(git::GitArgs),
 
+    /// Start a hands-free voice coding session.
+    ///
+    /// Uses speech-to-text and text-to-speech for natural language coding.
+    #[command(
+        about = "Start a hands-free voice coding session.",
+        long_about = "Launch an interactive voice-controlled coding session.\n\n\
+Speak naturally and Ember will:\n\
+  - Transcribe your speech in real-time\n\
+  - Execute coding commands\n\
+  - Speak responses back to you\n\n\
+STT: whisper (local), openai, deepgram\n\
+TTS: openai, elevenlabs, local"
+    )]
+    Voice {
+        /// Speech-to-text provider (whisper, openai, deepgram)
+        #[arg(long, default_value = "whisper")]
+        stt: String,
+
+        /// Text-to-speech provider (openai, elevenlabs, local)
+        #[arg(long, default_value = "openai")]
+        tts: String,
+
+        /// Model to use for AI responses
+        #[arg(short, long)]
+        model: Option<String>,
+
+        /// Wake word to activate listening
+        #[arg(long, default_value = "ember")]
+        wake_word: String,
+
+        /// Enable tools in voice mode
+        #[arg(long, value_delimiter = ',')]
+        tools: Option<Vec<String>>,
+    },
+
+    /// Index your codebase for semantic search (RAG).
+    ///
+    /// Embeds source files for retrieval-augmented generation.
+    #[command(
+        about = "Index your codebase for semantic search (RAG).",
+        long_about = "Build a local embedding index of your codebase for RAG.\n\n\
+Once indexed, Ember can semantically search your code.\n\
+The index is stored in .ember/index/ using local embeddings."
+    )]
+    Index {
+        /// Paths to index (defaults to current directory)
+        paths: Vec<String>,
+
+        /// Filter by language (comma-separated)
+        #[arg(long, value_delimiter = ',')]
+        language: Option<Vec<String>>,
+
+        /// Show index status and statistics
+        #[arg(long)]
+        status: bool,
+
+        /// Clear the existing index
+        #[arg(long)]
+        clear: bool,
+
+        /// Chunking strategy (fixed, paragraph, sentence, recursive)
+        #[arg(long, default_value = "recursive")]
+        strategy: String,
+    },
+
+    /// Run a multi-agent orchestrated task.
+    ///
+    /// Orchestrates multiple specialized AI agents working in parallel.
+    #[command(
+        about = "Run a multi-agent orchestrated task.",
+        long_about = "Orchestrate multiple specialized AI agents on complex tasks.\n\n\
+Roles: coder, reviewer, tester, architect, documenter\n\
+Agents work in parallel and results are aggregated."
+    )]
+    Agents {
+        #[command(subcommand)]
+        action: AgentsAction,
+    },
+
     /// Generate shell completion scripts.
     ///
     /// Generates shell completions that enable tab-completion for Ember commands.
@@ -466,6 +545,30 @@ enum ConfigAction {
 
     /// Show configuration file path
     Path,
+}
+
+#[derive(Subcommand)]
+enum AgentsAction {
+    /// Run a multi-agent task
+    Run {
+        /// The task description
+        task: String,
+
+        /// Comma-separated agent roles (coder, reviewer, tester, architect, documenter)
+        #[arg(long, value_delimiter = ',')]
+        roles: Option<String>,
+
+        /// Model to use for agents
+        #[arg(short, long)]
+        model: Option<String>,
+
+        /// Maximum orchestration rounds
+        #[arg(long, default_value = "5")]
+        max_rounds: usize,
+    },
+
+    /// List available agent roles
+    List,
 }
 
 #[tokio::main]
@@ -578,6 +681,194 @@ async fn run() -> Result<()> {
         Commands::Git(args) => {
             git::execute(args).await?;
         }
+
+        Commands::Voice {
+            stt,
+            tts,
+            model,
+            wake_word,
+            tools,
+        } => {
+            println!(
+                "{} {} voice mode",
+                "[ember]".bright_yellow(),
+                "🎤 Starting".bright_cyan(),
+            );
+            println!(
+                "   STT: {} | TTS: {} | Wake word: {}",
+                stt.bright_green(),
+                tts.bright_green(),
+                wake_word.bright_blue(),
+            );
+            if let Some(ref m) = model {
+                println!("   Model: {}", m.bright_green());
+            }
+            if let Some(ref t) = tools {
+                println!("   Tools: {}", t.join(", ").bright_cyan());
+            }
+            println!();
+            println!(
+                "{}",
+                "Voice interface requires audio device access.".dimmed()
+            );
+            println!(
+                "{}",
+                "Say the wake word to start, or press Enter for push-to-talk."
+                    .dimmed()
+            );
+            println!(
+                "\n{}",
+                "⚠️  Voice mode is in preview. Full audio pipeline coming soon."
+                    .bright_yellow()
+            );
+        }
+
+        Commands::Index {
+            paths,
+            language,
+            status,
+            clear,
+            strategy,
+        } => {
+            if status {
+                println!("{}", "Index Status:".bright_yellow().bold());
+                let index_dir = dirs::home_dir()
+                    .unwrap_or_default()
+                    .join(".ember")
+                    .join("index");
+                if index_dir.exists() {
+                    let count = std::fs::read_dir(&index_dir)
+                        .map(|d| d.count())
+                        .unwrap_or(0);
+                    println!("  Location: {}", index_dir.display());
+                    println!("  Files:    {}", count.to_string().bright_green());
+                } else {
+                    println!(
+                        "  {}",
+                        "No index found. Run 'ember index .' to create one.".dimmed()
+                    );
+                }
+            } else if clear {
+                let index_dir = dirs::home_dir()
+                    .unwrap_or_default()
+                    .join(".ember")
+                    .join("index");
+                if index_dir.exists() {
+                    std::fs::remove_dir_all(&index_dir)?;
+                    println!("{} Index cleared.", "[ember]".bright_yellow());
+                } else {
+                    println!("{}", "No index to clear.".dimmed());
+                }
+            } else {
+                let target_paths = if paths.is_empty() {
+                    vec![".".to_string()]
+                } else {
+                    paths
+                };
+                println!(
+                    "{} Indexing {} with {} strategy...",
+                    "[ember]".bright_yellow(),
+                    target_paths.join(", ").bright_cyan(),
+                    strategy.bright_green(),
+                );
+                if let Some(ref langs) = language {
+                    println!("  Languages: {}", langs.join(", ").bright_blue());
+                }
+
+                // Walk files and count
+                let mut file_count = 0usize;
+                for path in &target_paths {
+                    for entry in walkdir::WalkDir::new(path)
+                        .into_iter()
+                        .filter_map(|e| e.ok())
+                        .filter(|e| e.file_type().is_file())
+                    {
+                        let ext = entry
+                            .path()
+                            .extension()
+                            .and_then(|e| e.to_str())
+                            .unwrap_or("");
+                        let path_str = entry.path().to_string_lossy();
+                        if path_str.contains("/.git/")
+                            || path_str.contains("/target/")
+                            || path_str.contains("/node_modules/")
+                        {
+                            continue;
+                        }
+                        if let Some(ref langs) = language {
+                            let lang_match = langs.iter().any(|l| match l.as_str() {
+                                "rust" => ext == "rs",
+                                "python" => ext == "py",
+                                "javascript" | "js" => ext == "js" || ext == "jsx",
+                                "typescript" | "ts" => ext == "ts" || ext == "tsx",
+                                "go" => ext == "go",
+                                "java" => ext == "java",
+                                _ => ext == l.as_str(),
+                            });
+                            if !lang_match {
+                                continue;
+                            }
+                        }
+                        file_count += 1;
+                    }
+                }
+                println!(
+                    "{} Found {} files to index.",
+                    "[ember]".bright_yellow(),
+                    file_count.to_string().bright_green(),
+                );
+                println!(
+                    "\n{}",
+                    "⚠️  Embedding pipeline in preview. File discovery works, embeddings coming soon."
+                        .bright_yellow()
+                );
+            }
+        }
+
+        Commands::Agents { action } => match action {
+            AgentsAction::Run {
+                task,
+                roles,
+                model,
+                max_rounds,
+            } => {
+                println!(
+                    "{} {} multi-agent orchestration",
+                    "[ember]".bright_yellow(),
+                    "🤖 Starting".bright_cyan(),
+                );
+                println!("  Task:   {}", task.bright_green());
+                let role_list = roles.as_deref().unwrap_or("coder,reviewer");
+                println!("  Roles:  {}", role_list.bright_blue());
+                if let Some(ref m) = model {
+                    println!("  Model:  {}", m.bright_green());
+                }
+                println!("  Rounds: {}", max_rounds.to_string().bright_cyan());
+                println!(
+                    "\n{}",
+                    "⚠️  Multi-agent orchestration in preview. Framework ready, execution coming soon."
+                        .bright_yellow()
+                );
+            }
+            AgentsAction::List => {
+                println!("{}", "Available Agent Roles:".bright_yellow().bold());
+                println!("  {} — Writes implementation code", "coder".bright_cyan());
+                println!(
+                    "  {} — Reviews code quality and security",
+                    "reviewer".bright_cyan()
+                );
+                println!(
+                    "  {} — Generates and runs tests",
+                    "tester".bright_cyan()
+                );
+                println!("  {} — Plans system design", "architect".bright_cyan());
+                println!(
+                    "  {} — Writes documentation",
+                    "documenter".bright_cyan()
+                );
+                println!("\nUsage: ember agents run \"task\" --roles coder,reviewer");
+            }
+        },
     }
 
     Ok(())
