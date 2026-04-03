@@ -713,13 +713,11 @@ async fn run() -> Result<()> {
             );
             println!(
                 "{}",
-                "Say the wake word to start, or press Enter for push-to-talk."
-                    .dimmed()
+                "Say the wake word to start, or press Enter for push-to-talk.".dimmed()
             );
             println!(
                 "\n{}",
-                "⚠️  Voice mode is in preview. Full audio pipeline coming soon."
-                    .bright_yellow()
+                "⚠️  Voice mode is in preview. Full audio pipeline coming soon.".bright_yellow()
             );
         }
 
@@ -857,15 +855,9 @@ async fn run() -> Result<()> {
                     "  {} — Reviews code quality and security",
                     "reviewer".bright_cyan()
                 );
-                println!(
-                    "  {} — Generates and runs tests",
-                    "tester".bright_cyan()
-                );
+                println!("  {} — Generates and runs tests", "tester".bright_cyan());
                 println!("  {} — Plans system design", "architect".bright_cyan());
-                println!(
-                    "  {} — Writes documentation",
-                    "documenter".bright_cyan()
-                );
+                println!("  {} — Writes documentation", "documenter".bright_cyan());
                 println!("\nUsage: ember agents run \"task\" --roles coder,reviewer");
             }
         },

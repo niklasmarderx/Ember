@@ -195,14 +195,14 @@ impl SlashCommand {
             SlashCommand::Fork { .. } => "Fork the current session, optionally giving it a name",
             SlashCommand::Forks => "List all session forks",
             SlashCommand::Restore { .. } => "Restore the session to a previous fork point",
-            SlashCommand::Compare { .. } => {
-                "Compare two providers side-by-side on the same prompt"
-            }
+            SlashCommand::Compare { .. } => "Compare two providers side-by-side on the same prompt",
             SlashCommand::Cache { .. } => {
                 "Show semantic cache stats, or '/cache clear' to clear the cache"
             }
             SlashCommand::Undo => "Undo the last file write made by a tool",
-            SlashCommand::Commit { .. } => "Create a git commit with the given message (or auto-generate one)",
+            SlashCommand::Commit { .. } => {
+                "Create a git commit with the given message (or auto-generate one)"
+            }
             SlashCommand::Diff { .. } => "Show the current git diff of working-tree changes",
             SlashCommand::Unknown(_) => "Unknown command",
         }
@@ -232,7 +232,13 @@ fn parse_compare_args(rest: &str) -> (Option<String>, Option<String>, String) {
 
     // Known provider names (lowercase).
     let known_providers = [
-        "openai", "ollama", "anthropic", "gemini", "groq", "deepseek", "mistral",
+        "openai",
+        "ollama",
+        "anthropic",
+        "gemini",
+        "groq",
+        "deepseek",
+        "mistral",
     ];
 
     let looks_like_provider = |s: &str| known_providers.contains(&s.to_lowercase().as_str());
@@ -584,7 +590,7 @@ mod tests {
     // 8. all_commands returns the correct count (14 commands)
     #[test]
     fn all_commands_count() {
-        assert_eq!(SlashCommand::all_commands().len(), 18);
+        assert_eq!(SlashCommand::all_commands().len(), 17);
     }
 
     // 9. Registry completions for "/he" → ["/help"]

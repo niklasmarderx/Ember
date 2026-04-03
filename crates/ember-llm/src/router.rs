@@ -200,7 +200,11 @@ impl FallbackRouter {
     }
 
     /// Builder-style variant of [`register`].
-    pub fn with_provider(mut self, name: impl Into<String>, provider: Arc<dyn LLMProvider>) -> Self {
+    pub fn with_provider(
+        mut self,
+        name: impl Into<String>,
+        provider: Arc<dyn LLMProvider>,
+    ) -> Self {
         self.register(name, provider);
         self
     }
@@ -616,14 +620,21 @@ impl CascadeRouter {
     }
 
     /// Builder-style variant of [`register`].
-    pub fn with_provider(mut self, name: impl Into<String>, provider: Arc<dyn LLMProvider>) -> Self {
+    pub fn with_provider(
+        mut self,
+        name: impl Into<String>,
+        provider: Arc<dyn LLMProvider>,
+    ) -> Self {
         self.register(name, provider);
         self
     }
 
     /// Classify the last user message in `request` and return the appropriate
     /// candidate list.
-    fn candidates_for_request<'a>(&'a self, request: &CompletionRequest) -> (&'a [ModelCandidate], PromptComplexity) {
+    fn candidates_for_request<'a>(
+        &'a self,
+        request: &CompletionRequest,
+    ) -> (&'a [ModelCandidate], PromptComplexity) {
         let last_user_msg = request
             .messages
             .iter()
@@ -832,8 +843,7 @@ mod tests {
     #[test]
     fn fallback_router_with_provider_builder() {
         use crate::mock::MockProvider;
-        let router = FallbackRouter::new()
-            .with_provider("mock", Arc::new(MockProvider::new()));
+        let router = FallbackRouter::new().with_provider("mock", Arc::new(MockProvider::new()));
         assert!(router.provider_names().contains(&"mock"));
     }
 
@@ -914,25 +924,28 @@ mod tests {
     #[test]
     fn cascade_router_builder_pattern() {
         use crate::mock::MockProvider;
-        let router = CascadeRouter::new()
-            .with_provider("mock", Arc::new(MockProvider::new()));
+        let router = CascadeRouter::new().with_provider("mock", Arc::new(MockProvider::new()));
         assert!(router.providers.contains_key("mock"));
     }
 
     #[test]
     fn cascade_router_simple_candidates_override() {
-        let router = CascadeRouter::new().with_simple_candidates(vec![
-            ModelCandidate::new("openai", "gpt-4o-mini", 0.15),
-        ]);
+        let router = CascadeRouter::new().with_simple_candidates(vec![ModelCandidate::new(
+            "openai",
+            "gpt-4o-mini",
+            0.15,
+        )]);
         assert_eq!(router.simple_candidates.len(), 1);
         assert_eq!(router.simple_candidates[0].model, "gpt-4o-mini");
     }
 
     #[test]
     fn cascade_router_complex_candidates_override() {
-        let router = CascadeRouter::new().with_complex_candidates(vec![
-            ModelCandidate::new("anthropic", "claude-3-opus-20240229", 15.0),
-        ]);
+        let router = CascadeRouter::new().with_complex_candidates(vec![ModelCandidate::new(
+            "anthropic",
+            "claude-3-opus-20240229",
+            15.0,
+        )]);
         assert_eq!(router.complex_candidates.len(), 1);
         assert_eq!(router.complex_candidates[0].model, "claude-3-opus-20240229");
     }
@@ -941,8 +954,7 @@ mod tests {
     fn cascade_router_routes_simple_prompt_to_cheap_tier() {
         use crate::Message;
         let router = CascadeRouter::new();
-        let request = CompletionRequest::new("auto")
-            .with_message(Message::user("What is Rust?"));
+        let request = CompletionRequest::new("auto").with_message(Message::user("What is Rust?"));
         let (candidates, complexity) = router.candidates_for_request(&request);
         assert_eq!(complexity, PromptComplexity::Simple);
         // The first simple candidate should be haiku
@@ -953,8 +965,9 @@ mod tests {
     fn cascade_router_routes_complex_prompt_to_power_tier() {
         use crate::Message;
         let router = CascadeRouter::new();
-        let request = CompletionRequest::new("auto")
-            .with_message(Message::user("Refactor and architect a new distributed system design."));
+        let request = CompletionRequest::new("auto").with_message(Message::user(
+            "Refactor and architect a new distributed system design.",
+        ));
         let (candidates, complexity) = router.candidates_for_request(&request);
         assert_eq!(complexity, PromptComplexity::Complex);
         // The first complex candidate should be opus

@@ -168,7 +168,10 @@ fn execute_sessions(args: SessionsArgs) -> Result<()> {
     let dir = home.join(".ember").join("sessions");
 
     if !dir.exists() {
-        println!("{}", "No sessions directory found. Start a chat to create one.".dimmed());
+        println!(
+            "{}",
+            "No sessions directory found. Start a chat to create one.".dimmed()
+        );
         return Ok(());
     }
 
@@ -241,10 +244,7 @@ fn execute_sessions(args: SessionsArgs) -> Result<()> {
             "  {} ember chat --resume <id>",
             "Resume with:".bright_yellow()
         );
-        println!(
-            "  {} ember chat --continue",
-            "Resume last:".bright_yellow()
-        );
+        println!("  {} ember chat --continue", "Resume last:".bright_yellow());
         println!();
     }
 

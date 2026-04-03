@@ -56,13 +56,11 @@ use crate::ChatFormat;
 use anyhow::{Context, Result};
 use colored::Colorize;
 use ember_core::usage_tracker::SessionUsageTracker;
-use ember_llm::{CompletionRequest, LLMProvider, Message, OllamaProvider, OpenAIProvider};
 use ember_llm::router::is_model_alias;
-use ember_storage::semantic_cache::{
-    CacheContext, SemanticCache, SemanticCacheBuilder,
-};
+use ember_llm::{CompletionRequest, LLMProvider, Message, OllamaProvider, OpenAIProvider};
+use ember_storage::semantic_cache::{CacheContext, SemanticCache, SemanticCacheBuilder};
 use ember_tools::filesystem::undo_last as filesystem_undo_last;
-use ember_tools::{FilesystemTool, GitTool, ShellTool, ToolRegistry, WebTool};
+use ember_tools::{FilesystemTool, ShellTool, ToolRegistry, WebTool};
 use futures::StreamExt;
 use serde::{Deserialize, Serialize};
 use serde_json;
@@ -175,8 +173,8 @@ fn save_session(session: &PersistedSession) -> Result<()> {
 pub fn load_session(id: &str) -> Result<PersistedSession> {
     let dir = sessions_dir()?;
     let path = dir.join(format!("{}.json", id));
-    let json = std::fs::read_to_string(&path)
-        .with_context(|| format!("Session '{}' not found", id))?;
+    let json =
+        std::fs::read_to_string(&path).with_context(|| format!("Session '{}' not found", id))?;
     let session: PersistedSession = serde_json::from_str(&json)?;
     Ok(session)
 }
@@ -187,9 +185,7 @@ pub fn latest_session_id() -> Option<String> {
     let mut entries: Vec<_> = std::fs::read_dir(&dir)
         .ok()?
         .filter_map(|e| e.ok())
-        .filter(|e| {
-            e.path().extension().and_then(|s| s.to_str()) == Some("json")
-        })
+        .filter(|e| e.path().extension().and_then(|s| s.to_str()) == Some("json"))
         .collect();
 
     entries.sort_by_key(|e| {
@@ -227,16 +223,37 @@ fn seconds_to_ymd_hms(mut s: u64) -> (u32, u32, u32, u32, u32, u32) {
     let mut days = s as u32;
     let mut y = 1970u32;
     loop {
-        let dy = if (y % 4 == 0 && y % 100 != 0) || y % 400 == 0 { 366 } else { 365 };
-        if days < dy { break; }
+        let dy = if (y.is_multiple_of(4) && !y.is_multiple_of(100)) || y.is_multiple_of(400) {
+            366
+        } else {
+            365
+        };
+        if days < dy {
+            break;
+        }
         days -= dy;
         y += 1;
     }
-    let leap = (y % 4 == 0 && y % 100 != 0) || y % 400 == 0;
-    let month_days = [31u32, if leap { 29 } else { 28 }, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+    let leap = (y.is_multiple_of(4) && !y.is_multiple_of(100)) || y.is_multiple_of(400);
+    let month_days = [
+        31u32,
+        if leap { 29 } else { 28 },
+        31,
+        30,
+        31,
+        30,
+        31,
+        31,
+        30,
+        31,
+        30,
+        31,
+    ];
     let mut mo = 0u32;
     for md in &month_days {
-        if days < *md { break; }
+        if days < *md {
+            break;
+        }
         days -= md;
         mo += 1;
     }
@@ -376,8 +393,15 @@ pub async fn run(
         // Use the first candidate whose provider matches one we support in create_provider
         let candidate = candidates
             .into_iter()
-            .find(|c| matches!(c.provider, "openai" | "anthropic" | "ollama" | "gemini" | "groq" | "deepseek" | "mistral"))
-            .unwrap_or_else(|| ember_llm::router::ModelCandidate::new("openai", "gpt-4o-mini", 0.15));
+            .find(|c| {
+                matches!(
+                    c.provider,
+                    "openai" | "anthropic" | "ollama" | "gemini" | "groq" | "deepseek" | "mistral"
+                )
+            })
+            .unwrap_or_else(|| {
+                ember_llm::router::ModelCandidate::new("openai", "gpt-4o-mini", 0.15)
+            });
         eprintln!(
             "{} Model alias '{}' → {} ({})",
             "[ember]".bright_yellow(),
@@ -422,7 +446,10 @@ pub async fn run(
                 }
             },
             None => {
-                println!("{} No previous session found, starting fresh.", "[ember]".bright_yellow());
+                println!(
+                    "{} No previous session found, starting fresh.",
+                    "[ember]".bright_yellow()
+                );
                 None
             }
         }
@@ -653,9 +680,10 @@ fn handle_slash(
         }
 
         SlashCommand::Status => {
-            let turn_count = history.iter().filter(|m| {
-                matches!(m.role, ember_llm::Role::User)
-            }).count();
+            let turn_count = history
+                .iter()
+                .filter(|m| matches!(m.role, ember_llm::Role::User))
+                .count();
             let (inp, out) = tracker.total_tokens();
             println!();
             println!("{}", "Session Status:".bright_yellow().bold());
@@ -675,42 +703,44 @@ fn handle_slash(
             println!("  Input:  ${:.4}", cost.input_cost_usd);
             println!("  Output: ${:.4}", cost.output_cost_usd);
             if cost.cache_read_cost_usd > 0.0 || cost.cache_creation_cost_usd > 0.0 {
-                println!("  Cache:  ${:.4}", cost.cache_read_cost_usd + cost.cache_creation_cost_usd);
+                println!(
+                    "  Cache:  ${:.4}",
+                    cost.cache_read_cost_usd + cost.cache_creation_cost_usd
+                );
             }
             println!("  Total:  ${:.4}", cost.total_cost_usd());
             println!();
             SlashOutcome::Continue
         }
 
-        SlashCommand::Model { model } => {
-            match model {
-                None => {
-                    println!("Current model: {}", current_model.bright_green());
-                    println!("Aliases: fast, smart, code, local");
-                    println!("Usage: /model <name or alias>");
-                    SlashOutcome::Continue
-                }
-                Some(new_model) => {
-                    println!(
-                        "{} Switching model to {}",
-                        "[ember]".bright_yellow(),
-                        new_model.bright_green()
-                    );
-                    SlashOutcome::SwitchModel(new_model.clone())
-                }
+        SlashCommand::Model { model } => match model {
+            None => {
+                println!("Current model: {}", current_model.bright_green());
+                println!("Aliases: fast, smart, code, local");
+                println!("Usage: /model <name or alias>");
+                SlashOutcome::Continue
             }
-        }
+            Some(new_model) => {
+                println!(
+                    "{} Switching model to {}",
+                    "[ember]".bright_yellow(),
+                    new_model.bright_green()
+                );
+                SlashOutcome::SwitchModel(new_model.clone())
+            }
+        },
 
         SlashCommand::Memory => {
             let msg_count = history.len();
             // Rough token estimate: 4 chars per token
-            let approx_tokens: usize = history.iter()
-                .map(|m| (m.content.len() + 3) / 4)
-                .sum();
+            let approx_tokens: usize = history.iter().map(|m| (m.content.len() + 3) / 4).sum();
             println!();
             println!("{}", "Context Window:".bright_yellow().bold());
             println!("  Messages: {}", msg_count.to_string().bright_green());
-            println!("  ~Tokens:  {} (estimate)", approx_tokens.to_string().bright_green());
+            println!(
+                "  ~Tokens:  {} (estimate)",
+                approx_tokens.to_string().bright_green()
+            );
             println!();
             SlashOutcome::Continue
         }
@@ -742,25 +772,38 @@ fn handle_slash(
             println!();
             match section {
                 None => println!("{}", "Run 'ember config show' for full config.".dimmed()),
-                Some(s) => println!("{}", format!("Config section '{}' — run 'ember config show'.", s).dimmed()),
+                Some(s) => println!(
+                    "{}",
+                    format!("Config section '{}' — run 'ember config show'.", s).dimmed()
+                ),
             }
             println!();
             SlashOutcome::Continue
         }
 
         SlashCommand::Compact => {
-            println!("{}", "Context compaction not available in CLI mode.".dimmed());
+            println!(
+                "{}",
+                "Context compaction not available in CLI mode.".dimmed()
+            );
             SlashOutcome::Continue
         }
 
         SlashCommand::Permissions { .. } => {
-            println!("{}", "Permission management not available in CLI mode.".dimmed());
+            println!(
+                "{}",
+                "Permission management not available in CLI mode.".dimmed()
+            );
             SlashOutcome::Continue
         }
 
         SlashCommand::Fork { name } => {
             let label = name.as_deref().unwrap_or("unnamed");
-            println!("{} Fork '{}' — session forks require the TUI.", "[info]".bright_blue(), label);
+            println!(
+                "{} Fork '{}' — session forks require the TUI.",
+                "[info]".bright_blue(),
+                label
+            );
             SlashOutcome::Continue
         }
 
@@ -770,11 +813,19 @@ fn handle_slash(
         }
 
         SlashCommand::Restore { fork_id } => {
-            println!("{} Restore '{}' — session forks require the TUI.", "[info]".bright_blue(), fork_id);
+            println!(
+                "{} Restore '{}' — session forks require the TUI.",
+                "[info]".bright_blue(),
+                fork_id
+            );
             SlashOutcome::Continue
         }
 
-        SlashCommand::Compare { provider1, provider2, prompt } => {
+        SlashCommand::Compare {
+            provider1,
+            provider2,
+            prompt,
+        } => {
             // Signal to caller: run the async compare handler.
             SlashOutcome::RunCompare {
                 provider1: provider1.clone(),
@@ -803,11 +854,7 @@ fn handle_slash(
                     println!("{}", "Nothing to undo.".dimmed());
                 }
                 Err(e) => {
-                    println!(
-                        "{} Undo failed: {}",
-                        "[error]".bright_red(),
-                        e
-                    );
+                    println!("{} Undo failed: {}", "[error]".bright_red(), e);
                 }
             }
             SlashOutcome::Continue
@@ -828,11 +875,7 @@ fn handle_slash(
                         Ok(out) => {
                             let stdout = String::from_utf8_lossy(&out.stdout);
                             if out.status.success() {
-                                println!(
-                                    "{} {}",
-                                    "[commit]".bright_green(),
-                                    stdout.trim()
-                                );
+                                println!("{} {}", "[commit]".bright_green(), stdout.trim());
                             } else {
                                 let stderr = String::from_utf8_lossy(&out.stderr);
                                 println!(
@@ -945,7 +988,11 @@ async fn compare_providers(
     let name1 = p1_name.unwrap_or(current_provider);
     // Default second provider: pick something different from the first.
     let name2 = p2_name.unwrap_or_else(|| {
-        if name1 == "ollama" { "openai" } else { "ollama" }
+        if name1 == "ollama" {
+            "openai"
+        } else {
+            "ollama"
+        }
     });
 
     // Resolve models: use configured defaults per provider.
@@ -965,14 +1012,24 @@ async fn compare_providers(
     let provider1 = match create_provider(config, name1) {
         Ok(p) => p,
         Err(e) => {
-            eprintln!("{} Provider '{}' unavailable: {}", "[error]".bright_red(), name1, e);
+            eprintln!(
+                "{} Provider '{}' unavailable: {}",
+                "[error]".bright_red(),
+                name1,
+                e
+            );
             return Ok(());
         }
     };
     let provider2 = match create_provider(config, name2) {
         Ok(p) => p,
         Err(e) => {
-            eprintln!("{} Provider '{}' unavailable: {}", "[error]".bright_red(), name2, e);
+            eprintln!(
+                "{} Provider '{}' unavailable: {}",
+                "[error]".bright_red(),
+                name2,
+                e
+            );
             return Ok(());
         }
     };
@@ -1052,10 +1109,18 @@ async fn compare_providers(
     let choice = read_line()?;
     match choice.trim() {
         "1" => {
-            println!("{} Keeping response from {}.", "[compare]".bright_magenta(), name1.bright_blue());
+            println!(
+                "{} Keeping response from {}.",
+                "[compare]".bright_magenta(),
+                name1.bright_blue()
+            );
         }
         "2" => {
-            println!("{} Keeping response from {}.", "[compare]".bright_magenta(), name2.bright_blue());
+            println!(
+                "{} Keeping response from {}.",
+                "[compare]".bright_magenta(),
+                name2.bright_blue()
+            );
         }
         _ => {
             println!("{} Neither response kept.", "[compare]".bright_magenta());
@@ -1087,20 +1152,18 @@ fn handle_cache_command(cache: &SemanticCache, subcommand: Option<&str>) {
             println!("  Misses:     {}", stats.misses.to_string().bright_yellow());
             println!(
                 "  Hit rate:   {:.1}%",
-                if total > 0 { stats.hit_rate * 100.0 } else { 0.0 }
+                if total > 0 {
+                    stats.hit_rate * 100.0
+                } else {
+                    0.0
+                }
             );
-            println!(
-                "  Avg sim:    {:.3}",
-                stats.average_similarity
-            );
+            println!("  Avg sim:    {:.3}", stats.average_similarity);
             println!(
                 "  Tokens saved: {}",
                 stats.tokens_saved.to_string().bright_green()
             );
-            println!(
-                "  Est. savings: ${:.4}",
-                stats.estimated_savings_usd
-            );
+            println!("  Est. savings: ${:.4}", stats.estimated_savings_usd);
             println!();
             println!("  Use {} to clear the cache.", "/cache clear".bright_cyan());
             println!();
@@ -1305,7 +1368,11 @@ async fn agent_interactive(
                         tracker = SessionUsageTracker::new(&active_model);
                         continue;
                     }
-                    SlashOutcome::RunCompare { provider1, provider2, prompt } => {
+                    SlashOutcome::RunCompare {
+                        provider1,
+                        provider2,
+                        prompt,
+                    } => {
                         compare_providers(
                             config,
                             provider.name(),
@@ -1419,7 +1486,10 @@ async fn agent_interactive(
         println!();
 
         // Persist session after each turn
-        let turn_count = history.iter().filter(|m| matches!(m.role, ember_llm::Role::User)).count();
+        let turn_count = history
+            .iter()
+            .filter(|m| matches!(m.role, ember_llm::Role::User))
+            .count();
         let session = PersistedSession {
             id: session_id.clone(),
             provider: provider.name().to_owned(),
@@ -1613,7 +1683,11 @@ async fn interactive_chat(
                         tracker = SessionUsageTracker::new(&active_model);
                         continue;
                     }
-                    SlashOutcome::RunCompare { provider1, provider2, prompt } => {
+                    SlashOutcome::RunCompare {
+                        provider1,
+                        provider2,
+                        prompt,
+                    } => {
                         compare_providers(
                             config,
                             provider.name(),
@@ -1666,7 +1740,10 @@ async fn interactive_chat(
             println!();
 
             // Persist session
-            let turn_count = history.iter().filter(|m| matches!(m.role, ember_llm::Role::User)).count();
+            let turn_count = history
+                .iter()
+                .filter(|m| matches!(m.role, ember_llm::Role::User))
+                .count();
             let session = PersistedSession {
                 id: session_id.clone(),
                 provider: provider.name().to_owned(),
@@ -1719,12 +1796,17 @@ async fn interactive_chat(
 
                     if !full_response.is_empty() {
                         // Store in semantic cache.
-                        if let Err(e) = sem_cache.put(input, &full_response, &cache_ctx, &active_model) {
+                        if let Err(e) =
+                            sem_cache.put(input, &full_response, &cache_ctx, &active_model)
+                        {
                             debug!("Cache put failed: {}", e);
                         }
                         // Approximate usage for streaming responses
                         let approx_tokens = (full_response.len() + 3) / 4;
-                        let approx_input = history.iter().map(|m| (m.content.len() + 3) / 4).sum::<usize>();
+                        let approx_input = history
+                            .iter()
+                            .map(|m| (m.content.len() + 3) / 4)
+                            .sum::<usize>();
                         tracker.record_turn(ember_llm::TokenUsage::new(
                             approx_input as u32,
                             approx_tokens as u32,
@@ -1741,7 +1823,9 @@ async fn interactive_chat(
                 Ok(response) => {
                     println!("{}", response.content);
                     // Store in semantic cache.
-                    if let Err(e) = sem_cache.put(input, &response.content, &cache_ctx, &active_model) {
+                    if let Err(e) =
+                        sem_cache.put(input, &response.content, &cache_ctx, &active_model)
+                    {
                         debug!("Cache put failed: {}", e);
                     }
                     tracker.record_turn(response.usage.clone());
@@ -1756,7 +1840,10 @@ async fn interactive_chat(
         println!();
 
         // Persist session
-        let turn_count = history.iter().filter(|m| matches!(m.role, ember_llm::Role::User)).count();
+        let turn_count = history
+            .iter()
+            .filter(|m| matches!(m.role, ember_llm::Role::User))
+            .count();
         let session = PersistedSession {
             id: session_id.clone(),
             provider: provider.name().to_owned(),
