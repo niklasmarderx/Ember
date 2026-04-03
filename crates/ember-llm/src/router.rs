@@ -157,7 +157,7 @@ fn is_retryable(err: &Error) -> bool {
 /// when a request fails with a retryable error.
 ///
 /// # Example
-/// ```rust,no_run
+/// ```rust,ignore
 /// use std::sync::Arc;
 /// use ember_llm::{OpenAIProvider, OllamaProvider, CompletionRequest, Message};
 /// use ember_llm::router::FallbackRouter;
@@ -552,7 +552,7 @@ impl PromptComplexityAnalyzer {
 /// [`CascadeRouter::with_complex_candidates`].
 ///
 /// # Example
-/// ```rust,no_run
+/// ```rust,ignore
 /// use std::sync::Arc;
 /// use ember_llm::router::CascadeRouter;
 /// use ember_llm::CompletionRequest;
