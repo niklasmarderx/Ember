@@ -456,7 +456,7 @@ impl PromptComplexityAnalyzer {
     /// Analyse `prompt` and return its [`PromptComplexity`].
     pub fn analyze(&self, prompt: &str) -> PromptComplexity {
         let score = self.score(prompt);
-        if score >= 3 {
+        if score >= 2 {
             PromptComplexity::Complex
         } else {
             PromptComplexity::Simple
