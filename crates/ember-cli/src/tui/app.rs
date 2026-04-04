@@ -236,15 +236,15 @@ impl App {
 
 /// Run the TUI application
 pub async fn run(config: AppConfig) -> Result<()> {
+    // Create app
+    let mut app = App::new(&config)?;
+
     // Setup terminal
     enable_raw_mode()?;
     let mut stdout = io::stdout();
     execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
-
-    // Create app
-    let mut app = App::new(&config)?;
 
     // Create channel for async responses
     let (response_tx, mut response_rx) = mpsc::channel::<Result<(String, u32)>>(1);
