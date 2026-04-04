@@ -2,7 +2,7 @@
 
 <img src="assets/logo.svg" alt="Ember Logo" width="128" height="128"/>
 
-# 🔥 Ember
+# Ember
 
 > The open-source, provider-agnostic AI coding agent. Built in Rust.
 
@@ -10,6 +10,12 @@
 [![Crates.io](https://img.shields.io/crates/v/ember-cli)](https://crates.io/crates/ember-cli)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE-MIT)
 [![Rust 1.75+](https://img.shields.io/badge/rust-1.75+-orange.svg)](https://www.rust-lang.org)
+
+</div>
+
+<div align="center">
+
+![Ember Showcase](demo/showcase.gif)
 
 </div>
 
