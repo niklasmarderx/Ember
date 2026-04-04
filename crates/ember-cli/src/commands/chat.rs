@@ -2296,7 +2296,7 @@ async fn complete_with_retry_visible(
 /// Stream a response from the LLM, printing content tokens in real-time.
 ///
 /// Collects any streamed tool-call deltas into a synthetic
-/// [`CompletionResponse`] so the caller can handle tool calls exactly
+/// `CompletionResponse` so the caller can handle tool calls exactly
 /// like the non-streaming path.
 async fn stream_response_interactive(
     provider: &dyn LLMProvider,
