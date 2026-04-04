@@ -68,7 +68,11 @@ use ember_plugins::hooks::{HookContext, HookEvent, HookRunner};
 #[allow(dead_code)]
 mod hooks_stub {
     #[derive(Clone, Copy)]
-    pub enum HookEvent { PreToolUse, PostToolUse, PostToolUseFailure }
+    pub enum HookEvent {
+        PreToolUse,
+        PostToolUse,
+        PostToolUseFailure,
+    }
     pub struct HookContext {
         pub event: HookEvent,
         pub tool_name: String,
@@ -78,22 +82,32 @@ mod hooks_stub {
     }
     pub struct HookResult;
     impl HookResult {
-        pub fn messages(&self) -> &[String] { &[] }
-        pub fn should_block(&self) -> bool { false }
-        pub fn is_denied(&self) -> bool { false }
+        pub fn messages(&self) -> &[String] {
+            &[]
+        }
+        pub fn should_block(&self) -> bool {
+            false
+        }
+        pub fn is_denied(&self) -> bool {
+            false
+        }
     }
     pub struct HookRunner;
     impl HookRunner {
-        pub fn new() -> Self { Self }
-        pub fn run(&self, _ctx: &HookContext) -> HookResult { HookResult }
+        pub fn new() -> Self {
+            Self
+        }
+        pub fn run(&self, _ctx: &HookContext) -> HookResult {
+            HookResult
+        }
     }
 }
-#[cfg(not(feature = "plugins"))]
-use hooks_stub::{HookContext, HookEvent, HookRunner};
 use ember_storage::semantic_cache::{SemanticCache, SemanticCacheBuilder};
 use ember_tools::filesystem::undo_last as filesystem_undo_last;
 use ember_tools::ToolRegistry;
 use futures::StreamExt;
+#[cfg(not(feature = "plugins"))]
+use hooks_stub::{HookContext, HookEvent, HookRunner};
 use rustyline::error::ReadlineError;
 use serde_json;
 use std::io::{self, IsTerminal, Write};
@@ -1465,7 +1479,12 @@ async fn agent_one_shot(
                 println!("{}", serde_json::to_string_pretty(&output)?);
             }
             ChatFormat::Markdown => {
-                print_final_response(&format!("## Response\n\n{}\n\n---\n*Model: {} | Provider: {}*", response.content, model, provider.name()));
+                print_final_response(&format!(
+                    "## Response\n\n{}\n\n---\n*Model: {} | Provider: {}*",
+                    response.content,
+                    model,
+                    provider.name()
+                ));
             }
         }
 
@@ -1715,7 +1734,14 @@ async fn agent_interactive(
                                     tool_name.bright_cyan(),
                                     truncate_json(&args, 60).dimmed()
                                 );
-                                match registry.as_ref().expect("tool registry must be initialized when tools are enabled").execute(tool_name, args).await {
+                                match registry
+                                    .as_ref()
+                                    .expect(
+                                        "tool registry must be initialized when tools are enabled",
+                                    )
+                                    .execute(tool_name, args)
+                                    .await
+                                {
                                     Ok(out) => {
                                         let preview = truncate_str(&out.output, 100);
                                         if out.success {
@@ -1786,7 +1812,10 @@ async fn agent_interactive(
 
         // ── Auto-compaction: check token pressure before sending ─────
         {
-            let conv_tokens: usize = history.iter().map(|m| ember_core::estimate_string_tokens(&m.content)).sum();
+            let conv_tokens: usize = history
+                .iter()
+                .map(|m| ember_core::estimate_string_tokens(&m.content))
+                .sum();
             ctx_budget.set_conversation_tokens(conv_tokens);
             if ctx_budget.needs_compaction() {
                 let info = ember_core::compact_message_history(&mut history, &ctx_budget);
@@ -1832,12 +1861,8 @@ async fn agent_interactive(
                     }
                 }
             } else {
-                match complete_with_retry_visible(
-                    &*provider,
-                    request,
-                    config.agent.max_retries,
-                )
-                .await
+                match complete_with_retry_visible(&*provider, request, config.agent.max_retries)
+                    .await
                 {
                     Ok(r) => r,
                     Err(e) => {
@@ -1906,7 +1931,9 @@ async fn agent_interactive(
 
                 // Phase 2: Execute approved calls (parallel when multiple + config enabled)
                 if !approved_calls.is_empty() {
-                    let reg = registry.as_ref().expect("tool registry must be initialized when tools are enabled");
+                    let reg = registry
+                        .as_ref()
+                        .expect("tool registry must be initialized when tools are enabled");
                     let use_parallel = config.agent.parallel_tools && approved_calls.len() > 1;
 
                     let results: Vec<(
@@ -1959,7 +1986,11 @@ async fn agent_interactive(
                         match result {
                             Ok(tool_output) => {
                                 // Track success in strategy tracker
-                                let err_hint = if tool_output.success { None } else { Some(tool_output.output.as_str()) };
+                                let err_hint = if tool_output.success {
+                                    None
+                                } else {
+                                    Some(tool_output.output.as_str())
+                                };
                                 strategy_tracker.record(&call.name, tool_output.success, err_hint);
 
                                 let post_ctx = HookContext {
@@ -2014,11 +2045,7 @@ async fn agent_interactive(
                                         2 => "[reflect]".bright_yellow().bold(),
                                         _ => "[reflect]".bright_yellow(),
                                     };
-                                    println!(
-                                        "  {} {}",
-                                        label,
-                                        reflection.reasoning.dimmed()
-                                    );
+                                    println!("  {} {}", label, reflection.reasoning.dimmed());
                                     // Inject a system hint to help the LLM recover
                                     if let Some(ref alt) = reflection.alternative_strategy {
                                         let hint = format!(
@@ -2200,7 +2227,12 @@ async fn one_shot_chat(
                 println!("{}", serde_json::to_string_pretty(&output)?);
             }
             ChatFormat::Markdown => {
-                print_final_response(&format!("## Response\n\n{}\n\n---\n*Model: {} | Provider: {}*", response.content, model, provider.name()));
+                print_final_response(&format!(
+                    "## Response\n\n{}\n\n---\n*Model: {} | Provider: {}*",
+                    response.content,
+                    model,
+                    provider.name()
+                ));
             }
         }
     }

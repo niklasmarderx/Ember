@@ -1109,8 +1109,7 @@ impl KnowledgeGraph {
                 (entity_ids.contains(&r.source) || entity_ids.contains(&r.target))
                     // Optional relationship type filter
                     && query.relationship_type.as_ref()
-                        .map(|rt| &r.relation_type == rt)
-                        .unwrap_or(true)
+                        .map_or(true, |rt| &r.relation_type == rt)
             })
             .cloned()
             .collect();
@@ -1332,9 +1331,6 @@ impl KnowledgeGraph {
 
     /// Clean up low-confidence entries
     pub async fn cleanup(&self, min_confidence: f64) -> (usize, usize) {
-        let entities_removed;
-        let rels_removed;
-
         // Find low-confidence entities
         let to_remove: Vec<EntityId> = {
             let entities = self.entities.read().await;
@@ -1345,7 +1341,7 @@ impl KnowledgeGraph {
                 .collect()
         };
 
-        entities_removed = to_remove.len();
+        let entities_removed = to_remove.len();
         for id in to_remove {
             let _ = self.remove_entity(id).await;
         }
@@ -1359,7 +1355,7 @@ impl KnowledgeGraph {
                 .collect()
         };
 
-        rels_removed = rels_to_remove.len();
+        let rels_removed = rels_to_remove.len();
         for id in rels_to_remove {
             let _ = self.remove_relationship(id).await;
         }

@@ -13,7 +13,9 @@ use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Margin, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span, Text},
-    widgets::{Block, Borders, Clear, Paragraph, Scrollbar, ScrollbarOrientation, ScrollbarState, Wrap},
+    widgets::{
+        Block, Borders, Clear, Paragraph, Scrollbar, ScrollbarOrientation, ScrollbarState, Wrap,
+    },
     Frame,
 };
 
@@ -90,16 +92,13 @@ pub fn render(frame: &mut Frame, app: &App) {
     let size = frame.size();
 
     // Fill entire background
-    frame.render_widget(
-        Block::default().style(Style::default().bg(PANEL_BG)),
-        size,
-    );
+    frame.render_widget(Block::default().style(Style::default().bg(PANEL_BG)), size);
 
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
             Constraint::Length(3), // Header bar
-            Constraint::Min(6),   // Chat history
+            Constraint::Min(6),    // Chat history
             Constraint::Length(4), // Input area
             Constraint::Length(1), // Status bar
         ])
@@ -131,7 +130,11 @@ fn render_header(frame: &mut Frame, app: &App, area: Rect) {
 
     // Build header: Logo + mode + model + session info
     let mode_label = if app.agent_mode { "AGENT" } else { "CHAT" };
-    let mode_color = if app.agent_mode { TOOL_COLOR } else { EMBER_AMBER };
+    let mode_color = if app.agent_mode {
+        TOOL_COLOR
+    } else {
+        EMBER_AMBER
+    };
 
     let mut all_spans = vec![
         Span::styled(
@@ -148,9 +151,7 @@ fn render_header(frame: &mut Frame, app: &App, area: Rect) {
         ),
         Span::styled(
             format!("[{}]", mode_label),
-            Style::default()
-                .fg(mode_color)
-                .add_modifier(Modifier::BOLD),
+            Style::default().fg(mode_color).add_modifier(Modifier::BOLD),
         ),
         Span::styled(" │ ", Style::default().fg(SEPARATOR)),
         Span::styled(
@@ -264,10 +265,7 @@ fn render_chat(frame: &mut Frame, app: &App, area: Rect) {
         let tool_name = app.current_tool.as_deref().unwrap_or("tool");
 
         lines.push(Line::from(vec![
-            Span::styled(
-                format!(" {} ", spinner),
-                Style::default().fg(TOOL_COLOR),
-            ),
+            Span::styled(format!(" {} ", spinner), Style::default().fg(TOOL_COLOR)),
             Span::styled(
                 format!("executing {} ", tool_name),
                 Style::default()
@@ -276,9 +274,7 @@ fn render_chat(frame: &mut Frame, app: &App, area: Rect) {
             ),
             Span::styled(
                 "...",
-                Style::default()
-                    .fg(TOOL_COLOR)
-                    .add_modifier(Modifier::DIM),
+                Style::default().fg(TOOL_COLOR).add_modifier(Modifier::DIM),
             ),
         ]));
         lines.push(Line::from(""));
@@ -289,11 +285,7 @@ fn render_chat(frame: &mut Frame, app: &App, area: Rect) {
 
     // Auto-scroll to bottom
     let visible_height = inner.height;
-    let scroll_offset = if total_lines > visible_height {
-        total_lines - visible_height
-    } else {
-        0
-    };
+    let scroll_offset = total_lines.saturating_sub(visible_height);
 
     let chat = Paragraph::new(text)
         .style(Style::default().bg(PANEL_BG).fg(Color::White))
@@ -333,15 +325,11 @@ fn render_user_message(lines: &mut Vec<Line>, msg: &super::app::ChatMessage, con
     lines.push(Line::from(vec![
         Span::styled(
             " >> ",
-            Style::default()
-                .fg(USER_COLOR)
-                .add_modifier(Modifier::BOLD),
+            Style::default().fg(USER_COLOR).add_modifier(Modifier::BOLD),
         ),
         Span::styled(
             "you",
-            Style::default()
-                .fg(USER_COLOR)
-                .add_modifier(Modifier::BOLD),
+            Style::default().fg(USER_COLOR).add_modifier(Modifier::BOLD),
         ),
         Span::styled(
             format!("  {}", time_str),
@@ -423,15 +411,11 @@ fn render_tool_call_message(lines: &mut Vec<Line>, msg: &super::app::ChatMessage
     lines.push(Line::from(vec![
         Span::styled(
             " -> ",
-            Style::default()
-                .fg(TOOL_COLOR)
-                .add_modifier(Modifier::BOLD),
+            Style::default().fg(TOOL_COLOR).add_modifier(Modifier::BOLD),
         ),
         Span::styled(
             "tool",
-            Style::default()
-                .fg(TOOL_COLOR)
-                .add_modifier(Modifier::BOLD),
+            Style::default().fg(TOOL_COLOR).add_modifier(Modifier::BOLD),
         ),
         Span::styled(
             format!("  {}", tool_name),
@@ -451,9 +435,7 @@ fn render_tool_call_message(lines: &mut Vec<Line>, msg: &super::app::ChatMessage
         lines.push(Line::from(vec![
             Span::styled(
                 "    │ ",
-                Style::default()
-                    .fg(TOOL_COLOR)
-                    .add_modifier(Modifier::DIM),
+                Style::default().fg(TOOL_COLOR).add_modifier(Modifier::DIM),
             ),
             Span::styled(
                 display_args,
@@ -511,11 +493,7 @@ fn render_tool_result_message(
                     Span::styled(
                         wline.to_string(),
                         Style::default()
-                            .fg(if success {
-                                Color::White
-                            } else {
-                                TOOL_FAIL
-                            })
+                            .fg(if success { Color::White } else { TOOL_FAIL })
                             .add_modifier(Modifier::DIM),
                     ),
                 ]));
@@ -524,7 +502,12 @@ fn render_tool_result_message(
 
         if has_more {
             lines.push(Line::from(vec![
-                Span::styled("    │ ", Style::default().fg(result_color).add_modifier(Modifier::DIM)),
+                Span::styled(
+                    "    │ ",
+                    Style::default()
+                        .fg(result_color)
+                        .add_modifier(Modifier::DIM),
+                ),
                 Span::styled(
                     format!("... ({} more lines)", msg.content.lines().count() - 8),
                     Style::default().fg(MUTED).add_modifier(Modifier::DIM),
@@ -656,9 +639,7 @@ fn render_input(frame: &mut Frame, app: &App, area: Rect) {
     let display_text = if app.input.is_empty() && !is_busy {
         Text::from(Line::from(Span::styled(
             "Type your message here... (Enter to send)",
-            Style::default()
-                .fg(MUTED)
-                .add_modifier(Modifier::ITALIC),
+            Style::default().fg(MUTED).add_modifier(Modifier::ITALIC),
         )))
     } else {
         // Show input with a visible cursor block
@@ -762,8 +743,7 @@ fn render_status_bar(frame: &mut Frame, app: &App, area: Rect) {
     spans.push(Span::raw(" ".repeat(padding)));
     spans.push(Span::styled(right_parts, Style::default().fg(MUTED)));
 
-    let status = Paragraph::new(Line::from(spans))
-        .style(Style::default().bg(SURFACE_BG).fg(MUTED));
+    let status = Paragraph::new(Line::from(spans)).style(Style::default().bg(SURFACE_BG).fg(MUTED));
 
     frame.render_widget(status, area);
 }
@@ -833,9 +813,7 @@ fn render_help(frame: &mut Frame, app: &App) {
         help_text.push(Line::from(""));
         help_text.push(Line::from(Span::styled(
             "  Agent Mode",
-            Style::default()
-                .fg(TOOL_COLOR)
-                .add_modifier(Modifier::BOLD),
+            Style::default().fg(TOOL_COLOR).add_modifier(Modifier::BOLD),
         )));
         help_text.push(Line::from(""));
         help_text.push(Line::from(Span::styled(
@@ -896,10 +874,7 @@ fn help_line(key: &str, desc: &str) -> Line<'static> {
                 .fg(EMBER_AMBER)
                 .add_modifier(Modifier::BOLD),
         ),
-        Span::styled(
-            format!("  {}", desc),
-            Style::default().fg(Color::White),
-        ),
+        Span::styled(format!("  {}", desc), Style::default().fg(Color::White)),
     ])
 }
 

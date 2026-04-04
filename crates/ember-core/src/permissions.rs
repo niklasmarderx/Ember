@@ -56,21 +56,16 @@ use std::time::Duration;
 // ---------------------------------------------------------------------------
 
 /// Controls how the permission policy evaluates actions.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub enum PermissionMode {
     /// Allow everything. Default — no existing behaviour is affected.
+    #[default]
     Unrestricted,
     /// Ask the user before each action. The caller is responsible for
     /// surfacing the approval prompt and must honour `NeedsApproval`.
     Interactive,
     /// Evaluate actions strictly against the configured rules.
     Policy,
-}
-
-impl Default for PermissionMode {
-    fn default() -> Self {
-        Self::Unrestricted
-    }
 }
 
 // ---------------------------------------------------------------------------

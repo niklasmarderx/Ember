@@ -71,3 +71,5 @@ api = ["web", "url", "base64"]
 [dev-dependencies]
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
 tempfile = "3.10"
+[lints]
+workspace = true

@@ -35,15 +35,51 @@ pub struct ColorTheme {
 impl Default for ColorTheme {
     fn default() -> Self {
         Self {
-            heading: Color::Rgb { r: 255, g: 140, b: 50 },       // Ember orange
-            emphasis: Color::Rgb { r: 255, g: 210, b: 70 },      // Warm yellow
-            strong: Color::Rgb { r: 240, g: 240, b: 255 },       // Bright white
-            inline_code: Color::Rgb { r: 120, g: 220, b: 140 },  // Soft green
-            link: Color::Rgb { r: 100, g: 180, b: 255 },         // Sky blue
-            quote: Color::Rgb { r: 100, g: 100, b: 120 },        // Muted
-            code_block_border: Color::Rgb { r: 60, g: 60, b: 80 }, // Subtle border
-            spinner_active: Color::Rgb { r: 255, g: 183, b: 77 }, // Amber
-            spinner_done: Color::Rgb { r: 80, g: 220, b: 120 },  // Success green
+            heading: Color::Rgb {
+                r: 255,
+                g: 140,
+                b: 50,
+            }, // Ember orange
+            emphasis: Color::Rgb {
+                r: 255,
+                g: 210,
+                b: 70,
+            }, // Warm yellow
+            strong: Color::Rgb {
+                r: 240,
+                g: 240,
+                b: 255,
+            }, // Bright white
+            inline_code: Color::Rgb {
+                r: 120,
+                g: 220,
+                b: 140,
+            }, // Soft green
+            link: Color::Rgb {
+                r: 100,
+                g: 180,
+                b: 255,
+            }, // Sky blue
+            quote: Color::Rgb {
+                r: 100,
+                g: 100,
+                b: 120,
+            }, // Muted
+            code_block_border: Color::Rgb {
+                r: 60,
+                g: 60,
+                b: 80,
+            }, // Subtle border
+            spinner_active: Color::Rgb {
+                r: 255,
+                g: 183,
+                b: 77,
+            }, // Amber
+            spinner_done: Color::Rgb {
+                r: 80,
+                g: 220,
+                b: 120,
+            }, // Success green
         }
     }
 }

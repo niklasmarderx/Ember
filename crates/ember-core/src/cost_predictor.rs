@@ -344,8 +344,7 @@ impl CostPredictor {
     ) {
         let cost = self
             .estimate(model_id, input_tokens, output_tokens)
-            .map(|e| e.total_cost)
-            .unwrap_or(0.0);
+            .map_or(0.0, |e| e.total_cost);
 
         let record = UsageRecord {
             timestamp: chrono::Utc::now(),
@@ -358,7 +357,10 @@ impl CostPredictor {
 
         // Add to history
         {
-            let mut history = self.usage_history.write().expect("usage_history lock poisoned");
+            let mut history = self
+                .usage_history
+                .write()
+                .expect("usage_history lock poisoned");
             history.push(record);
         }
 
@@ -403,7 +405,10 @@ impl CostPredictor {
 
     /// Get aggregated usage statistics
     pub fn get_stats(&self) -> UsageStats {
-        let history = self.usage_history.read().expect("usage_history lock poisoned");
+        let history = self
+            .usage_history
+            .read()
+            .expect("usage_history lock poisoned");
 
         if history.is_empty() {
             return UsageStats::default();
@@ -569,14 +574,20 @@ impl CostPredictor {
 
     /// Clear usage history
     pub fn clear_history(&self) {
-        let mut history = self.usage_history.write().expect("usage_history lock poisoned");
+        let mut history = self
+            .usage_history
+            .write()
+            .expect("usage_history lock poisoned");
         history.clear();
         self.total_cost_micros.store(0, Ordering::SeqCst);
     }
 
     /// Export usage history to JSON
     pub fn export_history(&self) -> String {
-        let history = self.usage_history.read().expect("usage_history lock poisoned");
+        let history = self
+            .usage_history
+            .read()
+            .expect("usage_history lock poisoned");
         serde_json::to_string_pretty(&*history).unwrap_or_else(|_| "[]".to_string())
     }
 

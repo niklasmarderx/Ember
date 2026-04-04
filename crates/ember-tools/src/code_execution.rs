@@ -226,10 +226,10 @@ impl CodeExecutionTool {
             Language::Shell => None,
         };
 
-        let cmd_name = cmd_path
-            .as_ref()
-            .map(|p| p.to_string_lossy().to_string())
-            .unwrap_or_else(|| language.command().to_string());
+        let cmd_name = cmd_path.as_ref().map_or_else(
+            || language.command().to_string(),
+            |p| p.to_string_lossy().to_string(),
+        );
 
         // Build command
         let mut cmd = Command::new(&cmd_name);

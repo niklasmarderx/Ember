@@ -209,7 +209,8 @@ where
                     pool: self.inner.clone(),
                     _acquired_at: Instant::now(),
                     created_at: Instant::now()
-                        - Duration::from_millis(self.inner.config.max_lifetime_ms / 2),
+                        .checked_sub(Duration::from_millis(self.inner.config.max_lifetime_ms / 2))
+                        .unwrap(),
                 });
             }
             // Connection too old, discard
@@ -436,9 +437,14 @@ where
         let senders: Vec<_> = batch.into_iter().map(|(_, tx)| tx).collect();
 
         // Process batch
-        let _permit = self.semaphore.acquire().await.map_err(|_| {
-            tracing::error!("Batch processor semaphore closed unexpectedly");
-        }).ok();
+        let _permit = self
+            .semaphore
+            .acquire()
+            .await
+            .map_err(|_| {
+                tracing::error!("Batch processor semaphore closed unexpectedly");
+            })
+            .ok();
         let results = (self.processor)(items).await;
 
         // Send results
@@ -576,22 +582,17 @@ impl Default for SchedulerConfig {
 }
 
 /// Task priority
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, Default)]
 pub enum TaskPriority {
     /// Low priority
     Low = 0,
     /// Normal priority
+    #[default]
     Normal = 1,
     /// High priority
     High = 2,
     /// Critical priority
     Critical = 3,
-}
-
-impl Default for TaskPriority {
-    fn default() -> Self {
-        Self::Normal
-    }
 }
 
 /// Scheduled task
@@ -739,7 +740,9 @@ impl Throttler {
     pub fn new(operations_per_second: f64) -> Self {
         Self {
             interval: Duration::from_secs_f64(1.0 / operations_per_second),
-            last_operation: Arc::new(Mutex::new(Instant::now() - Duration::from_secs(1))),
+            last_operation: Arc::new(Mutex::new(
+                Instant::now().checked_sub(Duration::from_secs(1)).unwrap(),
+            )),
         }
     }
 
@@ -749,7 +752,7 @@ impl Throttler {
         let elapsed = last.elapsed();
 
         if elapsed < self.interval {
-            tokio::time::sleep(self.interval - elapsed).await;
+            tokio::time::sleep(self.interval.checked_sub(elapsed).unwrap()).await;
         }
 
         *last = Instant::now();

@@ -325,10 +325,7 @@ impl ToolRegistry {
 
     /// Check if a tool supports streaming.
     pub fn supports_streaming(&self, name: &str) -> bool {
-        self.tools
-            .get(name)
-            .map(|h| h.supports_streaming())
-            .unwrap_or(false)
+        self.tools.get(name).is_some_and(|h| h.supports_streaming())
     }
 
     /// Execute a tool with streaming output.

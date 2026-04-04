@@ -126,3 +126,14 @@ panic = "abort"
 inherits = "release"
 debug = true
 strip = false
+
+[workspace.lints.clippy]
+too_many_lines = "allow"
+format_push_string = "allow"
+unused_self = "allow"
+trivially_copy_pass_by_ref = "allow"
+unused_async = "allow"
+manual_let_else = "allow"
+manual_strip = "allow"
+field_reassign_with_default = "allow"
+wildcard_imports = "allow"

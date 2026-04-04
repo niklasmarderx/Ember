@@ -103,9 +103,8 @@ pub fn detect_project_kind(root: &Path) -> ProjectKind {
     ];
 
     for (marker, kind) in markers {
-        if marker.starts_with('*') {
+        if let Some(ext) = marker.strip_prefix('*') {
             // Glob — check if any file matches
-            let ext = &marker[1..];
             if let Ok(entries) = std::fs::read_dir(root) {
                 for entry in entries.flatten() {
                     if entry.file_name().to_string_lossy().ends_with(ext) {
@@ -149,8 +148,13 @@ impl fmt::Display for RiskTier {
 /// Classify a tool name into its risk tier.
 pub fn classify_tool_risk(tool_name: &str) -> RiskTier {
     match tool_name {
-        "file_read" | "glob" | "grep" | "web_fetch" | "list_files"
-        | "list_code_definitions" | "search_files" => RiskTier::Safe,
+        "file_read"
+        | "glob"
+        | "grep"
+        | "web_fetch"
+        | "list_files"
+        | "list_code_definitions"
+        | "search_files" => RiskTier::Safe,
 
         "file_edit" | "file_write" | "file_create" | "git" => RiskTier::Moderate,
 
@@ -322,31 +326,32 @@ You are a highly skilled software engineer with deep knowledge of many programmi
 
     fn build_tool_section(&self) -> String {
         let mut tools_desc = String::from("# AVAILABLE TOOLS\n\n");
-        tools_desc.push_str(
-            "You have access to the following tools. Use them strategically:\n\n",
-        );
+        tools_desc.push_str("You have access to the following tools. Use them strategically:\n\n");
 
         for name in &self.tool_names {
             let desc = tool_description(name);
             let risk = classify_tool_risk(name);
-            tools_desc.push_str(&format!(
-                "## `{}`  [risk: {}]\n{}\n\n",
-                name, risk, desc
-            ));
+            tools_desc.push_str(&format!("## `{}`  [risk: {}]\n{}\n\n", name, risk, desc));
         }
 
         tools_desc.push_str("## Tool Usage Strategy\n\n");
         tools_desc.push_str("- **Explore first**: Before modifying code, use `grep`/`glob`/`file_read` to understand the codebase\n");
         tools_desc.push_str("- **Edit precisely**: Use `file_edit` (SEARCH/REPLACE) for targeted changes, `file_write` only for new files or full rewrites\n");
-        tools_desc.push_str("- **Verify after changes**: Run `shell` with build/lint/test commands after edits\n");
-        tools_desc.push_str("- **One tool per step**: Make one change, verify it, then proceed to the next\n");
-        tools_desc.push_str("- **Read before edit**: ALWAYS read a file before editing it — never edit blind\n");
+        tools_desc.push_str(
+            "- **Verify after changes**: Run `shell` with build/lint/test commands after edits\n",
+        );
+        tools_desc.push_str(
+            "- **One tool per step**: Make one change, verify it, then proceed to the next\n",
+        );
+        tools_desc.push_str(
+            "- **Read before edit**: ALWAYS read a file before editing it — never edit blind\n",
+        );
 
         tools_desc
     }
 
     fn build_file_edit_protocol(&self) -> String {
-        r#"# FILE EDITING PROTOCOL
+        r"# FILE EDITING PROTOCOL
 
 When modifying existing files, prefer precise SEARCH/REPLACE edits over rewriting entire files.
 
@@ -368,7 +373,7 @@ Rules:
 5. To delete code: use an empty REPLACE section
 6. To move code: one block to delete + one to insert at new location
 
-When changes are extensive (>60% of file), rewrite the whole file instead."#
+When changes are extensive (>60% of file), rewrite the whole file instead."
             .to_string()
     }
 
@@ -419,15 +424,23 @@ When changes are extensive (>60% of file), rewrite the whole file instead."#
                 rules.push("Follow Rust idioms: use `Result` for error handling, prefer `&str` over `String` in function params where appropriate.");
                 rules.push("Run `cargo check` or `cargo build` after making changes to catch compile errors early.");
                 rules.push("Use `cargo clippy` conventions. Prefer `thiserror` for library errors, `anyhow` for applications.");
-                rules.push("Use `cargo test` to verify changes. Add `#[test]` functions for new logic.");
-                rules.push("Prefer `impl Into<String>` or generics over concrete types in public APIs.");
+                rules.push(
+                    "Use `cargo test` to verify changes. Add `#[test]` functions for new logic.",
+                );
+                rules.push(
+                    "Prefer `impl Into<String>` or generics over concrete types in public APIs.",
+                );
             }
             ProjectKind::TypeScript | ProjectKind::JavaScript => {
                 rules.push("Use modern ES6+ syntax. Prefer `const` over `let` where possible.");
-                rules.push("Follow the project's existing style (tabs vs spaces, semicolons, quotes).");
+                rules.push(
+                    "Follow the project's existing style (tabs vs spaces, semicolons, quotes).",
+                );
                 rules.push("Run the linter/formatter after changes if one is configured.");
                 rules.push("Use `async/await` over raw Promises. Handle errors with try/catch.");
-                rules.push("For TypeScript: use proper types, avoid `any`. Check with `tsc --noEmit`.");
+                rules.push(
+                    "For TypeScript: use proper types, avoid `any`. Check with `tsc --noEmit`.",
+                );
             }
             ProjectKind::Python => {
                 rules.push("Follow PEP 8 style. Use type hints where the project uses them.");
@@ -437,18 +450,24 @@ When changes are extensive (>60% of file), rewrite the whole file instead."#
                 rules.push("Use virtual environments. Check `pyproject.toml` or `requirements.txt` for dependencies.");
             }
             ProjectKind::Go => {
-                rules.push("Follow Go conventions: `gofmt` style, short variable names, error checking.");
+                rules.push(
+                    "Follow Go conventions: `gofmt` style, short variable names, error checking.",
+                );
                 rules.push("Run `go vet` and `go build` after changes.");
                 rules.push("Handle all errors — never use `_` to discard errors silently.");
                 rules.push("Use `go test ./...` to run the test suite.");
             }
             ProjectKind::Java | ProjectKind::Kotlin => {
                 rules.push("Follow the project's build system (Maven/Gradle). Run `mvn compile` or `gradle build` to verify.");
-                rules.push("Use proper exception handling. Follow existing patterns for error types.");
+                rules.push(
+                    "Use proper exception handling. Follow existing patterns for error types.",
+                );
             }
             ProjectKind::Ruby => {
                 rules.push("Follow Ruby community style. Use `bundle exec` for commands.");
-                rules.push("Run `ruby -c <file>` to check syntax. Use `rspec` or `minitest` for tests.");
+                rules.push(
+                    "Run `ruby -c <file>` to check syntax. Use `rspec` or `minitest` for tests.",
+                );
             }
             ProjectKind::CSharp => {
                 rules.push("Follow .NET conventions. Run `dotnet build` to verify changes.");

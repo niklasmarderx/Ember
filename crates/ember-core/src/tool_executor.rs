@@ -590,7 +590,7 @@ where
 // =============================================================================
 
 /// Context provided to tool execution
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct ToolContext {
     /// Current conversation ID
     pub conversation_id: Option<String>,
@@ -602,18 +602,6 @@ pub struct ToolContext {
     pub working_dir: Option<String>,
     /// Environment variables
     pub env_vars: HashMap<String, String>,
-}
-
-impl Default for ToolContext {
-    fn default() -> Self {
-        Self {
-            conversation_id: None,
-            user_id: None,
-            metadata: HashMap::new(),
-            working_dir: None,
-            env_vars: HashMap::new(),
-        }
-    }
 }
 
 impl ToolContext {

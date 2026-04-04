@@ -342,7 +342,7 @@ pub struct PageResponse<T> {
 impl<T> PageResponse<T> {
     /// Create a new page response
     pub fn new(items: Vec<T>, total_items: usize, page: usize, page_size: usize) -> Self {
-        let total_pages = (total_items + page_size - 1) / page_size;
+        let total_pages = total_items.div_ceil(page_size);
         Self {
             items,
             total_items,

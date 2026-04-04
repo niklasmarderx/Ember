@@ -1002,7 +1002,7 @@ impl TaskDelegator {
 
         tasks
             .values()
-            .filter(|t| status_filter.map_or(true, |s| t.status == s))
+            .filter(|t| status_filter.is_none_or(|s| t.status == s))
             .cloned()
             .collect()
     }
@@ -1261,7 +1261,7 @@ impl ConsensusManager {
 
         proposal
             .vote(agent_id, option_index)
-            .map_err(|e| CoreError::Agent(e))?;
+            .map_err(CoreError::Agent)?;
 
         let _ = self.event_tx.send(ConsensusEvent::VoteCast {
             proposal_id: proposal_id.to_string(),
@@ -1322,7 +1322,7 @@ impl ConsensusManager {
 
         proposals
             .values()
-            .filter(|p| status_filter.map_or(true, |s| p.status == s))
+            .filter(|p| status_filter.is_none_or(|s| p.status == s))
             .cloned()
             .collect()
     }

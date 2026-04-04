@@ -218,8 +218,7 @@ pub async fn execute_bash(input: &BashCommandInput) -> Result<BashCommandOutput>
 
     let timeout_duration = input
         .timeout_secs
-        .map(Duration::from_secs)
-        .unwrap_or(Duration::from_secs(30));
+        .map_or(Duration::from_secs(30), Duration::from_secs);
 
     let mut cmd = build_command(input);
 
@@ -443,17 +442,16 @@ impl BackgroundTaskManager {
         self.tasks
             .values()
             .map(|t| {
-                let status = t
-                    .handle
-                    .as_ref()
-                    .map(|h| {
+                let status = t.handle.as_ref().map_or_else(
+                    || TaskStatus::Failed("handle missing".to_owned()),
+                    |h| {
                         if h.is_finished() {
                             TaskStatus::Completed
                         } else {
                             TaskStatus::Running
                         }
-                    })
-                    .unwrap_or_else(|| TaskStatus::Failed("handle missing".to_owned()));
+                    },
+                );
                 (t.id.clone(), status)
             })
             .collect()

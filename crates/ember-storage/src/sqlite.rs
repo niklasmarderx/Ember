@@ -317,7 +317,8 @@ impl SqliteStorage {
         for dp in &date_params {
             all_params.push(Box::new(dp.clone()));
         }
-        let param_refs: Vec<&dyn rusqlite::types::ToSql> = all_params.iter().map(|p| p.as_ref()).collect();
+        let param_refs: Vec<&dyn rusqlite::types::ToSql> =
+            all_params.iter().map(|p| p.as_ref()).collect();
 
         let mut stmt = conn.prepare(&sql)?;
         let rows = stmt.query_map(&*param_refs, |row| {

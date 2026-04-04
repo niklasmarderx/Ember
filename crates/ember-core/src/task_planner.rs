@@ -80,22 +80,19 @@ impl std::fmt::Display for TaskId {
 }
 
 /// Priority level for tasks
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, Default,
+)]
 pub enum TaskPriority {
     /// Lowest priority
     Low = 0,
     /// Normal priority
+    #[default]
     Normal = 1,
     /// High priority
     High = 2,
     /// Critical priority - must be completed first
     Critical = 3,
-}
-
-impl Default for TaskPriority {
-    fn default() -> Self {
-        Self::Normal
-    }
 }
 
 /// Current status of a task
@@ -492,8 +489,7 @@ impl ExecutionPlan {
                 .filter(|id| {
                     self.tasks
                         .get(id)
-                        .map(|t| t.dependencies_met(&completed))
-                        .unwrap_or(false)
+                        .is_some_and(|t| t.dependencies_met(&completed))
                 })
                 .copied()
                 .collect();
@@ -1159,12 +1155,7 @@ impl TaskPlanner {
                     total_tasks,
                     running_tasks: running_tasks
                         .iter()
-                        .filter(|id| {
-                            plan.tasks
-                                .get(id)
-                                .map(|t| !t.status.is_terminal())
-                                .unwrap_or(false)
-                        })
+                        .filter(|id| plan.tasks.get(id).is_some_and(|t| !t.status.is_terminal()))
                         .copied()
                         .collect(),
                     estimated_remaining: Duration::ZERO,

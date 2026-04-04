@@ -353,7 +353,7 @@ impl Orchestrator {
         let orchestrator = Self::new();
 
         // Add default agents
-        let _agents = vec![
+        let _agents = [
             AgentConfig::builder()
                 .name("Coder")
                 .role(AgentRole::Coder)

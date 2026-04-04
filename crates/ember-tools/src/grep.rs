@@ -55,7 +55,12 @@ fn walk_dir_inner(dir: &Path, depth: usize, max_depth: usize, out: &mut Vec<Path
         let name = entry.file_name().to_string_lossy().to_string();
 
         // Skip hidden dirs and common non-source dirs
-        if name.starts_with('.') || name == "node_modules" || name == "target" || name == "__pycache__" || name == "venv" {
+        if name.starts_with('.')
+            || name == "node_modules"
+            || name == "target"
+            || name == "__pycache__"
+            || name == "venv"
+        {
             continue;
         }
 
@@ -78,15 +83,77 @@ fn is_text_extension(path: &Path) -> bool {
     // Common source code / text extensions
     matches!(
         ext.as_str(),
-        "rs" | "py" | "js" | "ts" | "jsx" | "tsx" | "go" | "java" | "c" | "cpp" | "h"
-            | "hpp" | "cs" | "rb" | "php" | "swift" | "kt" | "scala" | "sh" | "bash"
-            | "zsh" | "fish" | "ps1" | "bat" | "cmd" | "lua" | "r" | "sql" | "html"
-            | "css" | "scss" | "sass" | "less" | "xml" | "json" | "yaml" | "yml"
-            | "toml" | "ini" | "cfg" | "conf" | "md" | "txt" | "rst" | "tex"
-            | "csv" | "tsv" | "log" | "env" | "gitignore" | "dockerfile"
-            | "makefile" | "cmake" | "gradle" | "sbt" | "cabal" | "zig" | "nim"
-            | "ex" | "exs" | "erl" | "hs" | "ml" | "mli" | "vue" | "svelte"
-            | "astro" | "prisma" | "proto" | "graphql" | "tf" | "hcl"
+        "rs" | "py"
+            | "js"
+            | "ts"
+            | "jsx"
+            | "tsx"
+            | "go"
+            | "java"
+            | "c"
+            | "cpp"
+            | "h"
+            | "hpp"
+            | "cs"
+            | "rb"
+            | "php"
+            | "swift"
+            | "kt"
+            | "scala"
+            | "sh"
+            | "bash"
+            | "zsh"
+            | "fish"
+            | "ps1"
+            | "bat"
+            | "cmd"
+            | "lua"
+            | "r"
+            | "sql"
+            | "html"
+            | "css"
+            | "scss"
+            | "sass"
+            | "less"
+            | "xml"
+            | "json"
+            | "yaml"
+            | "yml"
+            | "toml"
+            | "ini"
+            | "cfg"
+            | "conf"
+            | "md"
+            | "txt"
+            | "rst"
+            | "tex"
+            | "csv"
+            | "tsv"
+            | "log"
+            | "env"
+            | "gitignore"
+            | "dockerfile"
+            | "makefile"
+            | "cmake"
+            | "gradle"
+            | "sbt"
+            | "cabal"
+            | "zig"
+            | "nim"
+            | "ex"
+            | "exs"
+            | "erl"
+            | "hs"
+            | "ml"
+            | "mli"
+            | "vue"
+            | "svelte"
+            | "astro"
+            | "prisma"
+            | "proto"
+            | "graphql"
+            | "tf"
+            | "hcl"
     ) || ext.is_empty() // files without extension (Makefile, Dockerfile, etc.)
 }
 
@@ -128,13 +195,10 @@ impl ToolHandler for GrepTool {
             .and_then(|v| v.as_str())
             .unwrap_or(".");
 
-        let include_ext = arguments
-            .get("include")
-            .and_then(|v| v.as_str());
+        let include_ext = arguments.get("include").and_then(|v| v.as_str());
 
-        let regex = Regex::new(pattern_str).map_err(|e| {
-            Error::invalid_arguments("grep", format!("Invalid regex: {}", e))
-        })?;
+        let regex = Regex::new(pattern_str)
+            .map_err(|e| Error::invalid_arguments("grep", format!("Invalid regex: {}", e)))?;
 
         let base_path = PathBuf::from(path_str);
         let base_path = if base_path.is_absolute() {

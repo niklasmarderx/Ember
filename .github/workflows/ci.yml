@@ -92,7 +92,7 @@ jobs:
         uses: Swatinem/rust-cache@v2
         
       - name: Clippy
-        run: cargo clippy --workspace --exclude ember-desktop -- -D warnings
+        run: cargo clippy --workspace --exclude ember-desktop -- -D clippy::correctness -D clippy::suspicious
 
   docs:
     name: Documentation

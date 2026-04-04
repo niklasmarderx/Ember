@@ -143,8 +143,7 @@ impl GitTool {
         for line in output.stdout.lines() {
             if line.starts_with("# branch.head ") {
                 branch_info = format!("On branch: {}", &line[14..]);
-            } else if line.starts_with("# branch.upstream ") {
-                let upstream = &line[18..];
+            } else if let Some(upstream) = line.strip_prefix("# branch.upstream ") {
                 branch_info.push_str(&format!(" (tracking: {})", upstream));
             } else if line.starts_with("# branch.ab ") {
                 let parts: Vec<&str> = line[12..].split_whitespace().collect();
@@ -172,9 +171,8 @@ impl GitTool {
                         modified.push(format!("{}: {}", worktree, path));
                     }
                 }
-            } else if line.starts_with("? ") {
+            } else if let Some(path) = line.strip_prefix("? ") {
                 // Untracked
-                let path = &line[2..];
                 untracked.push(path.to_string());
             }
         }
@@ -486,15 +484,16 @@ impl ToolHandler for GitTool {
                 let files: Vec<&str> = arguments
                     .get("files")
                     .and_then(|v| v.as_array())
-                    .map(|arr| arr.iter().filter_map(|v| v.as_str()).collect())
-                    .unwrap_or_else(|| {
-                        // If no files specified, check for target
-                        arguments
-                            .get("target")
-                            .and_then(|v| v.as_str())
-                            .map(|t| vec![t])
-                            .unwrap_or_else(|| vec!["."])
-                    });
+                    .map_or_else(
+                        || {
+                            // If no files specified, check for target
+                            arguments
+                                .get("target")
+                                .and_then(|v| v.as_str())
+                                .map_or_else(|| vec!["."], |t| vec![t])
+                        },
+                        |arr| arr.iter().filter_map(|v| v.as_str()).collect(),
+                    );
                 self.add(&files, repo_path).await?
             }
             "commit" => {

@@ -322,7 +322,8 @@ impl ShellTool {
                 );
                 return Err(Error::execution_failed(
                     "shell",
-                    format!("Command not allowed in strict mode. Use an allowed command pattern."),
+                    "Command not allowed in strict mode. Use an allowed command pattern."
+                        .to_string(),
                 ));
             }
         }

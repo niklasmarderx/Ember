@@ -34,13 +34,11 @@ pub mod onboarding;
 #[cfg(feature = "tui")]
 mod tui;
 
-use commands::{
-    chat, code, completions, config as config_cmd, export, git, history,
-};
 #[cfg(feature = "plugins")]
 use commands::plugin;
 #[cfg(feature = "serve")]
 use commands::serve;
+use commands::{chat, code, completions, config as config_cmd, export, git, history};
 use config::AppConfig;
 
 /// Ember CLI - AI assistant for your terminal.
@@ -878,19 +876,11 @@ async fn run() -> Result<()> {
     {
         let validation = config.validate();
         for warning in &validation.warnings {
-            eprintln!(
-                "  {} {}",
-                "⚠ config:".bright_yellow(),
-                warning.message
-            );
+            eprintln!("  {} {}", "⚠ config:".bright_yellow(), warning.message);
         }
         if !validation.is_valid() {
             for err in &validation.errors {
-                eprintln!(
-                    "  {} {}",
-                    "✗ config:".bright_red(),
-                    err.message
-                );
+                eprintln!("  {} {}", "✗ config:".bright_red(), err.message);
             }
             eprintln!(
                 "  {} Fix your config file or run {}",
@@ -970,7 +960,10 @@ async fn run() -> Result<()> {
             }
             #[cfg(not(feature = "serve"))]
             {
-                eprintln!("{} The 'serve' feature is not enabled in this build.", "[error]".bright_red());
+                eprintln!(
+                    "{} The 'serve' feature is not enabled in this build.",
+                    "[error]".bright_red()
+                );
                 eprintln!("  Recompile with: cargo install ember-cli --features serve");
                 std::process::exit(1);
             }
@@ -996,7 +989,10 @@ async fn run() -> Result<()> {
             }
             #[cfg(not(feature = "plugins"))]
             {
-                eprintln!("{} The 'plugins' feature is not enabled in this build.", "[error]".bright_red());
+                eprintln!(
+                    "{} The 'plugins' feature is not enabled in this build.",
+                    "[error]".bright_red()
+                );
                 eprintln!("  Recompile with: cargo install ember-cli --features plugins");
                 std::process::exit(1);
             }
@@ -1127,7 +1123,8 @@ async fn run() -> Result<()> {
                 );
                 println!(
                     "  {}",
-                    "This feature will export learned preferences and patterns from your sessions.".dimmed()
+                    "This feature will export learned preferences and patterns from your sessions."
+                        .dimmed()
                 );
             }
         },

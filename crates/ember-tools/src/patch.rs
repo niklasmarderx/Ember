@@ -209,7 +209,9 @@ pub fn compute_diff(original: &str, modified: &str) -> Vec<PatchHunk> {
     hunk_ranges.push((lo, hi));
 
     for &pos in &changed_positions[1..] {
-        let Some(last) = hunk_ranges.last_mut() else { continue; };
+        let Some(last) = hunk_ranges.last_mut() else {
+            continue;
+        };
         let extended_hi = (pos + CONTEXT + 1).min(edits.len());
         let expanded_lo = pos.saturating_sub(CONTEXT);
         if expanded_lo <= last.1 {
@@ -285,8 +287,8 @@ pub fn compute_diff(original: &str, modified: &str) -> Vec<PatchHunk> {
         }
 
         // old_start / new_start are 0-based indices; convert to 1-based.
-        let old_start_1 = old_start.map(|x| x + 1).unwrap_or(1);
-        let new_start_1 = new_start.map(|x| x + 1).unwrap_or(1);
+        let old_start_1 = old_start.map_or(1, |x| x + 1);
+        let new_start_1 = new_start.map_or(1, |x| x + 1);
 
         hunks.push(PatchHunk {
             old_start: old_start_1,

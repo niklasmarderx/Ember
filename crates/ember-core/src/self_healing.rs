@@ -628,7 +628,10 @@ where
 
     // All strategies failed
     system.record_failure(operation).await;
-    Err(format!("All recovery strategies failed for operation: {}", operation))
+    Err(format!(
+        "All recovery strategies failed for operation: {}",
+        operation
+    ))
 }
 
 #[cfg(test)]

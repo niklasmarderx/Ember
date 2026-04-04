@@ -2,8 +2,8 @@
 
 use std::time::Instant;
 
-use crate::config::AppConfig;
 use super::provider_factory::create_provider;
+use crate::config::AppConfig;
 
 use ember_llm::{CompletionRequest, Message};
 

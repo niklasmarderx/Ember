@@ -6,9 +6,8 @@
 use anyhow::{Context, Result};
 use colored::Colorize;
 use ember_llm::{
-    AnthropicProvider, BedrockProvider, DeepSeekProvider, GeminiProvider,
-    GroqProvider, LLMProvider, MistralProvider, OllamaProvider, OpenAIProvider,
-    OpenRouterProvider, XAIProvider,
+    AnthropicProvider, BedrockProvider, DeepSeekProvider, GeminiProvider, GroqProvider,
+    LLMProvider, MistralProvider, OllamaProvider, OpenAIProvider, OpenRouterProvider, XAIProvider,
 };
 use ember_tools::{FilesystemTool, GitTool, GlobTool, GrepTool, ShellTool, ToolRegistry, WebTool};
 use std::sync::Arc;

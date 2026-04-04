@@ -139,14 +139,12 @@ fn compute_cost(pricing: &ModelPricing, usage: &TokenUsage) -> UsageCostEstimate
         (usage.prompt_tokens as f64 / per_million) * pricing.input_cost_per_million;
     let output_cost_usd =
         (usage.completion_tokens as f64 / per_million) * pricing.output_cost_per_million;
-    let cache_creation_cost_usd = usage
-        .cache_creation_tokens
-        .map(|t| (t as f64 / per_million) * pricing.cache_creation_cost_per_million)
-        .unwrap_or(0.0);
-    let cache_read_cost_usd = usage
-        .cache_read_tokens
-        .map(|t| (t as f64 / per_million) * pricing.cache_read_cost_per_million)
-        .unwrap_or(0.0);
+    let cache_creation_cost_usd = usage.cache_creation_tokens.map_or(0.0, |t| {
+        (t as f64 / per_million) * pricing.cache_creation_cost_per_million
+    });
+    let cache_read_cost_usd = usage.cache_read_tokens.map_or(0.0, |t| {
+        (t as f64 / per_million) * pricing.cache_read_cost_per_million
+    });
 
     UsageCostEstimate {
         input_cost_usd,

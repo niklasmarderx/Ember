@@ -330,8 +330,7 @@ impl ImageTool {
             .unwrap_or("unknown");
 
         let format = ImageFormat::from_extension(extension)
-            .map(|f| f.extension().to_string())
-            .unwrap_or_else(|| extension.to_string());
+            .map_or_else(|| extension.to_string(), |f| f.extension().to_string());
 
         let info = ImageMetadata {
             width: 0,

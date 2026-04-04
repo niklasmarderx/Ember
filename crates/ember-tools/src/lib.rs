@@ -1,3 +1,15 @@
+#![allow(
+    clippy::too_many_lines,
+    clippy::format_push_string,
+    clippy::unused_self,
+    clippy::trivially_copy_pass_by_ref,
+    clippy::unused_async,
+    clippy::manual_let_else,
+    clippy::manual_strip,
+    clippy::field_reassign_with_default,
+    clippy::wildcard_imports
+)]
+
 //! # Ember Tools
 //!
 //! Built-in tools for Ember AI agents.

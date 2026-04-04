@@ -41,8 +41,10 @@ use std::fmt;
 /// Types of thinking blocks.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[derive(Default)]
 pub enum ThinkingType {
     /// General reasoning and analysis
+    #[default]
     Reasoning,
     /// Planning next steps
     Planning,
@@ -54,12 +56,6 @@ pub enum ThinkingType {
     Summary,
     /// Debugging or troubleshooting
     Debug,
-}
-
-impl Default for ThinkingType {
-    fn default() -> Self {
-        Self::Reasoning
-    }
 }
 
 impl fmt::Display for ThinkingType {
@@ -219,7 +215,7 @@ impl ThinkingExtractor {
                 }
             } else {
                 // Malformed tag, include as regular text
-                cleaned.push_str(&remaining[..start_idx + 1]);
+                cleaned.push_str(&remaining[..=start_idx]);
                 remaining = &remaining[start_idx + 1..];
                 position += 1;
             }

@@ -169,7 +169,7 @@ impl ContextManager {
 fn estimate_tokens(text: &str) -> usize {
     // Simple heuristic: ~4 characters per token for English text
     // This is a rough approximation; actual tokenization varies by model
-    (text.len() + 3) / 4
+    text.len().div_ceil(4)
 }
 
 #[cfg(test)]

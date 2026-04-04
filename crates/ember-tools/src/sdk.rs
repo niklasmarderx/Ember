@@ -530,7 +530,7 @@ impl ParamExtractor for Value {
 
 /// Validation helpers for tool parameters.
 pub mod validation {
-    use super::*;
+    use super::{Debug, Error, Result};
 
     /// Validate that a string is not empty.
     pub fn non_empty_string(value: &str, param_name: &str) -> Result<()> {
@@ -584,6 +584,7 @@ pub mod validation {
 
 #[cfg(test)]
 mod tests {
+    #[allow(clippy::wildcard_imports)]
     use super::*;
 
     #[test]

@@ -1,7 +1,7 @@
 //! Terminal I/O helpers — echo suppression, stdin draining, line reading.
 
-use std::io;
 use anyhow::Result;
+use std::io;
 
 /// Read a single line from stdin.
 pub fn read_line() -> Result<String> {

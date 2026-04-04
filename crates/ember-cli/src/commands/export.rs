@@ -234,7 +234,11 @@ fn parse_conversation_or_session(content: &str) -> Result<Conversation> {
 
     // Group user/assistant messages into turns
     let mut i = 0;
-    let msgs: Vec<_> = session.messages.iter().filter(|m| m.role != "system").collect();
+    let msgs: Vec<_> = session
+        .messages
+        .iter()
+        .filter(|m| m.role != "system")
+        .collect();
     while i < msgs.len() {
         if msgs[i].role == "user" {
             let user_msg = &msgs[i].content;

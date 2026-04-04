@@ -143,8 +143,7 @@ impl SessionForkManager {
                 let turn_count = self
                     .conversation_snapshots
                     .get(&fork.fork_id)
-                    .map(|t| t.len())
-                    .unwrap_or(0);
+                    .map_or(0, |t| t.len());
 
                 let is_active = newest_id == Some(fork.fork_id.as_str());
 

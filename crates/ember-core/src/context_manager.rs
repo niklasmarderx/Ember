@@ -156,7 +156,7 @@ pub enum MessageRole {
 }
 
 /// Additional message metadata.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct MessageMetadata {
     /// Tool name (if tool message)
     pub tool_name: Option<String>,
@@ -166,17 +166,6 @@ pub struct MessageMetadata {
     pub summarized_count: Option<usize>,
     /// Tags for filtering
     pub tags: Vec<String>,
-}
-
-impl Default for MessageMetadata {
-    fn default() -> Self {
-        Self {
-            tool_name: None,
-            is_summary: false,
-            summarized_count: None,
-            tags: vec![],
-        }
-    }
 }
 
 /// Token counting state.
@@ -409,7 +398,9 @@ impl ContextManager {
         for i in 0..self.messages.len().saturating_sub(skip_count) {
             if let Some(msg) = self.messages.get(i) {
                 if !msg.pinned {
-                    let Some(msg) = self.messages.remove(i) else { break; };
+                    let Some(msg) = self.messages.remove(i) else {
+                        break;
+                    };
                     self.update_token_count_on_remove(&msg);
                     self.stats.messages_pruned += 1;
                     self.stats.tokens_saved += msg.tokens;
@@ -451,7 +442,9 @@ impl ContextManager {
         }
 
         if let Some(idx) = lowest_idx {
-            let Some(msg) = self.messages.remove(idx) else { return; };
+            let Some(msg) = self.messages.remove(idx) else {
+                return;
+            };
             self.update_token_count_on_remove(&msg);
             self.stats.messages_pruned += 1;
             self.stats.tokens_saved += msg.tokens;

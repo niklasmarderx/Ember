@@ -157,8 +157,7 @@ impl App {
         };
 
         // Create default tool registry (same as `ember chat`)
-        let registry =
-            crate::commands::provider_factory::create_default_tool_registry(config);
+        let registry = crate::commands::provider_factory::create_default_tool_registry(config);
         let tool_names = registry.tool_names();
         let agent_mode = !tool_names.is_empty();
 
@@ -441,9 +440,8 @@ pub async fn run(config: AppConfig) -> Result<()> {
     let mut app = App::new(&config)?;
 
     // Create tool registry for the agent loop
-    let registry = Arc::new(
-        crate::commands::provider_factory::create_default_tool_registry(&config),
-    );
+    let registry =
+        Arc::new(crate::commands::provider_factory::create_default_tool_registry(&config));
 
     // Setup terminal
     enable_raw_mode().map_err(|e| {
@@ -651,8 +649,7 @@ async fn agent_loop(
                             })
                             .await;
                         // Add tool result to LLM history
-                        history
-                            .push(Message::tool_result(&call.id, &tool_output.output));
+                        history.push(Message::tool_result(&call.id, &tool_output.output));
                     }
                     Err(e) => {
                         let error_msg = format!("Tool error: {}", e);

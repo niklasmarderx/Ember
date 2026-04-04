@@ -174,8 +174,8 @@ impl InputValidator {
         let url_regex = Regex::new(r"https?://[^\s<>\[\]{}|\\^`]+").expect("hardcoded URL regex");
 
         // File path detection regex (Unix and Windows)
-        let path_regex =
-            Regex::new(r#"(?:^|[\s"'])(?:/[\w.-]+)+|(?:[A-Za-z]:)?\\[\w.-\\]+"#).expect("hardcoded regex");
+        let path_regex = Regex::new(r#"(?:^|[\s"'])(?:/[\w.-]+)+|(?:[A-Za-z]:)?\\[\w.-\\]+"#)
+            .expect("hardcoded regex");
 
         // Common injection patterns
         let injection_patterns = vec![
@@ -281,8 +281,7 @@ impl InputValidator {
         let duration = start.elapsed();
         let sanitized_length = sanitized_input
             .as_ref()
-            .map(|s| s.len())
-            .unwrap_or(original_length);
+            .map_or(original_length, |s| s.len());
 
         ValidationResult {
             is_valid: errors.is_empty(),
@@ -445,14 +444,12 @@ impl RateLimiter {
         // Check penalty
         let in_penalty = bucket
             .penalty_until
-            .map(|until| Instant::now() < until)
-            .unwrap_or(false);
+            .is_some_and(|until| Instant::now() < until);
 
         if in_penalty {
             let retry_after = bucket
                 .penalty_until
-                .map(|until| until.duration_since(Instant::now()).as_secs())
-                .unwrap_or(0);
+                .map_or(0, |until| until.duration_since(Instant::now()).as_secs());
 
             return RateLimitResult {
                 allowed: false,
@@ -511,8 +508,7 @@ impl RateLimiter {
         buckets.get(key).map(|bucket| {
             let in_penalty = bucket
                 .penalty_until
-                .map(|until| Instant::now() < until)
-                .unwrap_or(false);
+                .is_some_and(|until| Instant::now() < until);
 
             let remaining = bucket.tokens.floor() as u32;
 
@@ -1092,8 +1088,8 @@ impl PolicyEngine {
         policies.push(policy);
         // Sort by priority
         policies.sort_by(|a, b| {
-            let a_priority = a.rules.first().map(|r| r.priority).unwrap_or(u32::MAX);
-            let b_priority = b.rules.first().map(|r| r.priority).unwrap_or(u32::MAX);
+            let a_priority = a.rules.first().map_or(u32::MAX, |r| r.priority);
+            let b_priority = b.rules.first().map_or(u32::MAX, |r| r.priority);
             a_priority.cmp(&b_priority)
         });
     }
@@ -1144,12 +1140,8 @@ impl PolicyEngine {
         match &condition.operator {
             ConditionOperator::Equals => value == Some(&condition.value),
             ConditionOperator::NotEquals => value != Some(&condition.value),
-            ConditionOperator::Contains => {
-                value.map(|v| v.contains(&condition.value)).unwrap_or(false)
-            }
-            ConditionOperator::NotContains => {
-                value.map(|v| !v.contains(&condition.value)).unwrap_or(true)
-            }
+            ConditionOperator::Contains => value.is_some_and(|v| v.contains(&condition.value)),
+            ConditionOperator::NotContains => value.map_or(true, |v| !v.contains(&condition.value)),
             ConditionOperator::Matches => {
                 if let (Some(v), Ok(re)) = (value, Regex::new(&condition.value)) {
                     re.is_match(v)
@@ -1177,12 +1169,12 @@ impl PolicyEngine {
                     false
                 }
             }
-            ConditionOperator::In => value
-                .map(|v| condition.value.split(',').any(|item| item == v))
-                .unwrap_or(false),
-            ConditionOperator::NotIn => value
-                .map(|v| !condition.value.split(',').any(|item| item == v))
-                .unwrap_or(true),
+            ConditionOperator::In => {
+                value.is_some_and(|v| condition.value.split(',').any(|item| item == v))
+            }
+            ConditionOperator::NotIn => {
+                value.map_or(true, |v| !condition.value.split(',').any(|item| item == v))
+            }
         }
     }
 }

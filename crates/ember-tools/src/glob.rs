@@ -81,11 +81,7 @@ impl ToolHandler for GlobTool {
                 // Skip hidden files/dirs
                 let is_hidden = path
                     .components()
-                    .any(|c| {
-                        c.as_os_str()
-                            .to_string_lossy()
-                            .starts_with('.')
-                    });
+                    .any(|c| c.as_os_str().to_string_lossy().starts_with('.'));
                 if is_hidden {
                     return None;
                 }
@@ -97,10 +93,7 @@ impl ToolHandler for GlobTool {
                 {
                     return None;
                 }
-                let modified = std::fs::metadata(&path)
-                    .ok()?
-                    .modified()
-                    .ok()?;
+                let modified = std::fs::metadata(&path).ok()?.modified().ok()?;
                 Some((path, modified))
             })
             .collect();

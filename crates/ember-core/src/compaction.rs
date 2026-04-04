@@ -354,7 +354,10 @@ pub fn compact_message_history(
         return None; // not enough messages to compact
     }
 
-    let tokens_before: usize = history.iter().map(|m| estimate_str_tokens(&m.content)).sum();
+    let tokens_before: usize = history
+        .iter()
+        .map(|m| estimate_str_tokens(&m.content))
+        .sum();
 
     // Keep first message (system prompt) and last `keep_recent`
     let remove_start = 1;
@@ -391,7 +394,10 @@ pub fn compact_message_history(
     history.drain(remove_start..remove_end);
     history.insert(remove_start, ember_llm::Message::system(&summary));
 
-    let tokens_after: usize = history.iter().map(|m| estimate_str_tokens(&m.content)).sum();
+    let tokens_after: usize = history
+        .iter()
+        .map(|m| estimate_str_tokens(&m.content))
+        .sum();
 
     Some(CompactMessageInfo {
         messages_removed: removed_count,
@@ -466,10 +472,16 @@ impl StrategyTracker {
 
         // Analyze failure patterns
         let same_tool = tool_names.windows(2).all(|w| w[0] == w[1]);
-        let has_not_found = errors.iter().any(|e| e.contains("not found") || e.contains("No such file"));
+        let has_not_found = errors
+            .iter()
+            .any(|e| e.contains("not found") || e.contains("No such file"));
         let has_search_failed = errors.iter().any(|e| e.contains("SEARCH not found"));
-        let has_permission = errors.iter().any(|e| e.contains("denied") || e.contains("permission"));
-        let has_syntax = errors.iter().any(|e| e.contains("syntax") || e.contains("compile") || e.contains("parse"));
+        let has_permission = errors
+            .iter()
+            .any(|e| e.contains("denied") || e.contains("permission"));
+        let has_syntax = errors
+            .iter()
+            .any(|e| e.contains("syntax") || e.contains("compile") || e.contains("parse"));
 
         let (reasoning, alternative, severity) = if self.consecutive_failures >= 5 {
             (

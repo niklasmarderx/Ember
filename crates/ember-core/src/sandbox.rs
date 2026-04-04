@@ -66,24 +66,19 @@ impl std::fmt::Display for Capability {
 }
 
 /// Security level presets.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub enum SecurityLevel {
     /// No restrictions (not recommended).
     None,
     /// Basic restrictions - block dangerous commands.
     Basic,
     /// Standard - require approval for sensitive operations.
+    #[default]
     Standard,
     /// Strict - whitelist-only approach.
     Strict,
     /// Maximum - read-only, no network, no execution.
     Maximum,
-}
-
-impl Default for SecurityLevel {
-    fn default() -> Self {
-        Self::Standard
-    }
 }
 
 /// Resource limits for tool execution.
@@ -704,7 +699,7 @@ impl SecuritySandbox {
         {
             let mut requests = self.network_requests.write().await;
             let now = std::time::Instant::now();
-            let minute_ago = now - Duration::from_secs(60);
+            let minute_ago = now.checked_sub(Duration::from_secs(60)).unwrap();
 
             // Remove old requests
             requests.retain(|t| *t > minute_ago);
@@ -871,8 +866,7 @@ impl SecuritySandbox {
 
     /// Check if a domain matches a pattern.
     fn domain_matches(&self, domain: &str, pattern: &str) -> bool {
-        if pattern.starts_with("*.") {
-            let suffix = &pattern[2..];
+        if let Some(suffix) = pattern.strip_prefix("*.") {
             domain.ends_with(suffix) || domain == &suffix[1..]
         } else {
             domain == pattern || domain.ends_with(&format!(".{}", pattern))

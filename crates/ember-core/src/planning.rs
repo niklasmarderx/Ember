@@ -11,17 +11,13 @@ use uuid::Uuid;
 /// Mode of operation for the agent
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
+#[derive(Default)]
 pub enum AgentMode {
     /// Act mode: Execute actions immediately
+    #[default]
     Act,
     /// Plan mode: Create a plan first, then ask for approval
     Plan,
-}
-
-impl Default for AgentMode {
-    fn default() -> Self {
-        Self::Act
-    }
 }
 
 impl std::fmt::Display for AgentMode {

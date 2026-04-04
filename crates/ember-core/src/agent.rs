@@ -304,16 +304,19 @@ impl Agent {
         // Validate state transition
         let valid = matches!(
             (current, new_state),
-            (AgentState::Idle, AgentState::Thinking)
-                | (AgentState::Thinking, AgentState::Generating)
-                | (AgentState::Thinking, AgentState::Error)
-                | (AgentState::Generating, AgentState::ExecutingTool)
-                | (AgentState::Generating, AgentState::Idle)
-                | (AgentState::ExecutingTool, AgentState::Generating)
-                | (AgentState::ExecutingTool, AgentState::Thinking)
-                | (AgentState::ExecutingTool, AgentState::Error)
-                | (AgentState::Error, AgentState::Idle)
-                | (_, AgentState::Idle) // Always allow transition to Idle
+            (
+                AgentState::Idle | AgentState::ExecutingTool,
+                AgentState::Thinking
+            ) | (
+                AgentState::Thinking | AgentState::ExecutingTool,
+                AgentState::Generating
+            ) | (
+                AgentState::Thinking | AgentState::ExecutingTool,
+                AgentState::Error
+            ) | (
+                AgentState::Generating,
+                AgentState::ExecutingTool | AgentState::Idle
+            ) | (AgentState::Error | _, AgentState::Idle) // Always allow transition to Idle
         );
 
         if !valid {

@@ -75,8 +75,14 @@ pub async fn ready(
 
     // Database and storage checks are not yet integrated.
     // Don't pretend they're OK — report them as unchecked.
-    checks.insert("database".to_string(), "unchecked (not yet integrated)".to_string());
-    checks.insert("storage".to_string(), "unchecked (not yet integrated)".to_string());
+    checks.insert(
+        "database".to_string(),
+        "unchecked (not yet integrated)".to_string(),
+    );
+    checks.insert(
+        "storage".to_string(),
+        "unchecked (not yet integrated)".to_string(),
+    );
 
     let response = ReadinessResponse {
         status: if all_ok { "ready" } else { "not_ready" }.to_string(),
@@ -483,7 +489,9 @@ pub async fn delete_conversation(
 ) -> Result<Json<serde_json::Value>> {
     // Not yet integrated with ember-storage — return honest error
     info!(conversation_id = %id, "Delete conversation requested (not yet implemented)");
-    Err(WebError::Internal("Conversation deletion is not yet implemented.".to_string()))
+    Err(WebError::Internal(
+        "Conversation deletion is not yet implemented.".to_string(),
+    ))
 }
 
 // =============================================================================

@@ -82,11 +82,11 @@ pub mod security;
 mod self_healing;
 pub mod session_fork;
 mod streaming;
+pub mod system_prompt;
 mod task_planner;
 pub mod thinking;
 pub mod tool_executor;
 mod tool_selector;
-pub mod system_prompt;
 pub mod usage_tracker;
 
 pub use bootstrap::{BootstrapPhase, BootstrapPlan, BootstrapTimer};
@@ -223,6 +223,9 @@ pub use streaming::{
     StreamConfig, StreamController, StreamState, StreamStats, StreamToken, StreamTransformer,
     StreamingResponse, TokenAggregator,
 };
+pub use system_prompt::{
+    classify_tool_risk, detect_project_kind, ProjectKind, RiskTier, SystemPromptBuilder,
+};
 pub use task_planner::{
     DefaultTaskExecutor, ExecutionPlan, ExecutionProgress, Goal,
     PlannerConfig as TaskPlannerConfig, PlannerConfigBuilder as TaskPlannerConfigBuilder,
@@ -239,9 +242,6 @@ pub use tool_selector::{
 };
 pub use usage_tracker::{
     pricing_for_model, ModelPricing, SessionUsageTracker, TurnUsage, UsageCostEstimate,
-};
-pub use system_prompt::{
-    classify_tool_risk, detect_project_kind, ProjectKind, RiskTier, SystemPromptBuilder,
 };
 
 /// Re-export commonly used types from ember-llm

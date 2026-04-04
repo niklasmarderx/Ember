@@ -18,17 +18,13 @@ pub fn classify_call_risk(tool_name: &str, args: &serde_json::Value) -> ember_co
     match tool_name {
         "shell" => {
             // Analyse shell command for risk
-            let cmd = args
-                .get("command")
-                .and_then(|v| v.as_str())
-                .unwrap_or("");
+            let cmd = args.get("command").and_then(|v| v.as_str()).unwrap_or("");
             let lower = cmd.to_lowercase();
 
             // Read-only commands are Safe
             let safe_prefixes = [
-                "ls", "cat", "head", "tail", "wc", "grep", "rg", "find", "which", "echo",
-                "pwd", "whoami", "date", "uname", "env", "printenv", "tree", "file",
-                "stat", "du", "df",
+                "ls", "cat", "head", "tail", "wc", "grep", "rg", "find", "which", "echo", "pwd",
+                "whoami", "date", "uname", "env", "printenv", "tree", "file", "stat", "du", "df",
             ];
             let first_word = cmd.split_whitespace().next().unwrap_or("");
             if safe_prefixes.contains(&first_word) {
@@ -37,14 +33,26 @@ pub fn classify_call_risk(tool_name: &str, args: &serde_json::Value) -> ember_co
 
             // Build commands are Moderate
             let build_prefixes = [
-                "cargo", "npm", "pnpm", "yarn", "go", "make", "cmake", "pip",
-                "bundle", "mvn", "gradle", "rustfmt", "prettier", "eslint",
-                "git status", "git diff", "git log", "git branch",
+                "cargo",
+                "npm",
+                "pnpm",
+                "yarn",
+                "go",
+                "make",
+                "cmake",
+                "pip",
+                "bundle",
+                "mvn",
+                "gradle",
+                "rustfmt",
+                "prettier",
+                "eslint",
+                "git status",
+                "git diff",
+                "git log",
+                "git branch",
             ];
-            if build_prefixes
-                .iter()
-                .any(|p| lower.starts_with(p))
-            {
+            if build_prefixes.iter().any(|p| lower.starts_with(p)) {
                 return RiskTier::Moderate;
             }
 
@@ -68,10 +76,7 @@ pub fn classify_call_risk(tool_name: &str, args: &serde_json::Value) -> ember_co
             RiskTier::Dangerous
         }
         "filesystem" => {
-            let op = args
-                .get("operation")
-                .and_then(|v| v.as_str())
-                .unwrap_or("");
+            let op = args.get("operation").and_then(|v| v.as_str()).unwrap_or("");
             match op {
                 "read" | "list" | "search" | "glob" | "stat" => RiskTier::Safe,
                 "write" | "create" | "edit" | "append" => RiskTier::Moderate,
@@ -80,10 +85,7 @@ pub fn classify_call_risk(tool_name: &str, args: &serde_json::Value) -> ember_co
             }
         }
         "git" => {
-            let op = args
-                .get("operation")
-                .and_then(|v| v.as_str())
-                .unwrap_or("");
+            let op = args.get("operation").and_then(|v| v.as_str()).unwrap_or("");
             match op {
                 "status" | "diff" | "log" | "branch" | "show" => RiskTier::Safe,
                 "add" | "commit" | "stash" | "checkout" | "tag" => RiskTier::Moderate,
@@ -185,7 +187,10 @@ pub fn confirm_tool_execution(tool_name: &str, args: &serde_json::Value) -> bool
             }
         }
         "git" => {
-            let op = args.get("operation").and_then(|v| v.as_str()).unwrap_or("?");
+            let op = args
+                .get("operation")
+                .and_then(|v| v.as_str())
+                .unwrap_or("?");
             format!("Git {}", op)
         }
         _ => format!("Execute {} tool", tool_name),

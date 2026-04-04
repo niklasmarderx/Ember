@@ -390,7 +390,8 @@ async fn analyze_code(
             println!(
                 "  {} {}",
                 "[info]".yellow(),
-                "Complexity, code-smell, and symbol analysis require AST support (tree-sitter).".dimmed()
+                "Complexity, code-smell, and symbol analysis require AST support (tree-sitter)."
+                    .dimmed()
             );
             println!(
                 "  {} {}",
@@ -421,11 +422,7 @@ async fn analyze_code(
             csv.push_str("file,lines\n");
             for file in &files {
                 let loc = estimate_loc(file).unwrap_or(0);
-                csv.push_str(&format!(
-                    "{},{}\n",
-                    file.display(),
-                    loc,
-                ));
+                csv.push_str(&format!("{},{}\n", file.display(), loc,));
             }
 
             if let Some(output_path) = output {
@@ -470,7 +467,8 @@ async fn suggest_refactoring(
     );
     println!(
         "  {}",
-        "Refactoring suggestions require AST analysis which is not yet wired into the CLI.".dimmed()
+        "Refactoring suggestions require AST analysis which is not yet wired into the CLI."
+            .dimmed()
     );
     println!(
         "  {}",
@@ -589,7 +587,8 @@ async fn generate_tests(
     );
     println!(
         "  {}",
-        "Generic template tests that don't reference your actual code would be misleading.".dimmed()
+        "Generic template tests that don't reference your actual code would be misleading."
+            .dimmed()
     );
     println!(
         "  {}",
@@ -624,10 +623,9 @@ async fn show_stats(path: PathBuf, by_language: bool, detailed: bool) -> Result<
         let lang = ext_to_lang(ext);
         let loc = estimate_loc(file).unwrap_or(0);
 
-        let entry = stats_by_lang.entry(lang.to_string()).or_insert(LangStats {
-            files: 0,
-            lines: 0,
-        });
+        let entry = stats_by_lang
+            .entry(lang.to_string())
+            .or_insert(LangStats { files: 0, lines: 0 });
         entry.files += 1;
         entry.lines += loc;
     }
@@ -772,4 +770,3 @@ fn ext_to_lang(ext: &str) -> &str {
         _ => "Other",
     }
 }
-

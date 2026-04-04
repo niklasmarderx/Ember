@@ -93,24 +93,19 @@ pub struct PiiMatch {
 }
 
 /// Privacy level for data handling.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub enum PrivacyLevel {
     /// No special handling - send all data.
     None,
     /// Basic - redact obvious PII.
     Basic,
     /// Standard - redact all detected PII.
+    #[default]
     Standard,
     /// Strict - redact PII and use local processing when possible.
     Strict,
     /// Maximum - everything processed locally, no external calls.
     Maximum,
-}
-
-impl Default for PrivacyLevel {
-    fn default() -> Self {
-        Self::Standard
-    }
 }
 
 /// Configuration for the privacy shield.

@@ -263,7 +263,7 @@ impl VectorMemory {
                 document: self.documents.get(&id).cloned().unwrap_or_else(|| {
                     tracing::warn!(doc_id = %id, "Document missing from store during search");
                     Document {
-                        id: id.clone(),
+                        id,
                         content: String::new(),
                         embedding: None,
                         metadata: std::collections::HashMap::new(),
@@ -316,7 +316,7 @@ impl VectorMemory {
                 document: self.documents.get(&id).cloned().unwrap_or_else(|| {
                     tracing::warn!(doc_id = %id, "Document missing from store during search");
                     Document {
-                        id: id.clone(),
+                        id,
                         content: String::new(),
                         embedding: None,
                         metadata: std::collections::HashMap::new(),
