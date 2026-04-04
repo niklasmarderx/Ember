@@ -2,7 +2,7 @@
 
 use anyhow::Result;
 use crossterm::{
-    event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyModifiers},
+    event::{self, DisableMouseCapture, EnableMouseCapture, EnableBracketedPaste, DisableBracketedPaste, Event, KeyCode, KeyModifiers},
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
@@ -188,6 +188,20 @@ impl App {
         }
     }
 
+    /// Handle pasted text
+    pub fn handle_paste(&mut self, text: String) {
+        if matches!(self.state, AppState::Input | AppState::Normal) {
+            // Filter out control chars, keep printable + newlines→spaces
+            let clean: String = text.chars().map(|c| if c == '\n' || c == '\r' { ' ' } else { c })
+                .filter(|c| !c.is_control())
+                .collect();
+            for c in clean.chars() {
+                self.input.insert(self.cursor, c);
+                self.cursor += 1;
+            }
+        }
+    }
+
     /// Get the last user message for LLM request
     #[allow(dead_code)]
     pub fn last_user_message(&self) -> Option<&str> {
@@ -248,52 +262,61 @@ pub async fn run(config: AppConfig) -> Result<()> {
         "Failed to initialize terminal: {}. Make sure you're running in a real terminal emulator.", e
     ))?;
     let mut stdout = io::stdout();
-    execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
+    execute!(stdout, EnterAlternateScreen, EnableMouseCapture, EnableBracketedPaste)?;
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
 
     // Create channel for async responses
     let (response_tx, mut response_rx) = mpsc::channel::<Result<(String, u32)>>(1);
+    let mut request_sent = false;
 
     // Main loop
     loop {
         // Draw UI
         terminal.draw(|f| ui::render(f, &app))?;
 
-        // Check for async response
+        // Check for async response (always, not just on key events)
         if let Ok(result) = response_rx.try_recv() {
             match result {
                 Ok((content, tokens)) => app.add_response(content, tokens),
                 Err(e) => app.set_error(e.to_string()),
             }
+            request_sent = false;
+        }
+
+        // If we're in Waiting state and haven't sent a request yet, send one
+        if matches!(app.state, AppState::Waiting) && !request_sent {
+            let provider = app.provider.clone();
+            let model = app.model.clone();
+            let messages = app.build_messages();
+            let tx = response_tx.clone();
+
+            request_sent = true;
+            tokio::spawn(async move {
+                let request = ember_llm::CompletionRequest::from_messages(messages)
+                    .with_model(&model);
+
+                let result = provider.complete(request).await;
+                let _ = tx
+                    .send(
+                        result
+                            .map(|r| (r.content, r.usage.total_tokens))
+                            .map_err(|e| anyhow::anyhow!("{}", e)),
+                    )
+                    .await;
+            });
         }
 
         // Handle input with timeout
         if event::poll(std::time::Duration::from_millis(50))? {
-            if let Event::Key(key) = event::read()? {
-                app.handle_key(key.code, key.modifiers);
-
-                // If we just entered waiting state, spawn LLM request
-                if matches!(app.state, AppState::Waiting) {
-                    let provider = app.provider.clone();
-                    let model = app.model.clone();
-                    let messages = app.build_messages();
-                    let tx = response_tx.clone();
-
-                    tokio::spawn(async move {
-                        let request = ember_llm::CompletionRequest::from_messages(messages)
-                            .with_model(&model);
-
-                        let result = provider.complete(request).await;
-                        let _ = tx
-                            .send(
-                                result
-                                    .map(|r| (r.content, r.usage.total_tokens))
-                                    .map_err(|e| anyhow::anyhow!("{}", e)),
-                            )
-                            .await;
-                    });
+            match event::read()? {
+                Event::Key(key) => {
+                    app.handle_key(key.code, key.modifiers);
                 }
+                Event::Paste(text) => {
+                    app.handle_paste(text);
+                }
+                _ => {}
             }
         }
 
@@ -307,7 +330,8 @@ pub async fn run(config: AppConfig) -> Result<()> {
     execute!(
         terminal.backend_mut(),
         LeaveAlternateScreen,
-        DisableMouseCapture
+        DisableMouseCapture,
+        DisableBracketedPaste
     )?;
     terminal.show_cursor()?;
 
