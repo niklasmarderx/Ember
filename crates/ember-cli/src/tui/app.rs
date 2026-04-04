@@ -2,7 +2,10 @@
 
 use anyhow::Result;
 use crossterm::{
-    event::{self, DisableMouseCapture, EnableMouseCapture, EnableBracketedPaste, DisableBracketedPaste, Event, KeyCode, KeyEventKind, KeyModifiers},
+    event::{
+        self, DisableBracketedPaste, DisableMouseCapture, EnableBracketedPaste, EnableMouseCapture,
+        Event, KeyCode, KeyEventKind, KeyModifiers,
+    },
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
@@ -192,7 +195,9 @@ impl App {
     pub fn handle_paste(&mut self, text: String) {
         if matches!(self.state, AppState::Input | AppState::Normal) {
             // Filter out control chars, keep printable + newlines→spaces
-            let clean: String = text.chars().map(|c| if c == '\n' || c == '\r' { ' ' } else { c })
+            let clean: String = text
+                .chars()
+                .map(|c| if c == '\n' || c == '\r' { ' ' } else { c })
                 .filter(|c| !c.is_control())
                 .collect();
             for c in clean.chars() {
@@ -262,7 +267,12 @@ pub async fn run(config: AppConfig) -> Result<()> {
         "Failed to initialize terminal: {}. Make sure you're running in a real terminal emulator.", e
     ))?;
     let mut stdout = io::stdout();
-    execute!(stdout, EnterAlternateScreen, EnableMouseCapture, EnableBracketedPaste)?;
+    execute!(
+        stdout,
+        EnterAlternateScreen,
+        EnableMouseCapture,
+        EnableBracketedPaste
+    )?;
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
 
@@ -293,8 +303,8 @@ pub async fn run(config: AppConfig) -> Result<()> {
 
             request_sent = true;
             tokio::spawn(async move {
-                let request = ember_llm::CompletionRequest::from_messages(messages)
-                    .with_model(&model);
+                let request =
+                    ember_llm::CompletionRequest::from_messages(messages).with_model(&model);
 
                 let result = provider.complete(request).await;
                 let _ = tx
