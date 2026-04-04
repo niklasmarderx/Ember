@@ -1928,6 +1928,7 @@ async fn agent_interactive(
     let _ = rl.load_history(&history_path);
 
     let mut ctrl_c_count: u8 = 0;
+    let mut typeahead = String::new();
     loop {
         let cost_usd = tracker.total_cost().total_cost_usd();
         let prompt_str = if cost_usd > 0.0 {
@@ -1939,7 +1940,12 @@ async fn agent_interactive(
         } else {
             format!("{} ", "You:".bright_green().bold())
         };
-        let readline = rl.readline(&prompt_str);
+        let readline = if typeahead.is_empty() {
+            rl.readline(&prompt_str)
+        } else {
+            let prefill = std::mem::take(&mut typeahead);
+            rl.readline_with_initial(&prompt_str, (&prefill, ""))
+        };
         let input = match readline {
             Ok(line) => line,
             Err(ReadlineError::Interrupted) => {
@@ -2103,6 +2109,10 @@ async fn agent_interactive(
         }
 
         history.push(Message::user(input));
+
+        // Suppress keyboard echo while AI is responding so type-ahead
+        // doesn't visually mix with the output.
+        suppress_echo(true);
 
         for iteration in 0..MAX_TOOL_ITERATIONS {
             debug!("Interactive tool iteration {}", iteration + 1);
@@ -2313,6 +2323,10 @@ async fn agent_interactive(
             history.push(Message::assistant(&response.content));
             break;
         }
+
+        // Restore echo and drain any type-ahead into the next readline prefill
+        suppress_echo(false);
+        typeahead = drain_stdin();
 
         println!();
 
@@ -3106,4 +3120,68 @@ pub async fn bench_models(
         }
     }
     results
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Terminal echo suppression for type-ahead buffering
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Suppress or restore terminal echo so keystrokes during AI output
+/// don't appear on screen but remain in the stdin buffer.
+#[cfg(unix)]
+fn suppress_echo(suppress: bool) {
+    // Use nix-less raw termios via std::os::unix
+    use std::os::unix::io::AsRawFd;
+    let fd = std::io::stdin().as_raw_fd();
+
+    // We store/restore via a static to avoid unsafe global state issues.
+    // The simpler approach: just flip the ECHO bit each time.
+    unsafe {
+        let mut termios = std::mem::MaybeUninit::<libc::termios>::uninit();
+        if libc::tcgetattr(fd, termios.as_mut_ptr()) == 0 {
+            let mut t = termios.assume_init();
+            if suppress {
+                t.c_lflag &= !(libc::ECHO);
+            } else {
+                t.c_lflag |= libc::ECHO;
+            }
+            libc::tcsetattr(fd, libc::TCSANOW, &t);
+        }
+    }
+}
+
+#[cfg(not(unix))]
+fn suppress_echo(_suppress: bool) {}
+
+/// Drain any bytes sitting in the stdin buffer (non-blocking).
+/// Returns them as a UTF-8 string, filtering out control characters.
+fn drain_stdin() -> String {
+    use std::io::Read;
+    let mut buf = String::new();
+
+    #[cfg(unix)]
+    {
+        use std::os::unix::io::AsRawFd;
+        let fd = std::io::stdin().as_raw_fd();
+
+        // Set non-blocking
+        let flags = unsafe { libc::fcntl(fd, libc::F_GETFL) };
+        if flags >= 0 {
+            unsafe { libc::fcntl(fd, libc::F_SETFL, flags | libc::O_NONBLOCK) };
+
+            let mut raw = [0u8; 1024];
+            if let Ok(n) = std::io::stdin().lock().read(&mut raw) {
+                if let Ok(s) = std::str::from_utf8(&raw[..n]) {
+                    buf.push_str(s);
+                }
+            }
+
+            // Restore blocking mode
+            unsafe { libc::fcntl(fd, libc::F_SETFL, flags) };
+        }
+    }
+
+    // Filter: keep printable chars + space
+    buf.retain(|c| c.is_alphanumeric() || c.is_ascii_punctuation() || c == ' ');
+    buf
 }

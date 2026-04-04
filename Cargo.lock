@@ -2154,6 +2154,7 @@ dependencies = [
  "ember-web",
  "futures",
  "insta",
+ "libc",
  "predicates",
  "pulldown-cmark",
  "ratatui",

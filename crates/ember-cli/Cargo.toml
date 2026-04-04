@@ -82,6 +82,10 @@ axum = { workspace = true }
 # File system traversal (for code command)
 walkdir = "2.4"
 
+# Unix terminal control (echo suppression)
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
+
 [features]
 default = ["tui"]
 tui = ["dep:ratatui"]
