@@ -244,11 +244,7 @@ fn execute_sessions(args: SessionsArgs) -> Result<()> {
                         s.updated_at.dimmed(),
                     );
                     if !preview.is_empty() {
-                        println!(
-                            "  {:<12} {}",
-                            "",
-                            format!("\"{}\"", preview).dimmed()
-                        );
+                        println!("  {:<12} {}", "", format!("\"{}\"", preview).dimmed());
                     }
                 }
             }

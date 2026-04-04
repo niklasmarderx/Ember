@@ -718,7 +718,10 @@ async fn generate_review(
                         line: parts[1].trim().parse().unwrap_or(0),
                         severity: parts[2].trim().to_lowercase(),
                         message: parts[3].trim().to_string(),
-                        suggestion: parts.get(4).map(|s| s.trim().to_string()).filter(|s| !s.is_empty()),
+                        suggestion: parts
+                            .get(4)
+                            .map(|s| s.trim().to_string())
+                            .filter(|s| !s.is_empty()),
                     });
                 }
             }
@@ -743,7 +746,10 @@ async fn generate_review(
             let changed_files: Vec<&str> = diff
                 .lines()
                 .filter(|l| l.starts_with("+++ b/") || l.starts_with("--- a/"))
-                .filter_map(|l| l.strip_prefix("+++ b/").or_else(|| l.strip_prefix("--- a/")))
+                .filter_map(|l| {
+                    l.strip_prefix("+++ b/")
+                        .or_else(|| l.strip_prefix("--- a/"))
+                })
                 .collect();
             comments.push(ReviewComment {
                 file: "(overview)".to_string(),

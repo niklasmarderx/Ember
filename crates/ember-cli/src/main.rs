@@ -681,9 +681,25 @@ fn maybe_rewrite_args() -> Vec<String> {
 
     // Known subcommands that clap expects
     let known_subcommands = [
-        "chat", "run", "config", "info", "serve", "completions", "export",
-        "history", "plugin", "code", "git", "bench", "learn", "voice",
-        "index", "agents", "tui", "init", "help",
+        "chat",
+        "run",
+        "config",
+        "info",
+        "serve",
+        "completions",
+        "export",
+        "history",
+        "plugin",
+        "code",
+        "git",
+        "bench",
+        "learn",
+        "voice",
+        "index",
+        "agents",
+        "tui",
+        "init",
+        "help",
     ];
 
     // Find the first positional argument (skip flags like --verbose, --config foo)
@@ -695,7 +711,10 @@ fn maybe_rewrite_args() -> Vec<String> {
         }
         if arg.starts_with('-') {
             // Skip flag value if it's a key-value flag
-            if matches!(arg.as_str(), "--config" | "-c" | "--log-format" | "--log-level" | "--log-file") {
+            if matches!(
+                arg.as_str(),
+                "--config" | "-c" | "--log-format" | "--log-level" | "--log-file"
+            ) {
                 i += 1; // skip the value
             }
             i += 1;
@@ -742,7 +761,9 @@ fn read_piped_stdin() -> Option<String> {
         return None;
     }
     let mut content = String::new();
-    if std::io::Read::read_to_string(&mut std::io::stdin(), &mut content).is_ok() && !content.is_empty() {
+    if std::io::Read::read_to_string(&mut std::io::stdin(), &mut content).is_ok()
+        && !content.is_empty()
+    {
         Some(content)
     } else {
         None
@@ -780,17 +801,25 @@ async fn run() -> Result<()> {
         cli.log_file.as_deref(),
     )?;
 
-    let mut config = AppConfig::load(cli.config.as_deref()).context("Failed to load configuration")?;
+    let mut config =
+        AppConfig::load(cli.config.as_deref()).context("Failed to load configuration")?;
 
     // First-run detection: if no config file exists, no provider env vars are set,
     // and we're about to run a chat/run command on a TTY, offer interactive setup.
     if matches!(cli.command, Commands::Chat { .. } | Commands::Run { .. }) {
         let has_config = AppConfig::resolve_config_path().exists();
-        let has_env_key = ["OPENAI_API_KEY", "ANTHROPIC_API_KEY", "GOOGLE_API_KEY",
-            "GROQ_API_KEY", "DEEPSEEK_API_KEY", "MISTRAL_API_KEY",
-            "OPENROUTER_API_KEY", "XAI_API_KEY"]
-            .iter()
-            .any(|v| std::env::var(v).ok().filter(|s| !s.is_empty()).is_some());
+        let has_env_key = [
+            "OPENAI_API_KEY",
+            "ANTHROPIC_API_KEY",
+            "GOOGLE_API_KEY",
+            "GROQ_API_KEY",
+            "DEEPSEEK_API_KEY",
+            "MISTRAL_API_KEY",
+            "OPENROUTER_API_KEY",
+            "XAI_API_KEY",
+        ]
+        .iter()
+        .any(|v| std::env::var(v).ok().filter(|s| !s.is_empty()).is_some());
 
         if !has_config && !has_env_key && {
             use std::io::IsTerminal;
@@ -807,7 +836,8 @@ async fn run() -> Result<()> {
             );
             config_cmd::init_interactive(false).await?;
             // Reload config after wizard
-            config = AppConfig::load(cli.config.as_deref()).context("Failed to load configuration")?;
+            config =
+                AppConfig::load(cli.config.as_deref()).context("Failed to load configuration")?;
         }
     }
 
@@ -912,8 +942,8 @@ async fn run() -> Result<()> {
             runs,
             output,
         } => {
-            let model_list: Vec<String> = models
-                .unwrap_or_else(|| vec!["fast".into(), "smart".into(), "code".into()]);
+            let model_list: Vec<String> =
+                models.unwrap_or_else(|| vec!["fast".into(), "smart".into(), "code".into()]);
             println!(
                 "{} Benchmarking {} model(s) × {} run(s)",
                 "▸".bright_green(),
@@ -939,7 +969,9 @@ async fn run() -> Result<()> {
                     println!(
                         "  {:<30} {:>6} {:>6} {:>10} {}",
                         display_model,
-                        "-", "-", "-",
+                        "-",
+                        "-",
+                        "-",
                         format!("ERR: {}", truncate(err, 25)).bright_red()
                     );
                 } else {
@@ -960,12 +992,20 @@ async fn run() -> Result<()> {
             if output != "text" {
                 println!(
                     "  {}",
-                    format!("Output format '{}' — use --output text for table (default)", output).dimmed()
+                    format!(
+                        "Output format '{}' — use --output text for table (default)",
+                        output
+                    )
+                    .dimmed()
                 );
             }
 
             fn truncate(s: &str, max: usize) -> &str {
-                if s.len() > max { &s[..max] } else { s }
+                if s.len() > max {
+                    &s[..max]
+                } else {
+                    s
+                }
             }
         }
 

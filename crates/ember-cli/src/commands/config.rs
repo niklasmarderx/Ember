@@ -328,7 +328,10 @@ fn raw_input_masked(prompt: &str) -> String {
 
     let mut buf = String::new();
     loop {
-        if let Ok(Event::Key(KeyEvent { code, modifiers, .. })) = event::read() {
+        if let Ok(Event::Key(KeyEvent {
+            code, modifiers, ..
+        })) = event::read()
+        {
             if modifiers.contains(KeyModifiers::CONTROL) && code == KeyCode::Char('c') {
                 terminal::disable_raw_mode().ok();
                 println!();
@@ -417,7 +420,11 @@ pub async fn init_interactive(force: bool) -> Result<()> {
         4 => ("gemini", "GOOGLE_API_KEY", "gemini-2.0-flash"),
         5 => ("deepseek", "DEEPSEEK_API_KEY", "deepseek-chat"),
         6 => ("mistral", "MISTRAL_API_KEY", "mistral-large-latest"),
-        7 => ("openrouter", "OPENROUTER_API_KEY", "anthropic/claude-sonnet-4-20250514"),
+        7 => (
+            "openrouter",
+            "OPENROUTER_API_KEY",
+            "anthropic/claude-sonnet-4-20250514",
+        ),
         8 => ("xai", "XAI_API_KEY", "grok-3"),
         9 => ("openai", "OPENAI_API_KEY", "gpt-4o"), // custom = openai-compat
         _ => ("openai", "OPENAI_API_KEY", "gpt-4o"),
@@ -483,10 +490,7 @@ pub async fn init_interactive(force: bool) -> Result<()> {
     }
 
     // Step 3: Model selection
-    let model = raw_input(
-        &format!("Model [{}]:", default_model),
-        default_model,
-    );
+    let model = raw_input(&format!("Model [{}]:", default_model), default_model);
 
     // Step 4: Build and save config
     let mut config = AppConfig::default();
@@ -520,10 +524,7 @@ pub async fn init_interactive(force: bool) -> Result<()> {
     println!();
     let test = raw_input("Send a test message? (Y/n)", "y");
     if !test.eq_ignore_ascii_case("n") {
-        println!(
-            "\n  {} Sending test message...\n",
-            ">".bright_green()
-        );
+        println!("\n  {} Sending test message...\n", ">".bright_green());
         // Use create_provider + a simple completion
         match crate::commands::chat::create_provider(&config, provider_name) {
             Ok(provider) => {
@@ -536,7 +537,8 @@ pub async fn init_interactive(force: bool) -> Result<()> {
                     },
                     messages: vec![Message {
                         role: Role::User,
-                        content: "Say hello in one sentence and confirm you're working!".to_string(),
+                        content: "Say hello in one sentence and confirm you're working!"
+                            .to_string(),
                         content_parts: vec![],
                         name: None,
                         tool_calls: vec![],

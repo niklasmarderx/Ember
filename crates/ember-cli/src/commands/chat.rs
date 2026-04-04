@@ -55,6 +55,7 @@ use crate::config::AppConfig;
 use crate::ChatFormat;
 use anyhow::{Context, Result};
 use colored::Colorize;
+use ember_browser::BrowserTool;
 use ember_core::usage_tracker::SessionUsageTracker;
 use ember_llm::router::is_model_alias;
 use ember_llm::{
@@ -62,11 +63,10 @@ use ember_llm::{
     GroqProvider, LLMProvider, Message, MistralProvider, OllamaProvider, OpenAIProvider,
     OpenRouterProvider, RetryConfig, XAIProvider,
 };
+use ember_plugins::hooks::{HookContext, HookEvent, HookRunner};
 use ember_storage::semantic_cache::{SemanticCache, SemanticCacheBuilder};
 use ember_tools::filesystem::undo_last as filesystem_undo_last;
 use ember_tools::{FilesystemTool, GitTool, ShellTool, ToolRegistry, WebTool};
-use ember_browser::BrowserTool;
-use ember_plugins::hooks::{HookContext, HookEvent, HookRunner};
 use futures::StreamExt;
 use rustyline::error::ReadlineError;
 use serde::{Deserialize, Serialize};
@@ -520,10 +520,7 @@ pub async fn run(
             ctx_str
         );
         if auto_approve {
-            eprintln!(
-                "  {} auto-approve enabled",
-                "⚡".bright_yellow()
-            );
+            eprintln!("  {} auto-approve enabled", "⚡".bright_yellow());
         }
         eprintln!();
     }
@@ -540,16 +537,8 @@ pub async fn run(
             var.bright_red().bold(),
             provider_name.bright_cyan()
         );
-        eprintln!(
-            "  {} export {}=\"sk-...\"",
-            "fix:".dimmed(),
-            var
-        );
-        eprintln!(
-            "  {} {}",
-            "get key:".dimmed(),
-            url.bright_blue()
-        );
+        eprintln!("  {} export {}=\"sk-...\"", "fix:".dimmed(), var);
+        eprintln!("  {} {}", "get key:".dimmed(), url.bright_blue());
         eprintln!();
     }
 
@@ -740,17 +729,26 @@ fn create_tool_registry(tool_names: &[String]) -> Result<ToolRegistry> {
 /// Pre-flight check: warn if the selected provider's API key is missing.
 /// Returns (env_var_name, export_hint) or None if the key is present / not needed.
 /// Checks both environment variables AND config-file keys.
-fn check_provider_key(provider_name: &str, config: &crate::config::AppConfig) -> Option<(&'static str, &'static str)> {
+fn check_provider_key(
+    provider_name: &str,
+    config: &crate::config::AppConfig,
+) -> Option<(&'static str, &'static str)> {
     let (var, hint) = match provider_name {
         "openai" => ("OPENAI_API_KEY", "https://platform.openai.com/api-keys"),
-        "anthropic" => ("ANTHROPIC_API_KEY", "https://console.anthropic.com/settings/keys"),
+        "anthropic" => (
+            "ANTHROPIC_API_KEY",
+            "https://console.anthropic.com/settings/keys",
+        ),
         "gemini" | "google" => ("GOOGLE_API_KEY", "https://aistudio.google.com/apikey"),
         "groq" => ("GROQ_API_KEY", "https://console.groq.com/keys"),
         "deepseek" => ("DEEPSEEK_API_KEY", "https://platform.deepseek.com/api_keys"),
         "mistral" => ("MISTRAL_API_KEY", "https://console.mistral.ai/api-keys"),
         "openrouter" => ("OPENROUTER_API_KEY", "https://openrouter.ai/keys"),
         "xai" => ("XAI_API_KEY", "https://console.x.ai"),
-        "bedrock" | "aws" => ("AWS_ACCESS_KEY_ID", "https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-files.html"),
+        "bedrock" | "aws" => (
+            "AWS_ACCESS_KEY_ID",
+            "https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-files.html",
+        ),
         _ => return None, // ollama = local, no key needed
     };
 
@@ -760,10 +758,16 @@ fn check_provider_key(provider_name: &str, config: &crate::config::AppConfig) ->
     }
 
     // Check config-file API key (currently only openai has a config key field)
-    if provider_name == "openai" {
-        if config.provider.openai.api_key.as_ref().filter(|k| !k.is_empty()).is_some() {
-            return None;
-        }
+    if provider_name == "openai"
+        && config
+            .provider
+            .openai
+            .api_key
+            .as_ref()
+            .filter(|k| !k.is_empty())
+            .is_some()
+    {
+        return None;
     }
 
     Some((var, hint))
@@ -798,9 +802,8 @@ pub fn create_provider(config: &AppConfig, provider_name: &str) -> Result<Arc<dy
             Ok(Arc::new(provider))
         }
         "groq" => {
-            let provider = GroqProvider::from_env().context(
-                "Groq API key not found. Set GROQ_API_KEY environment variable.",
-            )?;
+            let provider = GroqProvider::from_env()
+                .context("Groq API key not found. Set GROQ_API_KEY environment variable.")?;
             Ok(Arc::new(provider))
         }
         "deepseek" => {
@@ -810,9 +813,8 @@ pub fn create_provider(config: &AppConfig, provider_name: &str) -> Result<Arc<dy
             Ok(Arc::new(provider))
         }
         "mistral" => {
-            let provider = MistralProvider::from_env().context(
-                "Mistral API key not found. Set MISTRAL_API_KEY environment variable.",
-            )?;
+            let provider = MistralProvider::from_env()
+                .context("Mistral API key not found. Set MISTRAL_API_KEY environment variable.")?;
             Ok(Arc::new(provider))
         }
         "openrouter" => {
@@ -822,9 +824,8 @@ pub fn create_provider(config: &AppConfig, provider_name: &str) -> Result<Arc<dy
             Ok(Arc::new(provider))
         }
         "xai" => {
-            let provider = XAIProvider::from_env().context(
-                "xAI API key not found. Set XAI_API_KEY environment variable.",
-            )?;
+            let provider = XAIProvider::from_env()
+                .context("xAI API key not found. Set XAI_API_KEY environment variable.")?;
             Ok(Arc::new(provider))
         }
         "bedrock" | "aws" => {
@@ -1308,16 +1309,36 @@ fn handle_slash(
         SlashCommand::Theme { theme } => {
             match theme.as_deref() {
                 Some("dark") => {
-                    println!("{} Theme switched to {}", "[theme]".bright_magenta(), "dark".bold());
+                    println!(
+                        "{} Theme switched to {}",
+                        "[theme]".bright_magenta(),
+                        "dark".bold()
+                    );
                     println!("  {} Deep blacks with bright accents", "●".bright_blue());
                 }
                 Some("light") => {
-                    println!("{} Theme switched to {}", "[theme]".bright_magenta(), "light".bold());
-                    println!("  {} Light background optimized colors", "●".bright_yellow());
+                    println!(
+                        "{} Theme switched to {}",
+                        "[theme]".bright_magenta(),
+                        "light".bold()
+                    );
+                    println!(
+                        "  {} Light background optimized colors",
+                        "●".bright_yellow()
+                    );
                 }
                 Some("neon") => {
-                    println!("{} Theme switched to {}", "[theme]".bright_magenta(), "neon".bold());
-                    println!("  {} {} {} Cyberpunk neon palette", "●".bright_magenta(), "●".bright_cyan(), "●".bright_green());
+                    println!(
+                        "{} Theme switched to {}",
+                        "[theme]".bright_magenta(),
+                        "neon".bold()
+                    );
+                    println!(
+                        "  {} {} {} Cyberpunk neon palette",
+                        "●".bright_magenta(),
+                        "●".bright_cyan(),
+                        "●".bright_green()
+                    );
                 }
                 Some(other) => {
                     println!(
@@ -1328,8 +1349,14 @@ fn handle_slash(
                 }
                 None => {
                     println!("{}", "Available Themes:".bright_magenta().bold());
-                    println!("  {} - Deep blacks with bright accents (default)", "dark".bright_cyan());
-                    println!("  {} - Optimized for light terminal backgrounds", "light".bright_cyan());
+                    println!(
+                        "  {} - Deep blacks with bright accents (default)",
+                        "dark".bright_cyan()
+                    );
+                    println!(
+                        "  {} - Optimized for light terminal backgrounds",
+                        "light".bright_cyan()
+                    );
                     println!("  {} - Cyberpunk neon palette", "neon".bright_cyan());
                     println!();
                     println!("  Usage: {}", "/theme <name>".dimmed());
@@ -1344,25 +1371,56 @@ fn handle_slash(
                     println!();
                     println!("{}", "🐾 Your Coding Buddy".bright_cyan().bold());
                     println!("  {:<14} {}", "Name:".dimmed(), buddy.name.bright_yellow());
-                    println!("  {:<14} {}", "Species:".dimmed(), buddy.species.bright_green());
+                    println!(
+                        "  {:<14} {}",
+                        "Species:".dimmed(),
+                        buddy.species.bright_green()
+                    );
                     println!("  {:<14} {}", "Title:".dimmed(), buddy.title.bright_white());
-                    println!("  {:<14} {}", "Personality:".dimmed(), buddy.personality.bright_white());
-                    println!("  {:<14} {}", "Specialty:".dimmed(), buddy.specialty.bright_white());
-                    println!("  {:<14} {}", "Level:".dimmed(), format!("Lv.{}", buddy.level).bright_magenta());
-                    println!("  {:<14} {}", "XP:".dimmed(), format!("{}/{}", buddy.xp, buddy.xp_for_next_level()).bright_blue());
+                    println!(
+                        "  {:<14} {}",
+                        "Personality:".dimmed(),
+                        buddy.personality.bright_white()
+                    );
+                    println!(
+                        "  {:<14} {}",
+                        "Specialty:".dimmed(),
+                        buddy.specialty.bright_white()
+                    );
+                    println!(
+                        "  {:<14} {}",
+                        "Level:".dimmed(),
+                        format!("Lv.{}", buddy.level).bright_magenta()
+                    );
+                    println!(
+                        "  {:<14} {}",
+                        "XP:".dimmed(),
+                        format!("{}/{}", buddy.xp, buddy.xp_for_next_level()).bright_blue()
+                    );
 
                     // Progress bar
                     let max_xp = buddy.xp_for_next_level();
-                    let filled = if max_xp > 0 { (buddy.xp as f64 / max_xp as f64 * 20.0) as usize } else { 0 };
+                    let filled = if max_xp > 0 {
+                        (buddy.xp as f64 / max_xp as f64 * 20.0) as usize
+                    } else {
+                        0
+                    };
                     let empty = 20_usize.saturating_sub(filled);
                     let bar = format!("[{}{}]", "█".repeat(filled), "░".repeat(empty));
                     println!("  {:<14} {}", "Progress:".dimmed(), bar.bright_cyan());
                     println!();
                 } else {
-                    println!("{}", "No buddy found. Run 'ember' to start onboarding and hatch your buddy!".bright_yellow());
+                    println!(
+                        "{}",
+                        "No buddy found. Run 'ember' to start onboarding and hatch your buddy!"
+                            .bright_yellow()
+                    );
                 }
             } else {
-                println!("{}", "No profile found. Run 'ember' to start onboarding!".bright_yellow());
+                println!(
+                    "{}",
+                    "No profile found. Run 'ember' to start onboarding!".bright_yellow()
+                );
             }
             SlashOutcome::Continue
         }
@@ -1475,7 +1533,7 @@ fn handle_slash(
                 "exit" | "quit" | "q" => return SlashOutcome::Exit,
                 _ => {
                     let reg = SlashCommandRegistry::new();
-                    if let Some(suggestion) = reg.suggest(&name) {
+                    if let Some(suggestion) = reg.suggest(name) {
                         println!(
                             "{} Unknown command '{}'. Did you mean {}?",
                             "[warn]".bright_yellow(),
@@ -1881,7 +1939,8 @@ async fn agent_interactive(
     }
     println!();
 
-    let tools = registry.as_ref()
+    let tools = registry
+        .as_ref()
         .map(|r| r.llm_tool_definitions())
         .unwrap_or_default();
 
@@ -1913,14 +1972,18 @@ async fn agent_interactive(
     let mut pending_plan: Vec<(String, String)> = Vec::new();
 
     // Compact mode — restore from session or config default
-    let mut compact_mode = resume.as_ref().map(|s| s.compact_mode).unwrap_or(config.agent.compact_mode);
+    let mut compact_mode = resume
+        .as_ref()
+        .map(|s| s.compact_mode)
+        .unwrap_or(config.agent.compact_mode);
 
     // Rustyline editor with slash-command tab-completion
     let completer = crate::commands::slash::SlashCompleter::new();
     let rl_config = rustyline::Config::builder()
         .completion_type(rustyline::CompletionType::List)
         .build();
-    let mut rl = rustyline::Editor::with_config(rl_config).context("Failed to initialize line editor")?;
+    let mut rl =
+        rustyline::Editor::with_config(rl_config).context("Failed to initialize line editor")?;
     rl.set_helper(Some(completer));
     let history_path = dirs::home_dir()
         .map(|h| h.join(".ember").join("history.txt"))
@@ -1954,7 +2017,10 @@ async fn agent_interactive(
                     println!("\n{}", "Goodbye!".bright_yellow());
                     break;
                 }
-                println!("{}", "Press Ctrl+C again to exit, or type a message.".dimmed());
+                println!(
+                    "{}",
+                    "Press Ctrl+C again to exit, or type a message.".dimmed()
+                );
                 continue;
             }
             Err(ReadlineError::Eof) => {
@@ -2022,7 +2088,11 @@ async fn agent_interactive(
                                 "▸".bright_cyan(),
                                 "ON".bright_green().bold()
                             );
-                            println!("  {}", "Use /execute to run the proposed plan, or /plan to toggle off.".dimmed());
+                            println!(
+                                "  {}",
+                                "Use /execute to run the proposed plan, or /plan to toggle off."
+                                    .dimmed()
+                            );
                         } else {
                             println!(
                                 "{} Plan mode {} — tools will execute normally.",
@@ -2078,7 +2148,11 @@ async fn agent_interactive(
                         println!(
                             "{} Compact mode {}",
                             "▸".bright_cyan(),
-                            if compact_mode { "ON — concise responses".bright_green() } else { "OFF — verbose responses".bright_red() }
+                            if compact_mode {
+                                "ON — concise responses".bright_green()
+                            } else {
+                                "OFF — verbose responses".bright_red()
+                            }
                         );
                         continue;
                     }
@@ -2134,13 +2208,16 @@ async fn agent_interactive(
                 io::stdout().flush()?;
             }
 
-            let response = match complete_with_retry_visible(&*provider, request, config.agent.max_retries).await {
-                Ok(r) => r,
-                Err(e) => {
-                    println!("{}", format!("Error: {}", e).bright_red());
-                    break;
-                }
-            };
+            let response =
+                match complete_with_retry_visible(&*provider, request, config.agent.max_retries)
+                    .await
+                {
+                    Ok(r) => r,
+                    Err(e) => {
+                        println!("{}", format!("Error: {}", e).bright_red());
+                        break;
+                    }
+                };
 
             // Record token usage
             tracker.record_turn(response.usage.clone());
@@ -2165,7 +2242,7 @@ async fn agent_interactive(
                         pending_plan.push((call.name.clone(), call.arguments.to_string()));
                         history.push(Message::tool_result(
                             &call.id,
-                            &format!("[Plan mode: {} call recorded but not executed]", call.name),
+                            format!("[Plan mode: {} call recorded but not executed]", call.name),
                         ));
                         continue;
                     }
@@ -2203,47 +2280,50 @@ async fn agent_interactive(
                     let reg = registry.as_ref().unwrap();
                     let use_parallel = config.agent.parallel_tools && approved_calls.len() > 1;
 
-                    let results: Vec<(String, std::result::Result<ember_tools::ToolOutput, ember_tools::Error>, &ember_llm::ToolCall)> =
-                        if use_parallel {
-                            let llm_calls: Vec<ember_llm::ToolCall> = approved_calls
-                                .iter()
-                                .map(|c| ember_llm::ToolCall::new(&c.id, &c.name, c.arguments.clone()))
-                                .collect();
-                            let par_results = reg.execute_parallel(&llm_calls).await;
-                            par_results
-                                .into_iter()
-                                .enumerate()
-                                .map(|(i, (id, res))| (id, res, approved_calls[i]))
-                                .collect()
-                        } else {
-                            let mut seq_results = Vec::new();
-                            for call in &approved_calls {
-                                // Use streaming execution for shell tools
-                                if reg.supports_streaming(&call.name) {
-                                    let (tx, mut rx) = tokio::sync::mpsc::channel::<String>(64);
-                                    let name = call.name.clone();
-                                    let args = call.arguments.clone();
+                    let results: Vec<(
+                        String,
+                        std::result::Result<ember_tools::ToolOutput, ember_tools::Error>,
+                        &ember_llm::ToolCall,
+                    )> = if use_parallel {
+                        let llm_calls: Vec<ember_llm::ToolCall> = approved_calls
+                            .iter()
+                            .map(|c| ember_llm::ToolCall::new(&c.id, &c.name, c.arguments.clone()))
+                            .collect();
+                        let par_results = reg.execute_parallel(&llm_calls).await;
+                        par_results
+                            .into_iter()
+                            .enumerate()
+                            .map(|(i, (id, res))| (id, res, approved_calls[i]))
+                            .collect()
+                    } else {
+                        let mut seq_results = Vec::new();
+                        for call in &approved_calls {
+                            // Use streaming execution for shell tools
+                            if reg.supports_streaming(&call.name) {
+                                let (tx, mut rx) = tokio::sync::mpsc::channel::<String>(64);
+                                let name = call.name.clone();
+                                let args = call.arguments.clone();
 
-                                    // Spawn display task that prints lines as they arrive
-                                    let display_handle = tokio::spawn(async move {
-                                        while let Some(line) = rx.recv().await {
-                                            let trimmed = line.trim_end();
-                                            if !trimmed.is_empty() {
-                                                println!("  {} {}", "│".dimmed(), trimmed);
-                                            }
+                                // Spawn display task that prints lines as they arrive
+                                let display_handle = tokio::spawn(async move {
+                                    while let Some(line) = rx.recv().await {
+                                        let trimmed = line.trim_end();
+                                        if !trimmed.is_empty() {
+                                            println!("  {} {}", "│".dimmed(), trimmed);
                                         }
-                                    });
+                                    }
+                                });
 
-                                    let res = reg.execute_streaming(&name, args, tx).await;
-                                    let _ = display_handle.await;
-                                    seq_results.push((call.id.clone(), res, *call));
-                                } else {
-                                    let res = reg.execute(&call.name, call.arguments.clone()).await;
-                                    seq_results.push((call.id.clone(), res, *call));
-                                }
+                                let res = reg.execute_streaming(&name, args, tx).await;
+                                let _ = display_handle.await;
+                                seq_results.push((call.id.clone(), res, *call));
+                            } else {
+                                let res = reg.execute(&call.name, call.arguments.clone()).await;
+                                seq_results.push((call.id.clone(), res, *call));
                             }
-                            seq_results
-                        };
+                        }
+                        seq_results
+                    };
 
                     // Phase 3: Process results (sequential — display + hooks + history)
                     for (call_id, result, call) in results {
@@ -2260,10 +2340,17 @@ async fn agent_interactive(
                                 for msg in post_result.messages() {
                                     println!("  {} {}", "[hook]".bright_magenta(), msg.dimmed());
                                 }
-                                format_tool_result_display(&call.name, &call.arguments, &tool_output);
+                                format_tool_result_display(
+                                    &call.name,
+                                    &call.arguments,
+                                    &tool_output,
+                                );
                                 let output = if compact_mode && tool_output.output.len() > 2000 {
-                                    format!("{}… [truncated, {} total chars]",
-                                        &tool_output.output[..2000], tool_output.output.len())
+                                    format!(
+                                        "{}… [truncated, {} total chars]",
+                                        &tool_output.output[..2000],
+                                        tool_output.output.len()
+                                    )
                                 } else {
                                     tool_output.output.clone()
                                 };
@@ -2346,7 +2433,9 @@ async fn agent_interactive(
             active_model: Some(active_model.clone()),
             compact_mode,
             plan_mode,
-            working_directory: std::env::current_dir().ok().map(|p| p.display().to_string()),
+            working_directory: std::env::current_dir()
+                .ok()
+                .map(|p| p.display().to_string()),
             total_cost_usd: tracker.total_cost().total_cost_usd(),
         };
         if let Err(e) = save_session(&session) {
@@ -2486,7 +2575,10 @@ async fn complete_with_retry_visible(
                 attempt,
                 max_retries,
                 delay.as_secs_f64(),
-                last_error.as_ref().map(|e| e.to_string()).unwrap_or_default()
+                last_error
+                    .as_ref()
+                    .map(|e| e.to_string())
+                    .unwrap_or_default()
             );
             tokio::time::sleep(delay).await;
         }
@@ -2585,7 +2677,10 @@ fn format_tool_call_display(tool_name: &str, args: &serde_json::Value) -> String
             )
         }
         "filesystem" => {
-            let op = args.get("operation").and_then(|v| v.as_str()).unwrap_or("?");
+            let op = args
+                .get("operation")
+                .and_then(|v| v.as_str())
+                .unwrap_or("?");
             let path = args.get("path").and_then(|v| v.as_str()).unwrap_or("?");
             let icon = match op {
                 "read" => "📖",
@@ -2596,20 +2691,22 @@ fn format_tool_call_display(tool_name: &str, args: &serde_json::Value) -> String
                 "exists" => "❓",
                 _ => "📄",
             };
-            format!(
-                "{} {} {}",
-                icon,
-                op.bright_cyan(),
-                path.bright_white()
-            )
+            format!("{} {} {}", icon, op.bright_cyan(), path.bright_white())
         }
         "git" => {
-            let op = args.get("operation").and_then(|v| v.as_str()).unwrap_or("?");
+            let op = args
+                .get("operation")
+                .and_then(|v| v.as_str())
+                .unwrap_or("?");
             format!("🔀 {} {}", "git".bright_cyan(), op.bright_white())
         }
         "web" => {
             let url = args.get("url").and_then(|v| v.as_str()).unwrap_or("?");
-            format!("🌐 {} {}", "fetch".bright_cyan(), truncate_str(url, 60).bright_white())
+            format!(
+                "🌐 {} {}",
+                "fetch".bright_cyan(),
+                truncate_str(url, 60).bright_white()
+            )
         }
         _ => {
             format!(
@@ -2643,11 +2740,7 @@ fn format_tool_result_display(
                         );
                     }
                     "write" => {
-                        println!(
-                            "  {} Wrote {}",
-                            "✓".bright_green(),
-                            path.bright_white()
-                        );
+                        println!("  {} Wrote {}", "✓".bright_green(), path.bright_white());
                         // Show inline diff with structured hunk data
                         show_inline_diff(result, path);
                     }
@@ -2661,11 +2754,7 @@ fn format_tool_result_display(
                         );
                     }
                     "delete" => {
-                        println!(
-                            "  {} Deleted {}",
-                            "✓".bright_green(),
-                            path.bright_white()
-                        );
+                        println!("  {} Deleted {}", "✓".bright_green(), path.bright_white());
                     }
                     _ => {
                         let preview = truncate_str(&result.output, 80);
@@ -2719,12 +2808,25 @@ fn format_tool_result_display(
 fn show_inline_diff(tool_output: &ember_tools::ToolOutput, path: &str) {
     // Try to extract structured diff hunks from tool data
     if let Some(ref data) = tool_output.data {
-        let lines_added = data.get("lines_added").and_then(|v| v.as_u64()).unwrap_or(0);
-        let lines_removed = data.get("lines_removed").and_then(|v| v.as_u64()).unwrap_or(0);
-        let created = data.get("created").and_then(|v| v.as_bool()).unwrap_or(false);
+        let lines_added = data
+            .get("lines_added")
+            .and_then(|v| v.as_u64())
+            .unwrap_or(0);
+        let lines_removed = data
+            .get("lines_removed")
+            .and_then(|v| v.as_u64())
+            .unwrap_or(0);
+        let created = data
+            .get("created")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false);
 
         if created {
-            println!("  {} new file (+{} lines)", "│".dimmed(), lines_added.to_string().bright_green());
+            println!(
+                "  {} new file (+{} lines)",
+                "│".dimmed(),
+                lines_added.to_string().bright_green()
+            );
         } else {
             println!(
                 "  {} {} {}",
@@ -2790,11 +2892,7 @@ fn show_inline_diff(tool_output: &ember_tools::ToolOutput, path: &str) {
             } else {
                 line.to_string()
             };
-            println!(
-                "  {} {}",
-                "+".bright_green(),
-                display_line.bright_green()
-            );
+            println!("  {} {}", "+".bright_green(), display_line.bright_green());
         }
         if line_count > 5 {
             println!(
@@ -2833,10 +2931,16 @@ fn build_working_directory_context() -> String {
             let mut version = None;
             for line in content.lines().take(20) {
                 if line.starts_with("name") {
-                    name = line.split('=').nth(1).map(|s| s.trim().trim_matches('"').to_string());
+                    name = line
+                        .split('=')
+                        .nth(1)
+                        .map(|s| s.trim().trim_matches('"').to_string());
                 }
                 if line.starts_with("version") {
-                    version = line.split('=').nth(1).map(|s| s.trim().trim_matches('"').to_string());
+                    version = line
+                        .split('=')
+                        .nth(1)
+                        .map(|s| s.trim().trim_matches('"').to_string());
                 }
             }
             if let (Some(n), Some(v)) = (name, version) {
@@ -2861,12 +2965,19 @@ fn build_working_directory_context() -> String {
         project_types.push("JavaScript/TypeScript (npm)");
         if let Ok(content) = std::fs::read_to_string(&package_json) {
             if let Ok(pkg) = serde_json::from_str::<serde_json::Value>(&content) {
-                let name = pkg.get("name").and_then(|v| v.as_str()).unwrap_or("unknown");
-                let version = pkg.get("version").and_then(|v| v.as_str()).unwrap_or("0.0.0");
+                let name = pkg
+                    .get("name")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("unknown");
+                let version = pkg
+                    .get("version")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("0.0.0");
                 ctx.push_str(&format!("Node project: {} v{}\n", name, version));
                 // Show available scripts
                 if let Some(scripts) = pkg.get("scripts").and_then(|v| v.as_object()) {
-                    let script_names: Vec<&str> = scripts.keys().map(|k| k.as_str()).take(10).collect();
+                    let script_names: Vec<&str> =
+                        scripts.keys().map(|k| k.as_str()).take(10).collect();
                     ctx.push_str(&format!("Scripts: {}\n", script_names.join(", ")));
                 }
                 // Show key deps
@@ -2886,7 +2997,10 @@ fn build_working_directory_context() -> String {
             for line in content.lines().take(20) {
                 if line.starts_with("name") {
                     if let Some(name) = line.split('=').nth(1) {
-                        ctx.push_str(&format!("Python project: {}\n", name.trim().trim_matches('"')));
+                        ctx.push_str(&format!(
+                            "Python project: {}\n",
+                            name.trim().trim_matches('"')
+                        ));
                     }
                 }
             }
@@ -2994,7 +3108,10 @@ fn confirm_tool_execution(tool_name: &str, args: &serde_json::Value) -> bool {
             format!("Run command: {}", cmd)
         }
         "filesystem" => {
-            let op = args.get("operation").and_then(|v| v.as_str()).unwrap_or("?");
+            let op = args
+                .get("operation")
+                .and_then(|v| v.as_str())
+                .unwrap_or("?");
             let path = args.get("path").and_then(|v| v.as_str()).unwrap_or("?");
             match op {
                 "write" => format!("Write to file: {}", path),

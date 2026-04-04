@@ -9,9 +9,8 @@ use std::env;
 use tracing::{debug, instrument};
 
 use crate::{
-    provider::StreamResponse, CompletionRequest, CompletionResponse, ContentPart, Error,
-    FinishReason, ImageSource, LLMProvider, ModelInfo, Result, StreamChunk, TokenUsage, ToolCall,
-    ToolCallDelta,
+    provider::StreamResponse, CompletionRequest, CompletionResponse, Error, FinishReason,
+    LLMProvider, ModelInfo, Result, StreamChunk, TokenUsage, ToolCall, ToolCallDelta,
 };
 
 use tokio_stream::wrappers::ReceiverStream;
@@ -122,9 +121,13 @@ impl LLMProvider for MistralProvider {
             let error_text = response.text().await.unwrap_or_default();
             let error_msg = serde_json::from_str::<MistralError>(&error_text)
                 .map(|e| e.message)
-                .unwrap_or_else(|_| if error_text.is_empty() {
-                    format!("HTTP {} (empty response)", status.as_u16())
-                } else { error_text });
+                .unwrap_or_else(|_| {
+                    if error_text.is_empty() {
+                        format!("HTTP {} (empty response)", status.as_u16())
+                    } else {
+                        error_text
+                    }
+                });
 
             return match status.as_u16() {
                 401 => Err(Error::api_key_missing("mistral")),
@@ -152,9 +155,13 @@ impl LLMProvider for MistralProvider {
             let error_text = response.text().await.unwrap_or_default();
             let error_msg = serde_json::from_str::<MistralError>(&error_text)
                 .map(|e| e.message)
-                .unwrap_or_else(|_| if error_text.is_empty() {
-                    format!("HTTP {} (empty response)", status.as_u16())
-                } else { error_text });
+                .unwrap_or_else(|_| {
+                    if error_text.is_empty() {
+                        format!("HTTP {} (empty response)", status.as_u16())
+                    } else {
+                        error_text
+                    }
+                });
 
             return match status.as_u16() {
                 401 => Err(Error::api_key_missing("mistral")),
@@ -273,7 +280,7 @@ impl LLMProvider for MistralProvider {
                 context_window: m.max_context_length,
                 max_output_tokens: None,
                 supports_tools: true,
-                supports_vision: m.capabilities.as_ref().map_or(false, |c| c.vision),
+                supports_vision: m.capabilities.as_ref().is_some_and(|c| c.vision),
                 provider: "mistral".to_string(),
             })
             .collect())
@@ -301,6 +308,7 @@ impl LLMProvider for MistralProvider {
 // Mistral API types
 
 #[derive(Debug, Serialize)]
+#[allow(dead_code)]
 struct MistralRequest {
     model: String,
     messages: Vec<MistralMessage>,
@@ -323,6 +331,7 @@ struct MistralRequest {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+#[allow(dead_code)]
 struct MistralMessage {
     role: String,
     content: MistralContent,
@@ -363,17 +372,20 @@ enum MistralContentPart {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+#[allow(dead_code)]
 struct MistralImageUrl {
     url: String,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+#[allow(dead_code)]
 struct MistralTool {
     r#type: String,
     function: MistralFunction,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+#[allow(dead_code)]
 struct MistralFunction {
     name: String,
     description: String,
@@ -381,6 +393,7 @@ struct MistralFunction {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+#[allow(dead_code)]
 struct MistralToolCall {
     id: Option<String>,
     r#type: String,
@@ -388,12 +401,14 @@ struct MistralToolCall {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+#[allow(dead_code)]
 struct MistralFunctionCall {
     name: Option<String>,
     arguments: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct MistralResponse {
     id: String,
     model: String,
@@ -402,12 +417,14 @@ struct MistralResponse {
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct MistralChoice {
     message: MistralMessage,
     finish_reason: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct MistralUsage {
     prompt_tokens: u32,
     completion_tokens: u32,
@@ -415,6 +432,7 @@ struct MistralUsage {
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct MistralError {
     message: String,
     #[serde(default)]
@@ -422,11 +440,13 @@ struct MistralError {
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct MistralModelsResponse {
     data: Vec<MistralModelInfo>,
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct MistralModelInfo {
     id: String,
     #[serde(default)]
@@ -438,6 +458,7 @@ struct MistralModelInfo {
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct MistralCapabilities {
     #[serde(default)]
     vision: bool,
@@ -448,29 +469,34 @@ struct MistralCapabilities {
 // Streaming response types
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct MistralStreamResponse {
     choices: Vec<MistralStreamChoice>,
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct MistralStreamChoice {
     delta: MistralStreamDelta,
     finish_reason: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct MistralStreamDelta {
     content: Option<String>,
     tool_calls: Option<Vec<MistralStreamToolCall>>,
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct MistralStreamToolCall {
     id: Option<String>,
     function: Option<MistralStreamFunction>,
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct MistralStreamFunction {
     name: Option<String>,
     arguments: Option<String>,

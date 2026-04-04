@@ -11,9 +11,8 @@ use std::env;
 use tracing::{debug, instrument};
 
 use crate::{
-    provider::StreamResponse, CompletionRequest, CompletionResponse, ContentPart, Error,
-    FinishReason, ImageSource, LLMProvider, ModelInfo, Result, StreamChunk, TokenUsage, ToolCall,
-    ToolCallDelta,
+    provider::StreamResponse, CompletionRequest, CompletionResponse, Error, FinishReason,
+    LLMProvider, ModelInfo, Result, StreamChunk, TokenUsage, ToolCall, ToolCallDelta,
 };
 
 use tokio_stream::wrappers::ReceiverStream;
@@ -354,9 +353,10 @@ impl LLMProvider for OpenRouterProvider {
                     .as_ref()
                     .and_then(|p| p.max_completion_tokens),
                 supports_tools: true, // Most models support tools via OpenRouter
-                supports_vision: m.architecture.as_ref().map_or(false, |a| {
-                    a.modality.as_ref().map_or(false, |m| m.contains("image"))
-                }),
+                supports_vision: m
+                    .architecture
+                    .as_ref()
+                    .is_some_and(|a| a.modality.as_ref().is_some_and(|m| m.contains("image"))),
                 provider: "openrouter".to_string(),
             })
             .collect())
@@ -384,6 +384,7 @@ impl LLMProvider for OpenRouterProvider {
 // OpenRouter API types (OpenAI-compatible with extensions)
 
 #[derive(Debug, Serialize)]
+#[allow(dead_code)]
 struct OpenRouterRequest {
     model: String,
     messages: Vec<OpenRouterMessage>,
@@ -408,6 +409,7 @@ struct OpenRouterRequest {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+#[allow(dead_code)]
 struct OpenRouterMessage {
     role: String,
     content: OpenRouterContent,
@@ -437,6 +439,7 @@ enum OpenRouterContentPart {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+#[allow(dead_code)]
 struct OpenRouterImageUrl {
     url: String,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -444,12 +447,14 @@ struct OpenRouterImageUrl {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+#[allow(dead_code)]
 struct OpenRouterTool {
     r#type: String,
     function: OpenRouterFunction,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+#[allow(dead_code)]
 struct OpenRouterFunction {
     name: String,
     description: String,
@@ -457,6 +462,7 @@ struct OpenRouterFunction {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+#[allow(dead_code)]
 struct OpenRouterToolCall {
     id: String,
     r#type: String,
@@ -464,12 +470,14 @@ struct OpenRouterToolCall {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+#[allow(dead_code)]
 struct OpenRouterFunctionCall {
     name: String,
     arguments: String,
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct OpenRouterResponse {
     id: String,
     model: String,
@@ -478,12 +486,14 @@ struct OpenRouterResponse {
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct OpenRouterChoice {
     message: OpenRouterMessage,
     finish_reason: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct OpenRouterUsage {
     prompt_tokens: u32,
     completion_tokens: u32,
@@ -491,11 +501,13 @@ struct OpenRouterUsage {
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct OpenRouterError {
     error: OpenRouterErrorDetail,
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct OpenRouterErrorDetail {
     message: String,
     #[serde(default)]
@@ -505,11 +517,13 @@ struct OpenRouterErrorDetail {
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct OpenRouterModelsResponse {
     data: Vec<OpenRouterModelInfo>,
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct OpenRouterModelInfo {
     id: String,
     name: Option<String>,
@@ -524,12 +538,14 @@ struct OpenRouterModelInfo {
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct OpenRouterTopProvider {
     #[serde(default)]
     max_completion_tokens: Option<u32>,
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct OpenRouterArchitecture {
     #[serde(default)]
     modality: Option<String>,
@@ -538,6 +554,7 @@ struct OpenRouterArchitecture {
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct OpenRouterPricing {
     #[serde(default)]
     prompt: Option<String>,
@@ -548,23 +565,27 @@ struct OpenRouterPricing {
 // Streaming types
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct OpenRouterStreamResponse {
     choices: Vec<OpenRouterStreamChoice>,
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct OpenRouterStreamChoice {
     delta: OpenRouterStreamDelta,
     finish_reason: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct OpenRouterStreamDelta {
     content: Option<String>,
     tool_calls: Option<Vec<OpenRouterStreamToolCall>>,
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct OpenRouterStreamToolCall {
     index: usize,
     id: Option<String>,
@@ -572,6 +593,7 @@ struct OpenRouterStreamToolCall {
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct OpenRouterStreamFunction {
     name: Option<String>,
     arguments: Option<String>,

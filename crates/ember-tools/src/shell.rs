@@ -486,8 +486,16 @@ impl ShellTool {
         self.validate_command(command)?;
         debug!(command = command, "Executing shell command (streaming)");
 
-        let shell = if cfg!(target_os = "windows") { "cmd" } else { "sh" };
-        let shell_arg = if cfg!(target_os = "windows") { "/C" } else { "-c" };
+        let shell = if cfg!(target_os = "windows") {
+            "cmd"
+        } else {
+            "sh"
+        };
+        let shell_arg = if cfg!(target_os = "windows") {
+            "/C"
+        } else {
+            "-c"
+        };
 
         let mut cmd = Command::new(shell);
         cmd.arg(shell_arg)
@@ -520,7 +528,9 @@ impl ShellTool {
                     let mut reader = BufReader::new(out);
                     let mut line = String::new();
                     while let Ok(n) = reader.read_line(&mut line).await {
-                        if n == 0 { break; }
+                        if n == 0 {
+                            break;
+                        }
                         let _ = tx_out.send(line.clone()).await;
                         lines.push_str(&line);
                         line.clear();
