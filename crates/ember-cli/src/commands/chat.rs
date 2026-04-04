@@ -1927,6 +1927,7 @@ async fn agent_interactive(
         .unwrap_or_default();
     let _ = rl.load_history(&history_path);
 
+    let mut ctrl_c_count: u8 = 0;
     loop {
         let cost_usd = tracker.total_cost().total_cost_usd();
         let prompt_str = if cost_usd > 0.0 {
@@ -1942,7 +1943,12 @@ async fn agent_interactive(
         let input = match readline {
             Ok(line) => line,
             Err(ReadlineError::Interrupted) => {
-                println!("{}", "Interrupted.".dimmed());
+                ctrl_c_count += 1;
+                if ctrl_c_count >= 2 {
+                    println!("\n{}", "Goodbye!".bright_yellow());
+                    break;
+                }
+                println!("{}", "Press Ctrl+C again to exit, or type a message.".dimmed());
                 continue;
             }
             Err(ReadlineError::Eof) => {
@@ -1955,6 +1961,7 @@ async fn agent_interactive(
             }
         };
         let input = input.trim();
+        ctrl_c_count = 0; // reset on valid input
 
         if input.is_empty() {
             continue;
