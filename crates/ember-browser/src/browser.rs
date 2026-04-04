@@ -175,7 +175,7 @@ impl BrowserController {
 
         let mut builder = BrowserConfig::builder();
 
-        if self.config.headless {
+        if !self.config.headless {
             builder = builder.with_head();
         }
 

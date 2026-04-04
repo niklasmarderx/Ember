@@ -183,11 +183,14 @@ fn sessions_dir() -> Result<std::path::PathBuf> {
 /// Generate a short random hex session id.
 fn new_session_id() -> String {
     use std::time::SystemTime;
-    let t = SystemTime::now()
+    let now = SystemTime::now()
         .duration_since(SystemTime::UNIX_EPOCH)
-        .unwrap_or_default()
-        .subsec_nanos();
-    format!("{:08x}", t ^ std::process::id())
+        .unwrap_or_default();
+    // Use timestamp + nanos + pid for uniqueness (pseudo-UUID)
+    let secs = now.as_secs();
+    let nanos = now.subsec_nanos();
+    let pid = std::process::id();
+    format!("{:08x}-{:08x}-{:04x}", secs, nanos, pid & 0xFFFF)
 }
 
 /// Save a session to disk.
@@ -461,8 +464,47 @@ pub async fn run(
     // Initialize memory system
     let memory_mgr = crate::memory::MemoryManager::new();
 
-    // Build system prompt: auto-context + user profile + memory + base prompt
-    let mut prompt_parts: Vec<String> = Vec::new();
+    // ── Build system prompt using SystemPromptBuilder ──
+    let cwd_path = std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));
+    let project_kind = ember_core::detect_project_kind(&cwd_path);
+
+    // Determine which tool names are active for the prompt
+    let active_tool_names: Vec<&str> = if let Some(ref tool_names) = tools {
+        if tool_names.len() == 1 && tool_names[0].to_lowercase() == "none" {
+            vec![]
+        } else {
+            tool_names.iter().map(|s| s.as_str()).collect()
+        }
+    } else {
+        // Default tools — matches create_default_tool_registry
+        let mut names = Vec::new();
+        if config.tools.shell_enabled {
+            names.push("shell");
+        }
+        if config.tools.filesystem_enabled {
+            names.push("file_read");
+            names.push("file_edit");
+            names.push("file_write");
+        }
+        if config.tools.web_enabled {
+            names.push("web_fetch");
+        }
+        names.push("git");
+        names.push("browser");
+        names
+    };
+
+    let mut prompt_builder = ember_core::SystemPromptBuilder::new()
+        .project_kind(project_kind)
+        .cwd(cwd_path.display().to_string())
+        .tool_names(&active_tool_names)
+        .auto_approve(auto_approve);
+
+    // Inject user profile name
+    if let Some(ref p) = profile {
+        prompt_builder = prompt_builder.user_name(&p.name);
+    }
+
     let mut context_tags: Vec<String> = Vec::new();
 
     // Smart auto-context: replaces manual EMBER.md + cwd gathering
@@ -479,14 +521,15 @@ pub async fn run(
         for label in auto_ctx.labels() {
             context_tags.push(label.to_string());
         }
-        prompt_parts.push(auto_ctx.to_prompt_section());
+        prompt_builder =
+            prompt_builder.add_context("PROJECT CONTEXT", auto_ctx.to_prompt_section());
     }
 
     if let Some(ref p) = profile {
         if let Some(ref buddy) = p.buddy {
             context_tags.push(format!("{} {}", buddy.emoji, buddy.name));
         }
-        prompt_parts.push(p.to_system_context());
+        prompt_builder = prompt_builder.add_context("USER PROFILE", p.to_system_context());
     }
 
     // Inject learned memory into system prompt
@@ -494,8 +537,13 @@ pub async fn run(
         if let Some(mem_ctx) = mgr.to_system_context() {
             let stats = mgr.load_stats();
             context_tags.push(format!("memory:{}", stats.total_observations));
-            prompt_parts.push(mem_ctx);
+            prompt_builder = prompt_builder.add_context("LEARNED MEMORY", mem_ctx);
         }
+    }
+
+    // Add project kind to context tags
+    if project_kind != ember_core::ProjectKind::Unknown {
+        context_tags.push(format!("lang:{}", project_kind));
     }
 
     // ── Compact startup banner ──
@@ -528,8 +576,11 @@ pub async fn run(
         eprintln!();
     }
 
-    prompt_parts.push(base_system_prompt);
-    let system_prompt = prompt_parts.join("\n\n---\n\n");
+    // If user provided a custom system prompt, add it as an extra rule section
+    if base_system_prompt != config.agent.system_prompt {
+        prompt_builder = prompt_builder.add_context("CUSTOM INSTRUCTIONS", base_system_prompt);
+    }
+    let system_prompt = prompt_builder.build();
     let temp = temperature.unwrap_or(config.agent.temperature);
 
     // Pre-flight: warn about missing API key before the hard error
@@ -1888,6 +1939,13 @@ async fn agent_interactive(
     // Initialize hook runner for PreToolUse/PostToolUse/PostToolUseFailure
     let hook_runner = HookRunner::new();
 
+    // Strategy tracker for smarter agentic loop (detects repeated failures)
+    let mut strategy_tracker = ember_core::StrategyTracker::new();
+
+    // Context budget tracker — estimates token usage and triggers compaction
+    let mut ctx_budget = ember_core::ContextBudget::for_model(128_000);
+    ctx_budget.set_system_tokens(ember_core::estimate_string_tokens(system_prompt));
+
     // Restore history from persisted session or start fresh
     let (session_id, mut history) = if let Some(ref s) = resume {
         let msgs: Vec<Message> = s.messages.iter().map(|m| m.to_message()).collect();
@@ -2114,6 +2172,24 @@ async fn agent_interactive(
         // doesn't visually mix with the output.
         suppress_echo(true);
 
+        // ── Auto-compaction: check token pressure before sending ─────
+        {
+            let conv_tokens: usize = history.iter().map(|m| ember_core::estimate_string_tokens(&m.content)).sum();
+            ctx_budget.set_conversation_tokens(conv_tokens);
+            if ctx_budget.needs_compaction() {
+                let info = ember_core::compact_message_history(&mut history, &ctx_budget);
+                if let Some(ref ci) = info {
+                    println!(
+                        "  {} Compacted {} messages ({} → {} tokens)",
+                        "[compact]".bright_yellow(),
+                        ci.messages_removed,
+                        ci.tokens_before,
+                        ci.tokens_after,
+                    );
+                }
+            }
+        }
+
         for iteration in 0..MAX_TOOL_ITERATIONS {
             debug!("Interactive tool iteration {}", iteration + 1);
 
@@ -2134,11 +2210,22 @@ async fn agent_interactive(
                 io::stdout().flush()?;
             }
 
-            let response = match complete_with_retry_visible(&*provider, request, config.agent.max_retries).await {
-                Ok(r) => r,
-                Err(e) => {
-                    println!("{}", format!("Error: {}", e).bright_red());
-                    break;
+            // ── Streaming response: collect text + tool calls from stream ──
+            let response = if streaming {
+                match stream_response_interactive(&*provider, request).await {
+                    Ok(r) => r,
+                    Err(e) => {
+                        println!("{}", format!("Error: {}", e).bright_red());
+                        break;
+                    }
+                }
+            } else {
+                match complete_with_retry_visible(&*provider, request, config.agent.max_retries).await {
+                    Ok(r) => r,
+                    Err(e) => {
+                        println!("{}", format!("Error: {}", e).bright_red());
+                        break;
+                    }
                 }
             };
 
@@ -2146,7 +2233,8 @@ async fn agent_interactive(
             tracker.record_turn(response.usage.clone());
 
             if !response.tool_calls.is_empty() {
-                if iteration == 0 {
+                if iteration == 0 && !streaming {
+                    // If streaming already printed "Ember: ", move to next line
                     println!();
                 }
 
@@ -2245,10 +2333,13 @@ async fn agent_interactive(
                             seq_results
                         };
 
-                    // Phase 3: Process results (sequential — display + hooks + history)
+                    // Phase 3: Process results (sequential — display + hooks + history + strategy tracking)
                     for (call_id, result, call) in results {
                         match result {
                             Ok(tool_output) => {
+                                // Track success in strategy tracker
+                                strategy_tracker.record(&call.name, tool_output.success, None);
+
                                 let post_ctx = HookContext {
                                     event: HookEvent::PostToolUse,
                                     tool_name: call.name.clone(),
@@ -2270,17 +2361,37 @@ async fn agent_interactive(
                                 history.push(Message::tool_result(&call_id, &output));
                             }
                             Err(e) => {
+                                // Track failure in strategy tracker
+                                let err_str = e.to_string();
+                                strategy_tracker.record(&call.name, false, Some(&err_str));
+
                                 let fail_ctx = HookContext {
                                     event: HookEvent::PostToolUseFailure,
                                     tool_name: call.name.clone(),
                                     tool_input: call.arguments.to_string(),
                                     tool_output: None,
-                                    error: Some(e.to_string()),
+                                    error: Some(err_str.clone()),
                                 };
                                 let _ = hook_runner.run(&fail_ctx);
                                 let error_msg = format!("Tool error: {}", e);
                                 println!("  {} {}", "[error]".bright_red(), &error_msg);
                                 history.push(Message::tool_result(&call_id, &error_msg));
+
+                                // If strategy tracker suggests switching, inject hint
+                                if strategy_tracker.should_switch_strategy() {
+                                    let reflection = strategy_tracker.reflect();
+                                    println!(
+                                        "  {} {}",
+                                        "[reflect]".bright_yellow(),
+                                        reflection.reasoning.dimmed()
+                                    );
+                                    // Inject a system hint to help the LLM recover
+                                    if let Some(ref alt) = reflection.alternative_strategy {
+                                        history.push(Message::system(&format!(
+                                            "[Strategy hint: {}]", alt
+                                        )));
+                                    }
+                                }
                             }
                         }
                     }
@@ -2288,26 +2399,23 @@ async fn agent_interactive(
                 continue;
             }
 
-            // Print the AI's text response with markdown rendering
-            if !response.content.is_empty() {
-                if iteration == 0 {
-                    #[cfg(feature = "tui")]
-                    {
-                        let renderer = TerminalRenderer::new();
-                        let _ = renderer.render_markdown(&response.content);
-                    }
-                    #[cfg(not(feature = "tui"))]
-                    println!("{}", response.content);
-                } else {
+            // Print the AI's text response
+            // When streaming was used, the text was already printed token-by-token
+            // by stream_response_interactive(). Only render when NOT streaming.
+            if !streaming && !response.content.is_empty() {
+                if iteration > 0 {
                     print!("{} ", "Ember:".bright_blue().bold());
-                    #[cfg(feature = "tui")]
-                    {
-                        let renderer = TerminalRenderer::new();
-                        let _ = renderer.render_markdown(&response.content);
-                    }
-                    #[cfg(not(feature = "tui"))]
-                    println!("{}", response.content);
                 }
+                #[cfg(feature = "tui")]
+                {
+                    let renderer = TerminalRenderer::new();
+                    let _ = renderer.render_markdown(&response.content);
+                }
+                #[cfg(not(feature = "tui"))]
+                println!("{}", response.content);
+            } else if streaming && !response.content.is_empty() {
+                // Streaming already printed the content; just ensure a newline
+                println!();
             }
 
             // Extract memory observations from this exchange
@@ -2511,6 +2619,102 @@ async fn complete_with_retry_visible(
             }
         }
     }
+}
+
+/// Stream a response from the LLM, printing content tokens in real-time.
+///
+/// Collects any streamed tool-call deltas into a synthetic
+/// [`CompletionResponse`] so the caller can handle tool calls exactly
+/// like the non-streaming path.
+async fn stream_response_interactive(
+    provider: &dyn LLMProvider,
+    request: CompletionRequest,
+) -> anyhow::Result<ember_llm::CompletionResponse> {
+    let mut stream = provider
+        .complete_stream(request)
+        .await
+        .context("Failed to start streaming response")?;
+
+    let mut content = String::new();
+    let mut token_count: u32 = 0;
+
+    // Tool-call accumulator: index → (id, name, arguments_json)
+    let mut tc_map: std::collections::HashMap<usize, (String, String, String)> =
+        std::collections::HashMap::new();
+    let mut finish_reason = None;
+
+    while let Some(chunk_result) = stream.next().await {
+        match chunk_result {
+            Ok(chunk) => {
+                // Accumulate text content and print immediately
+                if let Some(ref text) = chunk.content {
+                    if !text.is_empty() {
+                        print!("{}", text);
+                        io::stdout().flush()?;
+                        content.push_str(text);
+                        token_count += ((text.len() + 3) / 4) as u32;
+                    }
+                }
+
+                // Accumulate tool-call deltas
+                if let Some(ref deltas) = chunk.tool_calls {
+                    for delta in deltas {
+                        let entry = tc_map
+                            .entry(delta.index)
+                            .or_insert_with(|| (String::new(), String::new(), String::new()));
+                        if let Some(ref id) = delta.id {
+                            entry.0 = id.clone();
+                        }
+                        if let Some(ref name) = delta.name {
+                            entry.1 = name.clone();
+                        }
+                        if let Some(ref args) = delta.arguments {
+                            entry.2.push_str(args);
+                        }
+                    }
+                }
+
+                if let Some(fr) = chunk.finish_reason {
+                    finish_reason = Some(fr);
+                }
+                if chunk.done {
+                    break;
+                }
+            }
+            Err(e) => {
+                eprintln!("\n{} Stream error: {}", "[error]".bright_red(), e);
+                break;
+            }
+        }
+    }
+
+    // If we printed any content, add a newline before tool calls
+    if !content.is_empty() && !tc_map.is_empty() {
+        println!();
+    }
+
+    // Build tool calls from accumulated deltas
+    let mut tool_calls: Vec<ember_llm::ToolCall> = tc_map
+        .into_iter()
+        .map(|(_idx, (id, name, args_str))| {
+            let arguments = serde_json::from_str::<serde_json::Value>(&args_str)
+                .unwrap_or_else(|_| serde_json::Value::String(args_str));
+            ember_llm::ToolCall::new(id, name, arguments)
+        })
+        .collect();
+    // Sort by original index for deterministic order
+    tool_calls.sort_by(|a, b| a.id.cmp(&b.id));
+
+    let usage = ember_llm::TokenUsage::new(0, token_count);
+
+    Ok(ember_llm::CompletionResponse {
+        content,
+        tool_calls,
+        finish_reason,
+        usage,
+        model: String::new(),
+        id: None,
+    })
 }
 
 fn read_line() -> Result<String> {
@@ -2967,27 +3171,108 @@ fn build_working_directory_context() -> String {
 ///
 /// Respects the `--yes` flag and the "a" (always) answer which persists
 /// for the rest of the session.
+/// Classify the effective risk of a tool call, considering the operation type
+/// and arguments (not just the tool name).
+fn classify_call_risk(tool_name: &str, args: &serde_json::Value) -> ember_core::RiskTier {
+    use ember_core::RiskTier;
+
+    match tool_name {
+        "shell" => {
+            // Analyse shell command for risk
+            let cmd = args
+                .get("command")
+                .and_then(|v| v.as_str())
+                .unwrap_or("");
+            let lower = cmd.to_lowercase();
+
+            // Read-only commands are Safe
+            let safe_prefixes = [
+                "ls", "cat", "head", "tail", "wc", "grep", "rg", "find", "which", "echo",
+                "pwd", "whoami", "date", "uname", "env", "printenv", "tree", "file",
+                "stat", "du", "df",
+            ];
+            let first_word = cmd.split_whitespace().next().unwrap_or("");
+            if safe_prefixes.iter().any(|p| first_word == *p) {
+                return RiskTier::Safe;
+            }
+
+            // Build commands are Moderate
+            let build_prefixes = [
+                "cargo", "npm", "pnpm", "yarn", "go", "make", "cmake", "pip",
+                "bundle", "mvn", "gradle", "rustfmt", "prettier", "eslint",
+                "git status", "git diff", "git log", "git branch",
+            ];
+            if build_prefixes
+                .iter()
+                .any(|p| lower.starts_with(p))
+            {
+                return RiskTier::Moderate;
+            }
+
+            // Destructive patterns are Dangerous
+            if lower.contains("rm ")
+                || lower.contains("rm\t")
+                || lower.starts_with("rm ")
+                || lower.contains("sudo")
+                || lower.contains("chmod")
+                || lower.contains("chown")
+                || lower.contains("dd ")
+                || lower.contains("mkfs")
+                || lower.contains("> /dev/")
+                || lower.contains("curl") && lower.contains("|")
+                || lower.contains("wget") && lower.contains("|")
+            {
+                return RiskTier::Dangerous;
+            }
+
+            // Default shell = Dangerous
+            RiskTier::Dangerous
+        }
+        "filesystem" => {
+            let op = args
+                .get("operation")
+                .and_then(|v| v.as_str())
+                .unwrap_or("");
+            match op {
+                "read" | "list" | "search" | "glob" | "stat" => RiskTier::Safe,
+                "write" | "create" | "edit" | "append" => RiskTier::Moderate,
+                "delete" => RiskTier::Dangerous,
+                _ => RiskTier::Moderate,
+            }
+        }
+        "git" => {
+            let op = args
+                .get("operation")
+                .and_then(|v| v.as_str())
+                .unwrap_or("");
+            match op {
+                "status" | "diff" | "log" | "branch" | "show" => RiskTier::Safe,
+                "add" | "commit" | "stash" | "checkout" | "tag" => RiskTier::Moderate,
+                "push" | "force-push" | "reset" | "rebase" => RiskTier::Dangerous,
+                _ => RiskTier::Moderate,
+            }
+        }
+        "web" | "browser" => RiskTier::Safe,
+        _ => ember_core::classify_tool_risk(tool_name),
+    }
+}
+
 fn confirm_tool_execution(tool_name: &str, args: &serde_json::Value) -> bool {
+    use ember_core::RiskTier;
+
     // Check auto-approve first (set by --yes or previous "a" answer)
     if AUTO_APPROVE.load(Ordering::Relaxed) {
         return true;
     }
 
-    let is_dangerous = match tool_name {
-        "shell" => true, // Always confirm shell commands
-        "filesystem" => {
-            // Confirm writes and deletes, but not reads/lists
-            let op = args.get("operation").and_then(|v| v.as_str()).unwrap_or("");
-            matches!(op, "write" | "delete")
-        }
-        _ => false,
-    };
+    let risk = classify_call_risk(tool_name, args);
 
-    if !is_dangerous {
+    // Safe operations: always auto-approve
+    if risk == RiskTier::Safe {
         return true;
     }
 
-    // Format the confirmation message based on tool type
+    // Build description string for confirmation prompt
     let desc = match tool_name {
         "shell" => {
             let cmd = args.get("command").and_then(|v| v.as_str()).unwrap_or("?");
@@ -2997,17 +3282,29 @@ fn confirm_tool_execution(tool_name: &str, args: &serde_json::Value) -> bool {
             let op = args.get("operation").and_then(|v| v.as_str()).unwrap_or("?");
             let path = args.get("path").and_then(|v| v.as_str()).unwrap_or("?");
             match op {
-                "write" => format!("Write to file: {}", path),
+                "write" | "create" => format!("Write to file: {}", path),
+                "edit" => format!("Edit file: {}", path),
                 "delete" => format!("Delete: {}", path),
                 _ => format!("{}: {}", op, path),
             }
         }
+        "git" => {
+            let op = args.get("operation").and_then(|v| v.as_str()).unwrap_or("?");
+            format!("Git {}", op)
+        }
         _ => format!("Execute {} tool", tool_name),
     };
 
+    let risk_badge = match risk {
+        RiskTier::Moderate => "moderate".bright_yellow(),
+        RiskTier::Dangerous => "DANGEROUS".bright_red().bold(),
+        RiskTier::Safe => "safe".bright_green(), // won't reach here
+    };
+
     print!(
-        "  {} {} ({}/{}/{}) ",
+        "  {} [{}] {} ({}/{}/{}) ",
         "[confirm]".bright_yellow(),
+        risk_badge,
         desc,
         "y".bright_green(),
         "n".bright_red(),

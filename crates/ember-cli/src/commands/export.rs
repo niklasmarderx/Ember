@@ -132,47 +132,58 @@ pub fn export_conversation(
 
 /// Load a conversation from storage.
 fn load_conversation(id: Option<&str>) -> Result<Conversation> {
-    // Try to load from the data directory
+    // Try to load from the sessions directory (where chat saves them)
+    let sessions_dir = dirs::home_dir()
+        .map(|h| h.join(".ember").join("sessions"))
+        .unwrap_or_else(|| PathBuf::from(".ember/sessions"));
+
+    // Also check legacy data directory
     let data_dir = dirs::data_dir()
         .map(|d| d.join("ember").join("conversations"))
         .unwrap_or_else(|| PathBuf::from(".ember/conversations"));
 
     if let Some(conv_id) = id {
-        // Load specific conversation
+        // Load specific conversation — check sessions dir first, then legacy
+        let session_file = sessions_dir.join(format!("{}.json", conv_id));
         let conv_file = data_dir.join(format!("{}.json", conv_id));
-        if conv_file.exists() {
-            let content = std::fs::read_to_string(&conv_file)
-                .with_context(|| format!("Failed to read conversation {}", conv_id))?;
-            let conversation: Conversation = serde_json::from_str(&content)
-                .with_context(|| format!("Failed to parse conversation {}", conv_id))?;
-            return Ok(conversation);
-        }
-        bail!("Conversation '{}' not found", conv_id);
+        let target = if session_file.exists() {
+            session_file
+        } else if conv_file.exists() {
+            conv_file
+        } else {
+            bail!("Conversation '{}' not found", conv_id);
+        };
+        let content = std::fs::read_to_string(&target)
+            .with_context(|| format!("Failed to read conversation {}", conv_id))?;
+        let conversation: Conversation = serde_json::from_str(&content)
+            .with_context(|| format!("Failed to parse conversation {}", conv_id))?;
+        return Ok(conversation);
     }
 
-    // Try to load the most recent conversation
-    if data_dir.exists() {
-        let mut entries: Vec<_> = std::fs::read_dir(&data_dir)?
-            .filter_map(|e| e.ok())
-            .filter(|e| {
-                e.path()
-                    .extension()
-                    .map(|ext| ext == "json")
-                    .unwrap_or(false)
-            })
-            .collect();
+    // Try to load the most recent conversation from sessions dir or legacy dir
+    for dir in &[&sessions_dir, &data_dir] {
+        if dir.exists() {
+            let mut entries: Vec<_> = std::fs::read_dir(dir)?
+                .filter_map(|e| e.ok())
+                .filter(|e| {
+                    e.path()
+                        .extension()
+                        .map(|ext| ext == "json")
+                        .unwrap_or(false)
+                })
+                .collect();
 
-        // Sort by modification time (most recent first)
-        entries.sort_by(|a, b| {
-            let a_time = a.metadata().and_then(|m| m.modified()).ok();
-            let b_time = b.metadata().and_then(|m| m.modified()).ok();
-            b_time.cmp(&a_time)
-        });
+            entries.sort_by(|a, b| {
+                let a_time = a.metadata().and_then(|m| m.modified()).ok();
+                let b_time = b.metadata().and_then(|m| m.modified()).ok();
+                b_time.cmp(&a_time)
+            });
 
-        if let Some(entry) = entries.first() {
-            let content = std::fs::read_to_string(entry.path())?;
-            let conversation: Conversation = serde_json::from_str(&content)?;
-            return Ok(conversation);
+            if let Some(entry) = entries.first() {
+                let content = std::fs::read_to_string(entry.path())?;
+                let conversation: Conversation = serde_json::from_str(&content)?;
+                return Ok(conversation);
+            }
         }
     }
 

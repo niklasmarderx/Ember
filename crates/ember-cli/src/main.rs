@@ -811,6 +811,33 @@ async fn run() -> Result<()> {
         }
     }
 
+    // ── Config validation ──
+    {
+        let validation = config.validate();
+        for warning in &validation.warnings {
+            eprintln!(
+                "  {} {}",
+                "⚠ config:".bright_yellow(),
+                warning.message
+            );
+        }
+        if !validation.is_valid() {
+            for err in &validation.errors {
+                eprintln!(
+                    "  {} {}",
+                    "✗ config:".bright_red(),
+                    err.message
+                );
+            }
+            eprintln!(
+                "  {} Fix your config file or run {}",
+                "hint:".dimmed(),
+                "ember config init".bright_cyan()
+            );
+            // Don't bail — still usable with defaults, just warn loudly
+        }
+    }
+
     match cli.command {
         #[cfg(feature = "tui")]
         Commands::Tui => {
@@ -1367,7 +1394,7 @@ fn print_info() -> Result<()> {
         "[x]".green()
     );
     println!(
-        "  {} Anthropic    - Claude 3.5 Sonnet/Haiku/Opus",
+        "  {} Anthropic    - Claude Opus 4.6, Sonnet 4.6, Haiku 4.5",
         "[x]".green()
     );
     println!(
@@ -1421,20 +1448,22 @@ fn print_info() -> Result<()> {
         "  {} Browser      - Headless browser automation",
         "[x]".green()
     );
-    println!(
-        "  {} Code         - Execute Python, JS, Rust",
-        "[x]".green()
-    );
     println!();
     println!("{}", "Features:".bright_blue());
     println!("  {} Streaming responses", "[x]".green());
-    println!("  {} Conversation memory", "[x]".green());
-    println!("  {} Cost tracking & budgets", "[x]".green());
-    println!("  {} Checkpoints (undo/redo)", "[x]".green());
-    println!("  {} Multi-agent orchestration", "[x]".green());
-    println!("  {} WASM plugin system", "[x]".green());
-    println!("  {} Web UI & REST API", "[x]".green());
-    println!("  {} Privacy shield (PII redaction)", "[x]".green());
+    println!("  {} Session persistence & resume", "[x]".green());
+    println!("  {} Interactive setup wizard", "[x]".green());
+    println!("  {} Cost tracking", "[x]".green());
+    println!("  {} REST API server", "[x]".green());
+    println!("  {} Model benchmarking", "[x]".green());
+    println!("  {} AI code review (ember git review)", "[x]".green());
+    println!();
+    println!("{}", "Coming Soon:".bright_blue());
+    println!("  {} Multi-agent orchestration", "[ ]".dimmed());
+    println!("  {} WASM plugin system", "[ ]".dimmed());
+    println!("  {} Voice mode", "[ ]".dimmed());
+    println!("  {} Semantic code search (RAG)", "[ ]".dimmed());
+    println!("  {} MCP integration", "[ ]".dimmed());
     println!();
     println!("{}", "Configuration:".bright_blue());
     println!(
@@ -1445,17 +1474,12 @@ fn print_info() -> Result<()> {
     );
     println!();
     println!("{}", "Quick Start:".bright_blue());
+    println!("  ember init                        # Interactive setup");
     println!("  ember chat \"Hello!\"              # One-shot chat");
     println!("  ember chat                        # Interactive mode");
     println!("  ember chat --provider ollama      # Use local models");
-    println!("  ember serve                       # Start web UI");
-    println!("  ember plugin search weather       # Find plugins");
+    println!("  ember serve                       # Start REST API");
     println!();
-    println!(
-        "{} {}",
-        "Documentation:".bright_blue(),
-        "https://ember.dev/docs".cyan()
-    );
     println!(
         "{} {}",
         "Repository:".bright_blue(),
