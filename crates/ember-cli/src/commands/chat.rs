@@ -1829,7 +1829,7 @@ async fn agent_one_shot(
     system_prompt: &str,
     temperature: f32,
     message: &str,
-    streaming: bool,
+    _streaming: bool,
     registry: ToolRegistry,
     format: ChatFormat,
 ) -> Result<()> {
@@ -1914,11 +1914,7 @@ async fn agent_one_shot(
         match format {
             ChatFormat::Text => {
                 println!();
-                if streaming {
-                    print_final_response(&response.content);
-                } else {
-                    println!("{}", response.content);
-                }
+                print_final_response(&response.content);
             }
             ChatFormat::Json => {
                 let output = serde_json::json!({
@@ -1930,8 +1926,7 @@ async fn agent_one_shot(
                 println!("{}", serde_json::to_string_pretty(&output)?);
             }
             ChatFormat::Markdown => {
-                println!("## Response\n\n{}", response.content);
-                println!("\n---\n*Model: {} | Provider: {}*", model, provider.name());
+                print_final_response(&format!("## Response\n\n{}\n\n---\n*Model: {} | Provider: {}*", response.content, model, provider.name()));
             }
         }
 
@@ -2239,6 +2234,10 @@ async fn agent_interactive(
             println!("{}", "Goodbye!".bright_yellow());
             break;
         }
+
+        // ── @file expansion: inject referenced file contents ────────
+        let input = expand_file_mentions(input);
+        let input = input.as_str();
 
         history.push(Message::user(input));
 
@@ -2654,8 +2653,7 @@ async fn one_shot_chat(
                 println!("{}", serde_json::to_string_pretty(&output)?);
             }
             ChatFormat::Markdown => {
-                println!("## Response\n\n{}", response.content);
-                println!("\n---\n*Model: {} | Provider: {}*", model, provider.name());
+                print_final_response(&format!("## Response\n\n{}\n\n---\n*Model: {} | Provider: {}*", response.content, model, provider.name()));
             }
         }
     }
@@ -3402,8 +3400,62 @@ fn confirm_tool_execution(tool_name: &str, args: &serde_json::Value) -> bool {
                 .unwrap_or("?");
             let path = args.get("path").and_then(|v| v.as_str()).unwrap_or("?");
             match op {
-                "write" | "create" => format!("Write to file: {}", path),
-                "edit" => format!("Edit file: {}", path),
+                "write" | "create" => {
+                    // Show diff preview before confirming
+                    if let Some(new_content) = args.get("content").and_then(|v| v.as_str()) {
+                        let old_content = std::fs::read_to_string(path).unwrap_or_default();
+                        let hunks = ember_tools::compute_diff(&old_content, new_content);
+                        if !hunks.is_empty() {
+                            let diff_str = ember_tools::format_unified_diff(path, &hunks);
+                            let lines: Vec<&str> = diff_str.lines().collect();
+                            let max_lines = 30;
+                            for line in lines.iter().take(max_lines) {
+                                if line.starts_with('+') && !line.starts_with("+++") {
+                                    eprintln!("    {}", line.bright_green());
+                                } else if line.starts_with('-') && !line.starts_with("---") {
+                                    eprintln!("    {}", line.bright_red());
+                                } else if line.starts_with("@@") {
+                                    eprintln!("    {}", line.bright_cyan());
+                                } else {
+                                    eprintln!("    {}", line.dimmed());
+                                }
+                            }
+                            if lines.len() > max_lines {
+                                eprintln!(
+                                    "    {} ... {} more lines",
+                                    "".dimmed(),
+                                    lines.len() - max_lines
+                                );
+                            }
+                        } else if !old_content.is_empty() {
+                            eprintln!("    {}", "(no changes)".dimmed());
+                        } else {
+                            let line_count = new_content.lines().count();
+                            eprintln!("    {} new file ({} lines)", "+".bright_green(), line_count);
+                        }
+                    }
+                    format!("Write to file: {}", path)
+                }
+                "edit" => {
+                    if let (Some(old_str), Some(new_str)) = (
+                        args.get("old_str").and_then(|v| v.as_str()),
+                        args.get("new_str").and_then(|v| v.as_str()),
+                    ) {
+                        let old_lines: Vec<&str> = old_str.lines().collect();
+                        let new_lines: Vec<&str> = new_str.lines().collect();
+                        let max_show = 10;
+                        for line in old_lines.iter().take(max_show) {
+                            eprintln!("    {}{}", "-".bright_red(), line.bright_red());
+                        }
+                        for line in new_lines.iter().take(max_show) {
+                            eprintln!("    {}{}", "+".bright_green(), line.bright_green());
+                        }
+                        if old_lines.len() > max_show || new_lines.len() > max_show {
+                            eprintln!("    {}", "...".dimmed());
+                        }
+                    }
+                    format!("Edit file: {}", path)
+                }
                 "delete" => format!("Delete: {}", path),
                 _ => format!("{}: {}", op, path),
             }
@@ -3601,4 +3653,88 @@ fn drain_stdin() -> String {
     // Filter: keep printable chars + space
     buf.retain(|c| c.is_alphanumeric() || c.is_ascii_punctuation() || c == ' ');
     buf
+}
+
+/// Expand `@path/to/file` mentions in user input by reading the file
+/// contents and appending them as context. Supports both absolute and
+/// relative paths. Multiple @file mentions in one message are supported.
+fn expand_file_mentions(input: &str) -> String {
+    // Quick bail — no @ in the input
+    if !input.contains('@') {
+        return input.to_string();
+    }
+
+    let mut result = input.to_string();
+    let mut appended: Vec<String> = Vec::new();
+
+    // Simple parser: find @ followed by path-like characters
+    let chars: Vec<char> = input.chars().collect();
+    let mut i = 0;
+    while i < chars.len() {
+        if chars[i] == '@' && (i == 0 || chars[i - 1].is_whitespace()) {
+            // Start of a potential @file mention
+            let start = i + 1;
+            let mut end = start;
+            while end < chars.len()
+                && (chars[end].is_alphanumeric()
+                    || chars[end] == '/'
+                    || chars[end] == '.'
+                    || chars[end] == '-'
+                    || chars[end] == '_'
+                    || chars[end] == '~')
+            {
+                end += 1;
+            }
+            if end > start {
+                let raw_path: String = chars[start..end].iter().collect();
+
+                // Must look like a file path (contains / or .)
+                if raw_path.contains('/') || raw_path.contains('.') {
+                    // Expand ~ to home dir
+                    let path = if raw_path.starts_with('~') {
+                        if let Some(home) = dirs::home_dir() {
+                            home.join(raw_path[1..].trim_start_matches('/'))
+                        } else {
+                            std::path::PathBuf::from(&raw_path)
+                        }
+                    } else {
+                        std::path::PathBuf::from(&raw_path)
+                    };
+
+                    match std::fs::read_to_string(&path) {
+                        Ok(contents) => {
+                            let display_path = path.display();
+                            let line_count = contents.lines().count();
+                            eprintln!(
+                                "  {} {} ({} lines)",
+                                "[file]".bright_magenta(),
+                                display_path,
+                                line_count
+                            );
+                            appended.push(format!(
+                                "\n<file path=\"{}\">\n{}\n</file>",
+                                display_path, contents
+                            ));
+                        }
+                        Err(e) => {
+                            eprintln!(
+                                "  {} Could not read {}: {}",
+                                "[warn]".bright_yellow(),
+                                path.display(),
+                                e
+                            );
+                        }
+                    }
+                }
+            }
+            i = end;
+        } else {
+            i += 1;
+        }
+    }
+
+    if !appended.is_empty() {
+        result.push_str(&appended.join(""));
+    }
+    result
 }

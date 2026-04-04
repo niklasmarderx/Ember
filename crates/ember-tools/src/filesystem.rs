@@ -326,7 +326,7 @@ impl ToolHandler for FilesystemTool {
                 "operation": {
                     "type": "string",
                     "description": "The operation to perform",
-                    "enum": ["read", "write", "list", "delete", "search", "exists"]
+                    "enum": ["read", "write", "edit", "list", "delete", "search", "exists"]
                 },
                 "path": {
                     "type": "string",
@@ -334,7 +334,15 @@ impl ToolHandler for FilesystemTool {
                 },
                 "content": {
                     "type": "string",
-                    "description": "Content to write (for write operation)"
+                    "description": "Content to write (for write operation) or new_str replacement (for edit operation)"
+                },
+                "old_str": {
+                    "type": "string",
+                    "description": "Exact string to search for (for edit operation). Must match uniquely."
+                },
+                "new_str": {
+                    "type": "string",
+                    "description": "Replacement string (for edit operation). Use empty string to delete."
                 },
                 "pattern": {
                     "type": "string",
@@ -381,6 +389,64 @@ impl ToolHandler for FilesystemTool {
                 let data = serde_json::json!({
                     "path": path,
                     "created": result.created,
+                    "lines_added": result.lines_added,
+                    "lines_removed": result.lines_removed,
+                    "hunks": result.hunks,
+                });
+                Ok(ToolOutput {
+                    success: true,
+                    output: summary,
+                    data: Some(data),
+                })
+            }
+            "edit" => {
+                let old_str = arguments
+                    .get("old_str")
+                    .and_then(|v| v.as_str())
+                    .ok_or_else(|| {
+                        Error::invalid_arguments(
+                            "filesystem",
+                            "Missing 'old_str' for edit operation",
+                        )
+                    })?;
+                let new_str = arguments
+                    .get("new_str")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("");
+
+                let file_content = self.read_file(path).await?;
+                let matches: Vec<_> = file_content.match_indices(old_str).collect();
+
+                if matches.is_empty() {
+                    return Ok(ToolOutput {
+                        success: false,
+                        output: format!(
+                            "Edit failed: old_str not found in {}. Make sure it matches exactly.",
+                            path
+                        ),
+                        data: None,
+                    });
+                }
+                if matches.len() > 1 {
+                    return Ok(ToolOutput {
+                        success: false,
+                        output: format!(
+                            "Edit failed: old_str found {} times in {}. Provide more context to make it unique.",
+                            matches.len(),
+                            path
+                        ),
+                        data: None,
+                    });
+                }
+
+                let new_content = file_content.replacen(old_str, new_str, 1);
+                let result = self.write_file(path, &new_content).await?;
+                let summary = format!(
+                    "Edited {} (+{} -{})",
+                    path, result.lines_added, result.lines_removed
+                );
+                let data = serde_json::json!({
+                    "path": path,
                     "lines_added": result.lines_added,
                     "lines_removed": result.lines_removed,
                     "hunks": result.hunks,
