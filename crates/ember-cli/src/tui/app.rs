@@ -2,7 +2,7 @@
 
 use anyhow::Result;
 use crossterm::{
-    event::{self, DisableMouseCapture, EnableMouseCapture, EnableBracketedPaste, DisableBracketedPaste, Event, KeyCode, KeyModifiers},
+    event::{self, DisableMouseCapture, EnableMouseCapture, EnableBracketedPaste, DisableBracketedPaste, Event, KeyCode, KeyEventKind, KeyModifiers},
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
@@ -307,10 +307,23 @@ pub async fn run(config: AppConfig) -> Result<()> {
             });
         }
 
-        // Handle input with timeout
+        // Handle input — drain ALL pending events to handle fast paste
+        while event::poll(std::time::Duration::from_millis(0))? {
+            match event::read()? {
+                Event::Key(key) if key.kind == KeyEventKind::Press => {
+                    app.handle_key(key.code, key.modifiers);
+                }
+                Event::Paste(text) => {
+                    app.handle_paste(text);
+                }
+                _ => {} // ignore Release/Repeat/Mouse/Resize
+            }
+        }
+
+        // Wait briefly if no events were ready (avoid busy-loop)
         if event::poll(std::time::Duration::from_millis(50))? {
             match event::read()? {
-                Event::Key(key) => {
+                Event::Key(key) if key.kind == KeyEventKind::Press => {
                     app.handle_key(key.code, key.modifiers);
                 }
                 Event::Paste(text) => {
