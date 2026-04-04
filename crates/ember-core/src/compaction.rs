@@ -39,6 +39,11 @@ fn estimate_str_tokens(s: &str) -> usize {
     s.len().saturating_add(3) / 4
 }
 
+/// Public version of the token estimator for arbitrary strings.
+pub fn estimate_string_tokens(s: &str) -> usize {
+    estimate_str_tokens(s)
+}
+
 /// Estimate the total token footprint of a [`Turn`].
 ///
 /// Counts the user message, assistant response, and the text content of
@@ -274,6 +279,208 @@ pub fn compact_conversation(
         compacted_tokens,
         turns_removed: turns_to_summarise,
         summary,
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ContextBudget — lightweight token pressure tracker for raw Message lists
+// ---------------------------------------------------------------------------
+
+/// Tracks token pressure for a context window and determines when compaction
+/// is needed. Works with raw `Message` lists (unlike `CompactionConfig` which
+/// works with `Conversation` structs).
+#[derive(Debug, Clone)]
+pub struct ContextBudget {
+    /// Maximum tokens the model supports.
+    pub max_tokens: usize,
+    /// Estimated tokens used by the system prompt.
+    pub system_tokens: usize,
+    /// Estimated tokens used by conversation history.
+    pub conversation_tokens: usize,
+    /// Fraction of context that triggers compaction (default 0.75).
+    pub threshold: f64,
+}
+
+impl ContextBudget {
+    /// Create a budget for a model with the given context window size.
+    pub fn for_model(max_tokens: usize) -> Self {
+        Self {
+            max_tokens,
+            system_tokens: 0,
+            conversation_tokens: 0,
+            threshold: 0.75,
+        }
+    }
+
+    /// Record the estimated system prompt token count.
+    pub fn set_system_tokens(&mut self, tokens: usize) {
+        self.system_tokens = tokens;
+    }
+
+    /// Record the estimated conversation token count.
+    pub fn set_conversation_tokens(&mut self, tokens: usize) {
+        self.conversation_tokens = tokens;
+    }
+
+    /// Returns `true` when total tokens exceed threshold × max_tokens.
+    pub fn needs_compaction(&self) -> bool {
+        let total = self.system_tokens + self.conversation_tokens;
+        let limit = (self.max_tokens as f64 * self.threshold) as usize;
+        total >= limit
+    }
+}
+
+/// Result of compacting a raw message history.
+#[derive(Debug, Clone)]
+pub struct CompactMessageInfo {
+    /// Number of messages removed.
+    pub messages_removed: usize,
+    /// Estimated tokens before compaction.
+    pub tokens_before: usize,
+    /// Estimated tokens after compaction.
+    pub tokens_after: usize,
+}
+
+/// Compact a raw `Message` history by summarising older messages into a single
+/// system message. Keeps the first message (system prompt) and the last
+/// `keep_recent` messages intact.
+pub fn compact_message_history(
+    history: &mut Vec<ember_llm::Message>,
+    _budget: &ContextBudget,
+) -> Option<CompactMessageInfo> {
+    let keep_recent = 6; // keep last 6 messages
+
+    if history.len() <= keep_recent + 1 {
+        return None; // not enough messages to compact
+    }
+
+    let tokens_before: usize = history.iter().map(|m| estimate_str_tokens(&m.content)).sum();
+
+    // Keep first message (system prompt) and last `keep_recent`
+    let remove_start = 1;
+    let remove_end = history.len() - keep_recent;
+    let removed_count = remove_end - remove_start;
+
+    if removed_count == 0 {
+        return None;
+    }
+
+    // Build summary of removed messages
+    let mut summary_parts: Vec<String> = Vec::new();
+    summary_parts.push(format!(
+        "[Context summary — {} earlier messages compacted]",
+        removed_count
+    ));
+    for msg in &history[remove_start..remove_end] {
+        let prefix = match msg.role {
+            ember_llm::Role::User => "User",
+            ember_llm::Role::Assistant => "Assistant",
+            _ => continue,
+        };
+        let truncated = if msg.content.len() > 200 {
+            format!("{}…", &msg.content[..200])
+        } else {
+            msg.content.clone()
+        };
+        summary_parts.push(format!("{}: {}", prefix, truncated));
+    }
+
+    let summary = summary_parts.join("\n");
+
+    // Remove old messages and insert summary
+    history.drain(remove_start..remove_end);
+    history.insert(remove_start, ember_llm::Message::system(&summary));
+
+    let tokens_after: usize = history.iter().map(|m| estimate_str_tokens(&m.content)).sum();
+
+    Some(CompactMessageInfo {
+        messages_removed: removed_count,
+        tokens_before,
+        tokens_after,
+    })
+}
+
+// ---------------------------------------------------------------------------
+// StrategyTracker — detects repeated failures and suggests alternatives
+// ---------------------------------------------------------------------------
+
+/// Tracks tool execution success/failure to detect when the agent is stuck.
+#[derive(Debug, Clone)]
+pub struct StrategyTracker {
+    recent_results: Vec<(String, bool)>,
+    consecutive_failures: usize,
+}
+
+/// Reflection output from the strategy tracker.
+#[derive(Debug, Clone)]
+pub struct StrategyReflection {
+    /// Human-readable reasoning about why a strategy change is suggested.
+    pub reasoning: String,
+    /// Optional alternative approach to try.
+    pub alternative_strategy: Option<String>,
+}
+
+impl StrategyTracker {
+    /// Create a new strategy tracker.
+    pub fn new() -> Self {
+        Self {
+            recent_results: Vec::new(),
+            consecutive_failures: 0,
+        }
+    }
+
+    /// Record a tool execution result.
+    pub fn record(&mut self, tool_name: &str, success: bool, _error: Option<&str>) {
+        self.recent_results
+            .push((tool_name.to_string(), success));
+        if success {
+            self.consecutive_failures = 0;
+        } else {
+            self.consecutive_failures += 1;
+        }
+        // Keep only last 20 results
+        if self.recent_results.len() > 20 {
+            self.recent_results.remove(0);
+        }
+    }
+
+    /// Returns `true` if the agent appears stuck (3+ consecutive failures).
+    pub fn should_switch_strategy(&self) -> bool {
+        self.consecutive_failures >= 3
+    }
+
+    /// Generate a reflection about what's going wrong.
+    pub fn reflect(&self) -> StrategyReflection {
+        let recent_failures: Vec<&str> = self
+            .recent_results
+            .iter()
+            .rev()
+            .take(self.consecutive_failures)
+            .map(|(name, _)| name.as_str())
+            .collect();
+
+        let reasoning = format!(
+            "The last {} tool calls failed ({}). Consider a different approach.",
+            self.consecutive_failures,
+            recent_failures.join(", ")
+        );
+
+        let alternative = if self.consecutive_failures >= 5 {
+            Some("Try breaking the problem into smaller steps, or ask the user for clarification.".to_string())
+        } else {
+            Some("Try a different tool or different arguments.".to_string())
+        };
+
+        StrategyReflection {
+            reasoning,
+            alternative_strategy: alternative,
+        }
+    }
+}
+
+impl Default for StrategyTracker {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

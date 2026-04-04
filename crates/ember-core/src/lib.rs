@@ -119,6 +119,7 @@ mod task_planner;
 pub mod thinking;
 pub mod tool_executor;
 mod tool_selector;
+pub mod system_prompt;
 pub mod usage_tracker;
 
 pub use bootstrap::{BootstrapPhase, BootstrapPlan, BootstrapTimer};
@@ -140,8 +141,9 @@ pub use collaboration::{
     TaskDelegator, TaskEvent, TaskStatus as CollaborativeTaskStatus, ACP_VERSION,
 };
 pub use compaction::{
-    compact_conversation, estimate_tokens as estimate_conversation_tokens, should_compact,
-    CompactionConfig, CompactionResult,
+    compact_conversation, compact_message_history, estimate_string_tokens,
+    estimate_tokens as estimate_conversation_tokens, should_compact, CompactMessageInfo,
+    CompactionConfig, CompactionResult, ContextBudget, StrategyReflection, StrategyTracker,
 };
 pub use config::{AgentConfig, AgentConfigBuilder};
 pub use config_merge::{
@@ -270,6 +272,9 @@ pub use tool_selector::{
 };
 pub use usage_tracker::{
     pricing_for_model, ModelPricing, SessionUsageTracker, TurnUsage, UsageCostEstimate,
+};
+pub use system_prompt::{
+    classify_tool_risk, detect_project_kind, ProjectKind, RiskTier, SystemPromptBuilder,
 };
 
 /// Re-export commonly used types from ember-llm
