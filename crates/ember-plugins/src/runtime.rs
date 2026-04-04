@@ -287,23 +287,23 @@ impl PluginRuntime {
         // This is left as a TODO for the full WASM plugin support.
         let _ = module; // Suppress unused warning
 
-        // For now, return a placeholder - full implementation would call the actual function
+        // For now, return an honest error — full WASM execution is not yet implemented.
+        let _ = module; // Suppress unused warning
         let duration = start.elapsed();
 
         warn!(
             plugin = %plugin_name,
             function = %input.function,
-            "Plugin call simulation - real execution not yet implemented"
+            "Plugin WASM execution not yet implemented"
         );
 
         Ok(PluginOutput {
-            success: true,
-            result: Some(serde_json::json!({
-                "message": "Plugin function called (simulation)",
-                "plugin": plugin_name,
-                "function": input.function
-            })),
-            error: None,
+            success: false,
+            result: None,
+            error: Some(format!(
+                "Plugin WASM execution is not yet implemented. Plugin '{}' function '{}' cannot be called.",
+                plugin_name, input.function
+            )),
             duration_ms: duration.as_millis() as u64,
         })
     }

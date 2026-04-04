@@ -2,7 +2,7 @@
 //!
 //! Provides AI-powered code analysis, refactoring suggestions, and test generation.
 
-use anyhow::{Context, Result};
+use anyhow::Result;
 use clap::{Args, Subcommand, ValueEnum};
 use colored::Colorize;
 use std::path::{Path, PathBuf};
@@ -324,9 +324,9 @@ async fn analyze_code(
     _language: Option<LanguageArg>,
     format: OutputFormat,
     output: Option<PathBuf>,
-    max_complexity: u32,
-    show_smells: bool,
-    show_symbols: bool,
+    _max_complexity: u32,
+    _show_smells: bool,
+    _show_symbols: bool,
     _recursive: bool,
 ) -> Result<()> {
     println!(
@@ -344,40 +344,15 @@ async fn analyze_code(
     let files = collect_files(&path)?;
     println!("  Found {} files to analyze", files.len());
 
-    // Create mock analysis results for demonstration
+    // Line-count analysis — this is real (counts actual lines).
+    // NOTE: Complexity, code smells, and symbol counts require AST analysis
+    // (tree-sitter) which is not yet wired into the CLI.
     let mut total_loc = 0;
-    let mut total_complexity = 0;
-    let mut high_complexity_files = Vec::new();
-    let mut smells_found = Vec::new();
 
     for file in &files {
-        // Simulate analysis
         let loc = estimate_loc(file)?;
-        let complexity = (loc / 50).clamp(1, 25);
         total_loc += loc;
-        total_complexity += complexity;
-
-        if complexity > max_complexity as usize {
-            high_complexity_files.push((file.clone(), complexity));
-        }
-
-        if show_smells && loc > 200 {
-            smells_found.push((file.clone(), "LargeFile", format!("{} lines", loc)));
-        }
-        if show_smells && complexity > 15 {
-            smells_found.push((
-                file.clone(),
-                "HighComplexity",
-                format!("complexity {}", complexity),
-            ));
-        }
     }
-
-    let avg_complexity = if !files.is_empty() {
-        total_complexity / files.len()
-    } else {
-        0
-    };
 
     // Output results
     match format {
@@ -386,13 +361,7 @@ async fn analyze_code(
                 "path": path.display().to_string(),
                 "files_analyzed": files.len(),
                 "total_lines": total_loc,
-                "average_complexity": avg_complexity,
-                "high_complexity_files": high_complexity_files.iter()
-                    .map(|(f, c)| serde_json::json!({"file": f.display().to_string(), "complexity": c}))
-                    .collect::<Vec<_>>(),
-                "code_smells": smells_found.iter()
-                    .map(|(f, kind, desc)| serde_json::json!({"file": f.display().to_string(), "kind": kind, "description": desc}))
-                    .collect::<Vec<_>>()
+                "note": "Complexity and code-smell analysis requires AST support (not yet integrated)."
             });
 
             if let Some(output_path) = output {
@@ -416,64 +385,18 @@ async fn analyze_code(
                 "Total lines:".bright_blue(),
                 total_loc.to_string().white()
             );
-            println!(
-                "  {} {}",
-                "Average complexity:".bright_blue(),
-                format_complexity(avg_complexity, max_complexity as usize)
-            );
-
-            if !high_complexity_files.is_empty() {
-                println!();
-                println!("{}", "High Complexity Files".bright_red().bold());
-                println!("{}", "-".repeat(50));
-                for (file, complexity) in &high_complexity_files {
-                    println!(
-                        "  {} {} (complexity: {})",
-                        "[!]".red(),
-                        file.display().to_string().yellow(),
-                        complexity.to_string().red()
-                    );
-                }
-            }
-
-            if show_smells && !smells_found.is_empty() {
-                println!();
-                println!("{}", "Code Smells".bright_yellow().bold());
-                println!("{}", "-".repeat(50));
-                for (file, kind, desc) in &smells_found {
-                    println!(
-                        "  {} {} - {} ({})",
-                        "[~]".yellow(),
-                        file.display().to_string().cyan(),
-                        kind.bright_yellow(),
-                        desc
-                    );
-                }
-            }
-
-            if show_symbols {
-                println!();
-                println!("{}", "Symbol Summary".bright_blue().bold());
-                println!("{}", "-".repeat(50));
-                println!("  Functions: ~{}", files.len() * 5);
-                println!("  Structs/Classes: ~{}", files.len() * 2);
-                println!("  Constants: ~{}", files.len() * 3);
-            }
 
             println!();
-            if high_complexity_files.is_empty() && smells_found.is_empty() {
-                println!(
-                    "{} {}",
-                    "[OK]".green(),
-                    "Code looks good! No major issues found.".green()
-                );
-            } else {
-                println!(
-                    "{} Found {} issues to address",
-                    "[!]".yellow(),
-                    high_complexity_files.len() + smells_found.len()
-                );
-            }
+            println!(
+                "  {} {}",
+                "[info]".yellow(),
+                "Complexity, code-smell, and symbol analysis require AST support (tree-sitter).".dimmed()
+            );
+            println!(
+                "  {} {}",
+                "".dimmed(),
+                "The ember-code crate has the engine — CLI integration coming soon.".dimmed()
+            );
         }
         OutputFormat::Markdown => {
             let mut md = String::new();
@@ -484,18 +407,7 @@ async fn analyze_code(
             md.push_str("|--------|-------|\n");
             md.push_str(&format!("| Files analyzed | {} |\n", files.len()));
             md.push_str(&format!("| Total lines | {} |\n", total_loc));
-            md.push_str(&format!("| Average complexity | {} |\n", avg_complexity));
-
-            if !high_complexity_files.is_empty() {
-                md.push_str("\n## High Complexity Files\n\n");
-                for (file, complexity) in &high_complexity_files {
-                    md.push_str(&format!(
-                        "- `{}` (complexity: {})\n",
-                        file.display(),
-                        complexity
-                    ));
-                }
-            }
+            md.push_str("\n> **Note:** Complexity and code-smell analysis require AST support (not yet integrated).\n");
 
             if let Some(output_path) = output {
                 std::fs::write(&output_path, &md)?;
@@ -506,17 +418,13 @@ async fn analyze_code(
         }
         OutputFormat::Csv => {
             let mut csv = String::new();
-            csv.push_str("file,lines,complexity,smells\n");
+            csv.push_str("file,lines\n");
             for file in &files {
                 let loc = estimate_loc(file).unwrap_or(0);
-                let complexity = (loc / 50).clamp(1, 25);
-                let smell_count = smells_found.iter().filter(|(f, _, _)| f == file).count();
                 csv.push_str(&format!(
-                    "{},{},{},{}\n",
+                    "{},{}\n",
                     file.display(),
                     loc,
-                    complexity,
-                    smell_count
                 ));
             }
 
@@ -538,10 +446,10 @@ async fn suggest_refactoring(
     _language: Option<LanguageArg>,
     format: OutputFormat,
     output: Option<PathBuf>,
-    min_confidence: ConfidenceLevel,
+    _min_confidence: ConfidenceLevel,
     _kind: Option<String>,
     apply: bool,
-    yes: bool,
+    _yes: bool,
 ) -> Result<()> {
     println!(
         "{} {}",
@@ -631,15 +539,10 @@ async fn suggest_refactoring(
 
             if apply {
                 println!();
-                if yes {
-                    println!("{} Auto-applying refactorings...", "[!]".yellow());
-                    println!("{} Refactorings applied successfully!", "[OK]".green());
-                } else {
-                    println!(
-                        "{} Use --yes to confirm automatic application",
-                        "[?]".yellow()
-                    );
-                }
+                println!(
+                    "{} No refactoring suggestions available to apply.",
+                    "[info]".yellow()
+                );
             }
         }
         _ => {
@@ -656,11 +559,11 @@ async fn generate_tests(
     _language: Option<LanguageArg>,
     framework: Option<String>,
     test_type: TestType,
-    output: Option<PathBuf>,
-    include_edge_cases: bool,
-    include_error_tests: bool,
+    _output: Option<PathBuf>,
+    _include_edge_cases: bool,
+    _include_error_tests: bool,
     _mocks: bool,
-    dry_run: bool,
+    _dry_run: bool,
 ) -> Result<()> {
     println!(
         "{} {}",
@@ -676,86 +579,22 @@ async fn generate_tests(
     println!("  Using framework: {}", framework_name.bright_green());
     println!("  Test type: {:?}", test_type);
 
-    // Generate mock tests
-    let mut tests = Vec::new();
-
-    tests.push(GeneratedTest {
-        name: "test_basic_functionality".to_string(),
-        test_type: "Unit".to_string(),
-        code: generate_test_code(&framework_name, "test_basic_functionality", "basic"),
-    });
-
-    if include_edge_cases {
-        tests.push(GeneratedTest {
-            name: "test_empty_input".to_string(),
-            test_type: "EdgeCase".to_string(),
-            code: generate_test_code(&framework_name, "test_empty_input", "edge"),
-        });
-        tests.push(GeneratedTest {
-            name: "test_large_input".to_string(),
-            test_type: "EdgeCase".to_string(),
-            code: generate_test_code(&framework_name, "test_large_input", "edge"),
-        });
-    }
-
-    if include_error_tests {
-        tests.push(GeneratedTest {
-            name: "test_invalid_input_error".to_string(),
-            test_type: "Error".to_string(),
-            code: generate_test_code(&framework_name, "test_invalid_input_error", "error"),
-        });
-    }
-
+    // Test generation requires understanding the actual code (AST analysis or LLM).
+    // Generating generic template tests would be dishonest — they don't actually
+    // test the target code.
     println!();
     println!(
-        "{} {}",
-        "Generated".bright_green(),
-        format!("{} tests", tests.len()).white()
+        "{} Test generation requires AST analysis or LLM integration to produce meaningful tests.",
+        "[not implemented]".bright_yellow()
     );
-    println!("{}", "=".repeat(50));
-
-    for test in &tests {
-        println!();
-        println!(
-            "  {} {} ({})",
-            "[+]".green(),
-            test.name.bright_yellow(),
-            test.test_type.dimmed()
-        );
-        if dry_run {
-            println!("{}", "---".dimmed());
-            for line in test.code.lines().take(10) {
-                println!("    {}", line.dimmed());
-            }
-            if test.code.lines().count() > 10 {
-                println!("    {}", "... (truncated)".dimmed());
-            }
-        }
-    }
-
-    if !dry_run {
-        let output_path = output.unwrap_or_else(|| {
-            let mut p = path.clone();
-            p.set_extension("");
-            let name = p.file_name().unwrap_or_default().to_string_lossy();
-            PathBuf::from(format!("test_{}.rs", name))
-        });
-
-        let mut content = String::new();
-        content.push_str("// Auto-generated tests by Ember\n\n");
-        for test in &tests {
-            content.push_str(&test.code);
-            content.push_str("\n\n");
-        }
-
-        std::fs::write(&output_path, &content).context("Failed to write test file")?;
-        println!();
-        println!(
-            "{} Tests written to {}",
-            "[OK]".green(),
-            output_path.display().to_string().cyan()
-        );
-    }
+    println!(
+        "  {}",
+        "Generic template tests that don't reference your actual code would be misleading.".dimmed()
+    );
+    println!(
+        "  {}",
+        "The ember-code crate has the foundation — CLI integration coming soon.".dimmed()
+    );
 
     Ok(())
 }
@@ -788,19 +627,13 @@ async fn show_stats(path: PathBuf, by_language: bool, detailed: bool) -> Result<
         let entry = stats_by_lang.entry(lang.to_string()).or_insert(LangStats {
             files: 0,
             lines: 0,
-            blank: 0,
-            comment: 0,
         });
         entry.files += 1;
         entry.lines += loc;
-        entry.blank += loc / 10;
-        entry.comment += loc / 20;
     }
 
     let total_files: usize = stats_by_lang.values().map(|s| s.files).sum();
     let total_lines: usize = stats_by_lang.values().map(|s| s.lines).sum();
-    let total_blank: usize = stats_by_lang.values().map(|s| s.blank).sum();
-    let total_comment: usize = stats_by_lang.values().map(|s| s.comment).sum();
 
     println!();
     println!("{}", "Code Statistics".bright_yellow().bold());
@@ -809,38 +642,32 @@ async fn show_stats(path: PathBuf, by_language: bool, detailed: bool) -> Result<
     if by_language {
         println!();
         println!(
-            "{:<15} {:>8} {:>10} {:>8} {:>8}",
+            "{:<15} {:>8} {:>10}",
             "Language".bright_blue(),
             "Files".bright_blue(),
             "Lines".bright_blue(),
-            "Blank".bright_blue(),
-            "Comment".bright_blue()
         );
-        println!("{}", "-".repeat(60));
+        println!("{}", "-".repeat(40));
 
         let mut sorted: Vec<_> = stats_by_lang.iter().collect();
         sorted.sort_by(|a, b| b.1.lines.cmp(&a.1.lines));
 
         for (lang, stats) in sorted {
             println!(
-                "{:<15} {:>8} {:>10} {:>8} {:>8}",
+                "{:<15} {:>8} {:>10}",
                 lang.cyan(),
                 stats.files.to_string().white(),
                 stats.lines.to_string().white(),
-                stats.blank.to_string().dimmed(),
-                stats.comment.to_string().dimmed()
             );
         }
-        println!("{}", "-".repeat(60));
+        println!("{}", "-".repeat(40));
     }
 
     println!(
-        "{:<15} {:>8} {:>10} {:>8} {:>8}",
+        "{:<15} {:>8} {:>10}",
         "Total".bright_green().bold(),
         total_files.to_string().white().bold(),
         total_lines.to_string().white().bold(),
-        total_blank.to_string().dimmed(),
-        total_comment.to_string().dimmed()
     );
 
     if detailed {
@@ -871,17 +698,9 @@ struct RefactoringSuggestion {
     impact: String,
 }
 
-struct GeneratedTest {
-    name: String,
-    test_type: String,
-    code: String,
-}
-
 struct LangStats {
     files: usize,
     lines: usize,
-    blank: usize,
-    comment: usize,
 }
 
 fn collect_files(path: &PathBuf) -> Result<Vec<PathBuf>> {
@@ -917,16 +736,6 @@ fn estimate_loc(path: &PathBuf) -> Result<usize> {
     Ok(content.lines().count())
 }
 
-fn format_complexity(complexity: usize, threshold: usize) -> String {
-    if complexity <= threshold / 2 {
-        complexity.to_string().green().to_string()
-    } else if complexity <= threshold {
-        complexity.to_string().yellow().to_string()
-    } else {
-        complexity.to_string().red().to_string()
-    }
-}
-
 fn format_confidence(confidence: &str) -> String {
     match confidence {
         "VeryHigh" => "Very High".bright_green().to_string(),
@@ -935,23 +744,6 @@ fn format_confidence(confidence: &str) -> String {
         "Low" => "Low".red().to_string(),
         _ => confidence.to_string(),
     }
-}
-
-fn matches_confidence(confidence: &str, min: ConfidenceLevel) -> bool {
-    let level = match confidence {
-        "VeryHigh" => 4,
-        "High" => 3,
-        "Medium" => 2,
-        "Low" => 1,
-        _ => 0,
-    };
-    let min_level = match min {
-        ConfidenceLevel::VeryHigh => 4,
-        ConfidenceLevel::High => 3,
-        ConfidenceLevel::Medium => 2,
-        ConfidenceLevel::Low => 1,
-    };
-    level >= min_level
 }
 
 fn detect_framework(path: &Path) -> String {
@@ -981,75 +773,3 @@ fn ext_to_lang(ext: &str) -> &str {
     }
 }
 
-fn generate_test_code(framework: &str, name: &str, kind: &str) -> String {
-    match framework {
-        "rust-test" => {
-            let assertion = match kind {
-                "basic" => "assert!(result.is_ok());",
-                "edge" => "assert!(result.is_empty() || result.len() > 0);",
-                "error" => "assert!(result.is_err());",
-                _ => "assert!(true);",
-            };
-            format!(
-                r#"#[test]
-fn {}() {{
-    // Arrange
-    let input = Default::default();
-    
-    // Act
-    let result = function_under_test(input);
-    
-    // Assert
-    {}
-}}"#,
-                name, assertion
-            )
-        }
-        "pytest" => {
-            let assertion = match kind {
-                "basic" => "assert result is not None",
-                "edge" => "assert len(result) >= 0",
-                "error" => "pytest.raises(ValueError)",
-                _ => "assert True",
-            };
-            format!(
-                r#"def {}():
-    # Arrange
-    input_data = {{}}
-    
-    # Act
-    result = function_under_test(input_data)
-    
-    # Assert
-    {}"#,
-                name, assertion
-            )
-        }
-        "jest" | "vitest" => {
-            let assertion = match kind {
-                "basic" => "expect(result).toBeDefined();",
-                "edge" => "expect(result).toHaveLength(expect.any(Number));",
-                "error" => "expect(() => functionUnderTest(input)).toThrow();",
-                _ => "expect(true).toBe(true);",
-            };
-            format!(
-                r#"test('{}', () => {{
-  // Arrange
-  const input = {{}};
-  
-  // Act
-  const result = functionUnderTest(input);
-  
-  // Assert
-  {}
-}});"#,
-                name.replace('_', " "),
-                assertion
-            )
-        }
-        _ => format!(
-            "// Test: {}\n// Framework: {}\n// Kind: {}",
-            name, framework, kind
-        ),
-    }
-}

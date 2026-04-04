@@ -327,10 +327,8 @@ async fn uninstall_plugin(name: &str) -> anyhow::Result<()> {
 /// Update plugins.
 async fn update_plugins(name: Option<String>, all: bool) -> anyhow::Result<()> {
     if all {
-        println!("{} Checking for updates...", "[Update]".cyan());
-        // TODO: Implement batch update when installed plugin tracking is available
-        println!("{} Batch update not yet implemented.", "[Info]".yellow());
-        println!("  Use: ember plugin update <plugin-name>");
+        println!("{} Batch update is not yet implemented.", "[info]".yellow());
+        println!("  Update plugins individually: ember plugin update <plugin-name>");
     } else if let Some(plugin_name) = name {
         println!(
             "{} Updating plugin: {}",

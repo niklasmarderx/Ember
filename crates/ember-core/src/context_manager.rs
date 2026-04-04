@@ -268,7 +268,7 @@ impl ContextManager {
         // Check if pruning is needed
         self.prune_if_needed();
 
-        self.messages.back().unwrap()
+        self.messages.back().expect("just pushed a message")
     }
 
     /// Add message with metadata.
@@ -298,7 +298,7 @@ impl ContextManager {
 
         self.prune_if_needed();
 
-        self.messages.back().unwrap()
+        self.messages.back().expect("just pushed a message")
     }
 
     fn add_message_internal(&mut self, message: ContextMessage) {
@@ -409,7 +409,7 @@ impl ContextManager {
         for i in 0..self.messages.len().saturating_sub(skip_count) {
             if let Some(msg) = self.messages.get(i) {
                 if !msg.pinned {
-                    let msg = self.messages.remove(i).unwrap();
+                    let Some(msg) = self.messages.remove(i) else { break; };
                     self.update_token_count_on_remove(&msg);
                     self.stats.messages_pruned += 1;
                     self.stats.tokens_saved += msg.tokens;
@@ -451,7 +451,7 @@ impl ContextManager {
         }
 
         if let Some(idx) = lowest_idx {
-            let msg = self.messages.remove(idx).unwrap();
+            let Some(msg) = self.messages.remove(idx) else { return; };
             self.update_token_count_on_remove(&msg);
             self.stats.messages_pruned += 1;
             self.stats.tokens_saved += msg.tokens;
@@ -483,7 +483,7 @@ impl ContextManager {
         let total_tokens: usize = to_summarize.iter().map(|m| m.tokens).sum();
         let message_count = to_summarize.len();
 
-        // Create summary (in real implementation, this would call the LLM)
+        // Create summary (placeholder — real implementation would call the LLM)
         let summary = self.create_summary_placeholder(&to_summarize);
         let summary_tokens = self.estimate_tokens(&summary);
 
@@ -534,6 +534,11 @@ impl ContextManager {
     }
 
     /// Create a placeholder summary.
+    ///
+    /// NOTE: A real implementation would call the LLM to produce an actual
+    /// summary of the conversation content. This placeholder only records
+    /// message counts so the system knows messages were compacted, but does
+    /// not capture semantic content.
     fn create_summary_placeholder(&self, messages: &[ContextMessage]) -> String {
         let user_count = messages
             .iter()

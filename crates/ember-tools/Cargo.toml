@@ -36,7 +36,7 @@ async-trait = { workspace = true }
 reqwest = { workspace = true, optional = true }
 
 # Path handling
-dirs = "5.0"
+dirs = "6.0"
 shellexpand = "3.1"
 
 # Glob patterns

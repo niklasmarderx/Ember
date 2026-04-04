@@ -210,7 +210,7 @@ impl Memory {
     /// Get the most important entries.
     pub fn most_important(&self, n: usize) -> Vec<&MemoryEntry> {
         let mut entries: Vec<_> = self.entries.values().collect();
-        entries.sort_by(|a, b| b.importance.partial_cmp(&a.importance).unwrap());
+        entries.sort_by(|a, b| b.importance.partial_cmp(&a.importance).unwrap_or(std::cmp::Ordering::Equal));
         entries.into_iter().take(n).collect()
     }
 
@@ -232,7 +232,7 @@ impl Memory {
         if let Some((id, _)) = self
             .entries
             .iter()
-            .min_by(|(_, a), (_, b)| a.importance.partial_cmp(&b.importance).unwrap())
+            .min_by(|(_, a), (_, b)| a.importance.partial_cmp(&b.importance).unwrap_or(std::cmp::Ordering::Equal))
             .map(|(id, e)| (*id, e.entry_type))
         {
             self.remove(&id);

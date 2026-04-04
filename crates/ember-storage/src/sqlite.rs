@@ -281,15 +281,20 @@ impl SqliteStorage {
             "#,
         );
 
-        // Add date filters if specified
-        if options.from_date.is_some() || options.to_date.is_some() {
-            if let Some(ref from) = options.from_date {
-                sql.push_str(&format!(" AND c.created_at >= '{}'", from));
-            }
-            if let Some(ref to) = options.to_date {
-                sql.push_str(&format!(" AND c.created_at <= '{}'", to));
-            }
+        // Add date filters if specified — use parameter binding to prevent SQL injection
+        let mut param_idx = 2; // ?1 is already used for search_pattern
+        let mut date_params: Vec<String> = Vec::new();
+        if let Some(ref from) = options.from_date {
+            sql.push_str(&format!(" AND c.created_at >= ?{}", param_idx));
+            date_params.push(from.clone());
+            param_idx += 1;
         }
+        if let Some(ref to) = options.to_date {
+            sql.push_str(&format!(" AND c.created_at <= ?{}", param_idx));
+            date_params.push(to.clone());
+            param_idx += 1;
+        }
+        let _ = param_idx; // suppress unused warning
 
         // Add sorting
         let order = match options.sort_by {
@@ -300,14 +305,22 @@ impl SqliteStorage {
         };
         sql.push_str(&format!(" ORDER BY {}", order));
 
-        // Add pagination
+        // Add pagination (usize is safe, no injection risk)
         sql.push_str(&format!(
             " LIMIT {} OFFSET {}",
             options.limit, options.offset
         ));
 
+        // Build parameter list: [search_pattern, optional from_date, optional to_date]
+        let mut all_params: Vec<Box<dyn rusqlite::types::ToSql>> = Vec::new();
+        all_params.push(Box::new(search_pattern.clone()));
+        for dp in &date_params {
+            all_params.push(Box::new(dp.clone()));
+        }
+        let param_refs: Vec<&dyn rusqlite::types::ToSql> = all_params.iter().map(|p| p.as_ref()).collect();
+
         let mut stmt = conn.prepare(&sql)?;
-        let rows = stmt.query_map(params![search_pattern], |row| {
+        let rows = stmt.query_map(&*param_refs, |row| {
             let matching_snippet: Option<String> = row.get(5)?;
             let snippet = matching_snippet.map(|content| Self::extract_snippet(&content, query));
 

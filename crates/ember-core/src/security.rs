@@ -171,26 +171,26 @@ impl InputValidator {
             .collect();
 
         // URL detection regex
-        let url_regex = Regex::new(r"https?://[^\s<>\[\]{}|\\^`]+").unwrap();
+        let url_regex = Regex::new(r"https?://[^\s<>\[\]{}|\\^`]+").expect("hardcoded URL regex");
 
         // File path detection regex (Unix and Windows)
         let path_regex =
-            Regex::new(r#"(?:^|[\s"'])(?:/[\w.-]+)+|(?:[A-Za-z]:)?\\[\w.-\\]+"#).unwrap();
+            Regex::new(r#"(?:^|[\s"'])(?:/[\w.-]+)+|(?:[A-Za-z]:)?\\[\w.-\\]+"#).expect("hardcoded regex");
 
         // Common injection patterns
         let injection_patterns = vec![
             ("sql_injection".to_string(), Regex::new(
                 r"(?i)(?:--|;|'|\bOR\b|\bAND\b|\bUNION\b|\bSELECT\b|\bDROP\b|\bINSERT\b|\bDELETE\b|\bUPDATE\b).*(?:--|;|')"
-            ).unwrap()),
+            ).expect("hardcoded regex")),
             ("command_injection".to_string(), Regex::new(
                 r"(?:;|\||&&|\$\(|`)[^;|&`]*(?:rm|cat|wget|curl|bash|sh|python|perl|ruby|nc|netcat)"
-            ).unwrap()),
+            ).expect("hardcoded regex")),
             ("path_traversal".to_string(), Regex::new(
                 r"(?:\.\.[\\/]){2,}|(?:\.\.[\\/]).*(?:etc|passwd|shadow|hosts)"
-            ).unwrap()),
+            ).expect("hardcoded regex")),
             ("xss".to_string(), Regex::new(
                 r"<script[^>]*>|javascript:|on\w+\s*=|<iframe|<object|<embed"
-            ).unwrap()),
+            ).expect("hardcoded regex")),
         ];
 
         Self {

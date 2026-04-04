@@ -145,42 +145,39 @@ impl ToolHandler for GrepTool {
 
         debug!(pattern = pattern_str, path = %base_path.display(), "Grep search");
 
-        // Collect files to search
-        let files = if base_path.is_file() {
-            vec![base_path.clone()]
-        } else {
-            walk_dir(&base_path, 10)
-        };
+        // Collect files to search (blocking I/O — run off the async runtime)
+        let base_clone = base_path.clone();
+        let include_clone = include_ext.map(|s| s.to_string());
+        let files = tokio::task::spawn_blocking(move || {
+            let all = if base_clone.is_file() {
+                vec![base_clone.clone()]
+            } else {
+                walk_dir(&base_clone, 10)
+            };
+            // Pre-filter by extension and text-ness to avoid re-stat later
+            all.into_iter()
+                .filter(|f| {
+                    if let Some(ref ext) = include_clone {
+                        let file_ext = f.extension().and_then(|e| e.to_str()).unwrap_or("");
+                        file_ext.eq_ignore_ascii_case(ext)
+                    } else {
+                        is_text_extension(f)
+                    }
+                })
+                .filter(|f| {
+                    std::fs::metadata(f)
+                        .map(|m| m.len() <= MAX_FILE_SIZE)
+                        .unwrap_or(false)
+                })
+                .collect::<Vec<PathBuf>>()
+        })
+        .await
+        .map_err(|e| Error::execution_failed("grep", format!("File walk failed: {}", e)))?;
 
         let mut matches: Vec<String> = Vec::new();
         let mut files_with_matches = 0usize;
 
         for file_path in &files {
-            // Extension filter
-            if let Some(ext) = include_ext {
-                let file_ext = file_path
-                    .extension()
-                    .and_then(|e| e.to_str())
-                    .unwrap_or("");
-                if !file_ext.eq_ignore_ascii_case(ext) {
-                    continue;
-                }
-            }
-
-            // Skip non-text files
-            if !is_text_extension(file_path) && include_ext.is_none() {
-                continue;
-            }
-
-            // Skip oversized files
-            let meta = match std::fs::metadata(file_path) {
-                Ok(m) => m,
-                Err(_) => continue,
-            };
-            if meta.len() > MAX_FILE_SIZE {
-                continue;
-            }
-
             let content = match fs::read_to_string(file_path).await {
                 Ok(c) => c,
                 Err(_) => continue,

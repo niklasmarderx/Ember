@@ -7,6 +7,8 @@ use colored::Colorize;
 use ember_core::{Conversation, ExportFormat};
 use std::path::PathBuf;
 
+use super::session::PersistedSession;
+
 /// Arguments for the export command.
 #[derive(Debug, Args)]
 pub struct ExportArgs {
@@ -19,7 +21,7 @@ pub struct ExportArgs {
     pub output: Option<PathBuf>,
 
     /// Conversation ID to export (uses current if not specified)
-    #[arg(short, long)]
+    #[arg(long)]
     pub conversation: Option<String>,
 
     /// Include system prompt in export
@@ -155,7 +157,7 @@ fn load_conversation(id: Option<&str>) -> Result<Conversation> {
         };
         let content = std::fs::read_to_string(&target)
             .with_context(|| format!("Failed to read conversation {}", conv_id))?;
-        let conversation: Conversation = serde_json::from_str(&content)
+        let conversation = parse_conversation_or_session(&content)
             .with_context(|| format!("Failed to parse conversation {}", conv_id))?;
         return Ok(conversation);
     }
@@ -181,7 +183,7 @@ fn load_conversation(id: Option<&str>) -> Result<Conversation> {
 
             if let Some(entry) = entries.first() {
                 let content = std::fs::read_to_string(entry.path())?;
-                let conversation: Conversation = serde_json::from_str(&content)?;
+                let conversation = parse_conversation_or_session(&content)?;
                 return Ok(conversation);
             }
         }
@@ -204,6 +206,50 @@ fn load_conversation(id: Option<&str>) -> Result<Conversation> {
     let turn2 = conv.start_turn("What's the weather like today?");
     turn2.assistant_response = "I don't have access to real-time weather data. However, you can check your local weather service or a weather app for current conditions in your area.".to_string();
     turn2.complete();
+
+    Ok(conv)
+}
+
+/// Try to parse a JSON string as a Conversation, falling back to PersistedSession format.
+fn parse_conversation_or_session(content: &str) -> Result<Conversation> {
+    // Try native Conversation format first
+    if let Ok(conv) = serde_json::from_str::<Conversation>(content) {
+        return Ok(conv);
+    }
+
+    // Fall back to PersistedSession format (used by `ember chat`)
+    let session: PersistedSession = serde_json::from_str(content)
+        .context("File is neither a Conversation nor a PersistedSession")?;
+
+    // Convert PersistedSession → Conversation
+    let system_prompt = session
+        .messages
+        .iter()
+        .find(|m| m.role == "system")
+        .map(|m| m.content.clone())
+        .unwrap_or_default();
+
+    let mut conv = Conversation::new(&system_prompt);
+    conv.title = Some(format!("Session {}", &session.id));
+
+    // Group user/assistant messages into turns
+    let mut i = 0;
+    let msgs: Vec<_> = session.messages.iter().filter(|m| m.role != "system").collect();
+    while i < msgs.len() {
+        if msgs[i].role == "user" {
+            let user_msg = &msgs[i].content;
+            let assistant_msg = if i + 1 < msgs.len() && msgs[i + 1].role == "assistant" {
+                i += 1;
+                &msgs[i].content
+            } else {
+                ""
+            };
+            let turn = conv.start_turn(user_msg);
+            turn.assistant_response = assistant_msg.to_string();
+            turn.complete();
+        }
+        i += 1;
+    }
 
     Ok(conv)
 }

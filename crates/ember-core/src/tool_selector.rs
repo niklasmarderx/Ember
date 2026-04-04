@@ -178,7 +178,7 @@ impl ToolSelector {
             .collect();
 
         // Sort by relevance score descending
-        recommendations.sort_by(|a, b| b.relevance_score.partial_cmp(&a.relevance_score).unwrap());
+        recommendations.sort_by(|a, b| b.relevance_score.partial_cmp(&a.relevance_score).unwrap_or(std::cmp::Ordering::Equal));
 
         // Limit to max recommendations
         recommendations.truncate(self.config.max_recommendations);

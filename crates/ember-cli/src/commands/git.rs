@@ -693,7 +693,7 @@ async fn generate_review(
 
     // Send diff to LLM for review
     let config = crate::config::AppConfig::load(None).unwrap_or_default();
-    let provider = crate::commands::chat::create_provider(&config, &config.provider.default)?;
+    let provider = crate::commands::provider_factory::create_provider(&config, &config.provider.default)?;
     let review_prompt = format!(
         "You are a code reviewer. Analyze this git diff and provide review comments.\n\
          For each issue, output EXACTLY this format, one per line:\n\

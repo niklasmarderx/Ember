@@ -209,7 +209,7 @@ pub fn compute_diff(original: &str, modified: &str) -> Vec<PatchHunk> {
     hunk_ranges.push((lo, hi));
 
     for &pos in &changed_positions[1..] {
-        let last = hunk_ranges.last_mut().unwrap();
+        let Some(last) = hunk_ranges.last_mut() else { continue; };
         let extended_hi = (pos + CONTEXT + 1).min(edits.len());
         let expanded_lo = pos.saturating_sub(CONTEXT);
         if expanded_lo <= last.1 {

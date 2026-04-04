@@ -573,20 +573,21 @@ pub struct RecoveryStats {
 pub async fn attempt_recovery<F, Fut, T, E>(
     system: &SelfHealingSystem,
     operation: &str,
-    error: &E,
+    _error: &E,
     retry_fn: F,
-) -> Result<T, E>
+) -> Result<T, String>
 where
     F: Fn() -> Fut,
     Fut: std::future::Future<Output = Result<T, E>>,
     E: std::fmt::Display,
 {
-    let error_message = error.to_string();
+    let error_message = _error.to_string();
     let category = ErrorCategory::from_error_message(&error_message);
 
     // Check circuit breaker
     if !system.allow_operation(operation).await {
-        return Err(error.to_string()).map_err(|_| panic!("Circuit breaker open"));
+        tracing::warn!(operation, "Circuit breaker open, returning original error");
+        return Err(format!("Circuit breaker open for operation: {}", operation));
     }
 
     let strategies = system.get_strategies(&category).await;
@@ -627,7 +628,7 @@ where
 
     // All strategies failed
     system.record_failure(operation).await;
-    Err(error.to_string()).map_err(|_| panic!("All recovery strategies failed"))
+    Err(format!("All recovery strategies failed for operation: {}", operation))
 }
 
 #[cfg(test)]

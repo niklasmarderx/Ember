@@ -31,7 +31,7 @@ Ember is a command-line AI coding agent written in Rust. It runs an agentic loop
 - **Voice mode** *(preview)* — `ember voice` for hands-free coding with speech-to-text and TTS.
 - **RAG indexing** *(preview)* — `ember index .` to embed your codebase for semantic search.
 - **Multi-agent orchestration** *(preview)* — `ember agents run "task" --roles coder,reviewer` for parallel specialized agents.
-- **Plugin hooks** — intercept any tool call before or after execution. Approve, deny, log, or transform output from your own code.
+- **Plugin hooks** *(preview)* — intercept any tool call before or after execution. Approve, deny, log, or transform output from your own code.
 - **Auto-compaction** — when the context window fills up, the oldest turns are summarised in-place. The session continues without interruption.
 - **Cost tracking** — every API call records token counts and a USD estimate. `/cost` shows the running total for the session.
 - **Granular permissions** — restrict what paths a tool may read or write, which commands it may run, and whether writes are allowed at all.
@@ -40,8 +40,8 @@ Ember is a command-line AI coding agent written in Rust. It runs an agentic loop
 - **`.ember/rules/` directory** — Modular rule files instead of one giant EMBER.md. Organize by concern: `style.md`, `testing.md`, `security.md`. Auto-merged at load.
 - **`/checkpoint` + `/replay`** — Save conversation checkpoints and replay sessions as tutorials. Great for onboarding and code review.
 - **`ember bench`** — Built-in benchmarking across providers. Compare quality, latency, and cost in one command. No other tool has this.
-- **`ember learn`** — Tracks your coding preferences and patterns over time. Personalized AI that gets better the more you use it.
-- **Semantic caching** — Similar prompts served from cache. `/cache` shows stats, `/cache clear` resets.
+- **`ember learn`** *(preview)* — Tracks your coding preferences and patterns over time. Personalized AI that gets better the more you use it.
+- **Semantic caching** *(preview)* — Similar prompts served from cache. `/cache` shows stats, `/cache clear` resets.
 - **Single binary** — `cargo build --release` produces one ~15 MB executable with no runtime dependencies.
 
 ---
@@ -263,8 +263,8 @@ ember-enterprise   Enterprise features
 |---|---|---|---|
 | Multi-Provider | ✅ 10 providers | ❌ Anthropic only | ❌ OpenAI only |
 | Session Forking | ✅ | ❌ | ❌ |
-| Plugin Hooks | ✅ Pre/Post/Failure | ❌ | ❌ |
-| MCP Support | ✅ Multi-transport | ✅ | ❌ |
+| Plugin Hooks | ⚠ Preview | ❌ | ❌ |
+| MCP Support | ⚠ Preview | ✅ | ❌ |
 | Cost Tracking | ✅ Per-turn + session | Basic | Basic |
 | Prompt Cache Tracking | ✅ Creation + read | ✅ | N/A |
 | Auto-Compaction | ✅ Configurable | ✅ | ❌ |

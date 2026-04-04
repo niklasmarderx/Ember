@@ -17,7 +17,7 @@ use serde_json;
 use std::path::PathBuf;
 use tracing::debug;
 
-use crate::commands::chat::PersistedSession;
+use crate::commands::session::PersistedSession;
 
 /// History command arguments.
 #[derive(Debug, Args)]

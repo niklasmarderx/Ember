@@ -526,7 +526,7 @@ pub async fn init_interactive(force: bool) -> Result<()> {
     if !test.eq_ignore_ascii_case("n") {
         println!("\n  {} Sending test message...\n", ">".bright_green());
         // Use create_provider + a simple completion
-        match crate::commands::chat::create_provider(&config, provider_name) {
+        match crate::commands::provider_factory::create_provider(&config, provider_name) {
             Ok(provider) => {
                 use ember_llm::{CompletionRequest, Message, Role};
                 let req = CompletionRequest {

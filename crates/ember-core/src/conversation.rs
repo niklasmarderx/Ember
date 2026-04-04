@@ -209,7 +209,7 @@ impl Conversation {
         let turn = Turn::new(user_message);
         self.turns.push(turn);
         self.updated_at = Utc::now();
-        self.turns.last_mut().unwrap()
+        self.turns.last_mut().expect("just pushed a turn")
     }
 
     /// Get the current turn (most recent).

@@ -1040,7 +1040,7 @@ async fn run() -> Result<()> {
             );
             println!("  {}", "─".repeat(65));
 
-            let results = chat::bench_models(&config, &task, &model_list).await;
+            let results = crate::commands::bench::bench_models(&config, &task, &model_list).await;
             for r in &results {
                 if let Some(ref err) = r.error {
                     let display_model = format!("{} ({})", r.model, r.provider);

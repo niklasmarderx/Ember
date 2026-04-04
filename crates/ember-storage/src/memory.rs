@@ -260,7 +260,18 @@ impl VectorMemory {
             .take(limit)
             .enumerate()
             .map(|(idx, (id, score))| SearchResult {
-                document: self.documents.get(&id).cloned().unwrap(),
+                document: self.documents.get(&id).cloned().unwrap_or_else(|| {
+                    tracing::warn!(doc_id = %id, "Document missing from store during search");
+                    Document {
+                        id: id.clone(),
+                        content: String::new(),
+                        embedding: None,
+                        metadata: std::collections::HashMap::new(),
+                        created_at: chrono::Utc::now(),
+                        source: None,
+                        doc_type: None,
+                    }
+                }),
                 score,
                 rank: idx + 1,
             })
@@ -302,7 +313,18 @@ impl VectorMemory {
             .take(limit)
             .enumerate()
             .map(|(idx, (id, score))| SearchResult {
-                document: self.documents.get(&id).cloned().unwrap(),
+                document: self.documents.get(&id).cloned().unwrap_or_else(|| {
+                    tracing::warn!(doc_id = %id, "Document missing from store during search");
+                    Document {
+                        id: id.clone(),
+                        content: String::new(),
+                        embedding: None,
+                        metadata: std::collections::HashMap::new(),
+                        created_at: chrono::Utc::now(),
+                        source: None,
+                        doc_type: None,
+                    }
+                }),
                 score,
                 rank: idx + 1,
             })

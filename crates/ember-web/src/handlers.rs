@@ -73,11 +73,10 @@ pub async fn ready(
         checks.insert("llm_provider".to_string(), "ok".to_string());
     }
 
-    // Database check (placeholder — not yet integrated)
-    checks.insert("database".to_string(), "ok".to_string());
-
-    // Storage check (placeholder — not yet integrated)
-    checks.insert("storage".to_string(), "ok".to_string());
+    // Database and storage checks are not yet integrated.
+    // Don't pretend they're OK — report them as unchecked.
+    checks.insert("database".to_string(), "unchecked (not yet integrated)".to_string());
+    checks.insert("storage".to_string(), "unchecked (not yet integrated)".to_string());
 
     let response = ReadinessResponse {
         status: if all_ok { "ready" } else { "not_ready" }.to_string(),
@@ -482,12 +481,9 @@ pub async fn get_conversation(
 pub async fn delete_conversation(
     axum::extract::Path(id): axum::extract::Path<String>,
 ) -> Result<Json<serde_json::Value>> {
-    // TODO: Integrate with ember-storage
-    info!(conversation_id = %id, "Deleting conversation");
-    Ok(Json(serde_json::json!({
-        "deleted": true,
-        "id": id
-    })))
+    // Not yet integrated with ember-storage — return honest error
+    info!(conversation_id = %id, "Delete conversation requested (not yet implemented)");
+    Err(WebError::Internal("Conversation deletion is not yet implemented.".to_string()))
 }
 
 // =============================================================================

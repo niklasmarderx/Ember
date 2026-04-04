@@ -79,14 +79,14 @@ pub struct PooledConnection<T: Send + 'static> {
 }
 
 impl<T: Send + 'static> PooledConnection<T> {
-    /// Get reference to the connection
-    pub fn get(&self) -> &T {
-        self.connection.as_ref().unwrap()
+    /// Get reference to the connection. Returns None if connection was already taken.
+    pub fn get(&self) -> Option<&T> {
+        self.connection.as_ref()
     }
 
-    /// Get mutable reference to the connection
-    pub fn get_mut(&mut self) -> &mut T {
-        self.connection.as_mut().unwrap()
+    /// Get mutable reference to the connection. Returns None if connection was already taken.
+    pub fn get_mut(&mut self) -> Option<&mut T> {
+        self.connection.as_mut()
     }
 }
 
@@ -436,7 +436,9 @@ where
         let senders: Vec<_> = batch.into_iter().map(|(_, tx)| tx).collect();
 
         // Process batch
-        let _permit = self.semaphore.acquire().await.unwrap();
+        let _permit = self.semaphore.acquire().await.map_err(|_| {
+            tracing::error!("Batch processor semaphore closed unexpectedly");
+        }).ok();
         let results = (self.processor)(items).await;
 
         // Send results
@@ -513,12 +515,12 @@ pub struct PooledObject<T: Send + 'static> {
 impl<T: Send + 'static> PooledObject<T> {
     /// Get reference to the object
     pub fn get(&self) -> &T {
-        self.object.as_ref().unwrap()
+        self.object.as_ref().expect("pooled object already taken")
     }
 
     /// Get mutable reference to the object
     pub fn get_mut(&mut self) -> &mut T {
-        self.object.as_mut().unwrap()
+        self.object.as_mut().expect("pooled object already taken")
     }
 }
 

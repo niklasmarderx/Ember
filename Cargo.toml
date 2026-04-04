@@ -12,13 +12,10 @@ members = [
     "crates/ember-web",
 ]
 exclude = [
-    "crates/ember-desktop",
     "crates/ember-telemetry",
     "crates/ember-i18n",
     "crates/ember-benchmarks",
     "crates/ember-code",
-    "crates/ember-learn",
-    "crates/ember-voice",
     "crates/ember-enterprise",
 ]
 
@@ -45,13 +42,10 @@ ember-mcp = { path = "crates/ember-mcp" }
 ember-cli = { path = "crates/ember-cli" }
 ember-web = { path = "crates/ember-web" }
 ember-browser = { path = "crates/ember-browser" }
-ember-desktop = { path = "crates/ember-desktop" }
 ember-telemetry = { path = "crates/ember-telemetry" }
 ember-i18n = { path = "crates/ember-i18n" }
 ember-benchmarks = { path = "crates/ember-benchmarks" }
 ember-code = { path = "crates/ember-code" }
-ember-learn = { path = "crates/ember-learn" }
-ember-voice = { path = "crates/ember-voice" }
 ember-enterprise = { path = "crates/ember-enterprise" }
 
 # Async runtime
@@ -77,7 +71,7 @@ tower-http = { version = "0.5", features = ["cors", "fs", "trace"] }
 rusqlite = { version = "0.31", features = ["bundled"] }
 
 # Error handling
-thiserror = "1"
+thiserror = "2"
 anyhow = "1"
 
 # Logging
@@ -96,7 +90,7 @@ uuid = { version = "1", features = ["v4", "serde"] }
 chrono = { version = "0.4", features = ["serde"] }
 
 # Directory/Config paths
-dirs = "5"
+dirs = "6"
 
 # Text processing
 regex = "1"

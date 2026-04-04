@@ -190,13 +190,13 @@ impl CostPredictor {
 
     /// Update budget configuration
     pub fn set_config(&self, config: BudgetConfig) {
-        let mut cfg = self.config.write().unwrap();
+        let mut cfg = self.config.write().expect("config lock poisoned");
         *cfg = config;
     }
 
     /// Get current budget configuration
     pub fn config(&self) -> BudgetConfig {
-        self.config.read().unwrap().clone()
+        self.config.read().expect("config lock poisoned").clone()
     }
 
     /// Estimate cost for a request before making it
@@ -229,7 +229,7 @@ impl CostPredictor {
                 output_price_per_1k: 0.0,
             });
 
-        let config = self.config.read().unwrap();
+        let config = self.config.read().expect("config lock poisoned");
         let mut alerts = Vec::new();
         let mut allowed = true;
 
@@ -358,7 +358,7 @@ impl CostPredictor {
 
         // Add to history
         {
-            let mut history = self.usage_history.write().unwrap();
+            let mut history = self.usage_history.write().expect("usage_history lock poisoned");
             history.push(record);
         }
 
@@ -380,7 +380,7 @@ impl CostPredictor {
 
         self.usage_history
             .read()
-            .unwrap()
+            .expect("usage_history lock poisoned")
             .iter()
             .filter(|r| r.timestamp > hour_ago)
             .map(|r| r.cost)
@@ -394,7 +394,7 @@ impl CostPredictor {
 
         self.usage_history
             .read()
-            .unwrap()
+            .expect("usage_history lock poisoned")
             .iter()
             .filter(|r| r.timestamp > day_ago)
             .map(|r| r.cost)
@@ -403,7 +403,7 @@ impl CostPredictor {
 
     /// Get aggregated usage statistics
     pub fn get_stats(&self) -> UsageStats {
-        let history = self.usage_history.read().unwrap();
+        let history = self.usage_history.read().expect("usage_history lock poisoned");
 
         if history.is_empty() {
             return UsageStats::default();
@@ -569,14 +569,14 @@ impl CostPredictor {
 
     /// Clear usage history
     pub fn clear_history(&self) {
-        let mut history = self.usage_history.write().unwrap();
+        let mut history = self.usage_history.write().expect("usage_history lock poisoned");
         history.clear();
         self.total_cost_micros.store(0, Ordering::SeqCst);
     }
 
     /// Export usage history to JSON
     pub fn export_history(&self) -> String {
-        let history = self.usage_history.read().unwrap();
+        let history = self.usage_history.read().expect("usage_history lock poisoned");
         serde_json::to_string_pretty(&*history).unwrap_or_else(|_| "[]".to_string())
     }
 

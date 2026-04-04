@@ -1,7 +1,7 @@
 //! Ember Enterprise - Enterprise-grade features for Ember
 //!
 //! This crate provides enterprise features including:
-//! - SSO/SAML/OIDC authentication
+//! - Local authentication with session management
 //! - Comprehensive audit logging
 //! - Role-Based Access Control (RBAC)
 //! - Team management and collaboration
@@ -81,12 +81,6 @@ pub enum EnterpriseError {
 
     #[error("Internal error: {0}")]
     Internal(String),
-}
-
-impl From<reqwest::Error> for EnterpriseError {
-    fn from(err: reqwest::Error) -> Self {
-        EnterpriseError::NetworkError(err.to_string())
-    }
 }
 
 impl From<serde_json::Error> for EnterpriseError {

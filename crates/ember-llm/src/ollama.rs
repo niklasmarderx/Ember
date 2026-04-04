@@ -213,7 +213,7 @@ impl LLMProvider for OllamaProvider {
                 description: None,
                 context_window: None,
                 max_output_tokens: None,
-                supports_tools: true,
+                supports_tools: false,
                 supports_vision: false,
                 provider: "ollama".to_string(),
             })
@@ -228,7 +228,7 @@ impl LLMProvider for OllamaProvider {
     }
 
     fn supports_tools(&self) -> bool {
-        true
+        false // Ollama tool calling not yet implemented
     }
 
     fn supports_vision(&self) -> bool {

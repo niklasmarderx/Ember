@@ -650,7 +650,10 @@ impl LLMProvider for BedrockProvider {
         let body_bytes = serde_json::to_vec(&body)
             .map_err(|e| Error::InvalidRequest(format!("Failed to serialize request: {}", e)))?;
 
-        // Note: In production, proper AWS SigV4 signing should be used
+        // WARNING: AWS SigV4 request signing is NOT yet implemented.
+        // Bedrock requests will fail without proper authentication.
+        // This provider is not production-ready until SigV4 signing is added.
+        tracing::warn!("Bedrock provider lacks AWS SigV4 signing — requests will likely fail");
         let response = self
             .client
             .post(&url)
