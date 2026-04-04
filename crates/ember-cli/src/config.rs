@@ -415,11 +415,12 @@ impl AppConfig {
     }
 
     /// Load configuration from file or use defaults.
+    /// Checks primary path, then falls back to ~/.config/ember/ and ~/.ember/.
     pub fn load(path: Option<&str>) -> Result<Self> {
         let config_path = if let Some(p) = path {
             PathBuf::from(p)
         } else {
-            Self::config_path()?
+            Self::resolve_config_path()
         };
 
         if config_path.exists() {
@@ -431,6 +432,32 @@ impl AppConfig {
             // Return defaults if no config file exists
             Ok(Self::default())
         }
+    }
+
+    /// Resolve config path with fallback chain:
+    /// 1. Primary: dirs::config_dir()/ember/config.toml (e.g. ~/Library/Application Support/ember/)
+    /// 2. Fallback: ~/.config/ember/config.toml
+    /// 3. Fallback: ~/.ember/config.toml
+    pub fn resolve_config_path() -> PathBuf {
+        let primary = Self::config_path().unwrap_or_default();
+        if primary.exists() {
+            return primary;
+        }
+
+        if let Some(home) = dirs::home_dir() {
+            let xdg = home.join(".config").join("ember").join("config.toml");
+            if xdg.exists() {
+                return xdg;
+            }
+
+            let dot = home.join(".ember").join("config.toml");
+            if dot.exists() {
+                return dot;
+            }
+        }
+
+        // None exist — return primary so new configs get created there
+        primary
     }
 
     /// Validate the configuration and return detailed errors/warnings.

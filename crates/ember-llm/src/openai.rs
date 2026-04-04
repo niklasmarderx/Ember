@@ -107,22 +107,17 @@ impl LLMProvider for OpenAIProvider {
         let status = response.status();
 
         if !status.is_success() {
-            let error_body: OpenAIError = response.json().await.unwrap_or_else(|_| OpenAIError {
-                error: OpenAIErrorDetail {
-                    message: "Unknown error".to_string(),
-                    r#type: "unknown".to_string(),
-                    code: None,
-                },
-            });
+            let error_text = response.text().await.unwrap_or_default();
+            let error_msg = serde_json::from_str::<OpenAIError>(&error_text)
+                .map(|e| e.error.message)
+                .unwrap_or_else(|_| if error_text.is_empty() {
+                    format!("HTTP {} (empty response)", status.as_u16())
+                } else { error_text });
 
             return match status.as_u16() {
                 401 => Err(Error::api_key_missing("openai")),
                 429 => Err(Error::rate_limit("openai", None)),
-                _ => Err(Error::api_error(
-                    "openai",
-                    status.as_u16(),
-                    error_body.error.message,
-                )),
+                _ => Err(Error::api_error("openai", status.as_u16(), error_msg)),
             };
         }
 
@@ -145,22 +140,17 @@ impl LLMProvider for OpenAIProvider {
         let status = response.status();
 
         if !status.is_success() {
-            let error_body: OpenAIError = response.json().await.unwrap_or_else(|_| OpenAIError {
-                error: OpenAIErrorDetail {
-                    message: "Unknown error".to_string(),
-                    r#type: "unknown".to_string(),
-                    code: None,
-                },
-            });
+            let error_text = response.text().await.unwrap_or_default();
+            let error_msg = serde_json::from_str::<OpenAIError>(&error_text)
+                .map(|e| e.error.message)
+                .unwrap_or_else(|_| if error_text.is_empty() {
+                    format!("HTTP {} (empty response)", status.as_u16())
+                } else { error_text });
 
             return match status.as_u16() {
                 401 => Err(Error::api_key_missing("openai")),
                 429 => Err(Error::rate_limit("openai", None)),
-                _ => Err(Error::api_error(
-                    "openai",
-                    status.as_u16(),
-                    error_body.error.message,
-                )),
+                _ => Err(Error::api_error("openai", status.as_u16(), error_msg)),
             };
         }
 

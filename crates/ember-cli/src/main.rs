@@ -397,6 +397,30 @@ Supports: Conventional Commits, emoji style, detailed format",
     )]
     Git(git::GitArgs),
 
+    /// Interactive setup wizard — configure Ember in 30 seconds.
+    ///
+    /// Guides you through provider selection, API key entry, and
+    /// sends a test message to verify everything works.
+    ///
+    /// Examples:
+    ///   ember init
+    ///   ember init --force
+    #[command(
+        about = "Interactive setup wizard.",
+        long_about = "Guided setup that gets you from install to chatting in 30 seconds.\n\n\
+Walks you through:\n\
+  1. Provider selection (OpenAI, Anthropic, Ollama, etc.)\n\
+  2. API key entry (masked)\n\
+  3. Model selection\n\
+  4. Test message to verify the connection\n\n\
+Re-run with --force to overwrite an existing config."
+    )]
+    Init {
+        /// Overwrite existing configuration
+        #[arg(long)]
+        force: bool,
+    },
+
     /// Benchmark a task across multiple providers and models.
     ///
     /// Compare response quality, speed, and cost.
@@ -659,7 +683,7 @@ fn maybe_rewrite_args() -> Vec<String> {
     let known_subcommands = [
         "chat", "run", "config", "info", "serve", "completions", "export",
         "history", "plugin", "code", "git", "bench", "learn", "voice",
-        "index", "agents", "tui", "help",
+        "index", "agents", "tui", "init", "help",
     ];
 
     // Find the first positional argument (skip flags like --verbose, --config foo)
@@ -756,7 +780,36 @@ async fn run() -> Result<()> {
         cli.log_file.as_deref(),
     )?;
 
-    let config = AppConfig::load(cli.config.as_deref()).context("Failed to load configuration")?;
+    let mut config = AppConfig::load(cli.config.as_deref()).context("Failed to load configuration")?;
+
+    // First-run detection: if no config file exists, no provider env vars are set,
+    // and we're about to run a chat/run command on a TTY, offer interactive setup.
+    if matches!(cli.command, Commands::Chat { .. } | Commands::Run { .. }) {
+        let has_config = AppConfig::resolve_config_path().exists();
+        let has_env_key = ["OPENAI_API_KEY", "ANTHROPIC_API_KEY", "GOOGLE_API_KEY",
+            "GROQ_API_KEY", "DEEPSEEK_API_KEY", "MISTRAL_API_KEY",
+            "OPENROUTER_API_KEY", "XAI_API_KEY"]
+            .iter()
+            .any(|v| std::env::var(v).ok().filter(|s| !s.is_empty()).is_some());
+
+        if !has_config && !has_env_key && {
+            use std::io::IsTerminal;
+            std::io::stdin().is_terminal()
+        } {
+            eprintln!(
+                "\n  {} No configuration found. Let's set up Ember!",
+                "!".bright_yellow()
+            );
+            eprintln!(
+                "  {} Run {} anytime to reconfigure.\n",
+                "tip:".dimmed(),
+                "ember init".bright_cyan()
+            );
+            config_cmd::init_interactive(false).await?;
+            // Reload config after wizard
+            config = AppConfig::load(cli.config.as_deref()).context("Failed to load configuration")?;
+        }
+    }
 
     match cli.command {
         #[cfg(feature = "tui")]
@@ -847,6 +900,10 @@ async fn run() -> Result<()> {
 
         Commands::Git(args) => {
             git::execute(args).await?;
+        }
+
+        Commands::Init { force } => {
+            config_cmd::init_interactive(force).await?;
         }
 
         Commands::Bench {

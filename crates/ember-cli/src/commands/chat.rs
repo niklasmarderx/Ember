@@ -533,7 +533,7 @@ pub async fn run(
     let temp = temperature.unwrap_or(config.agent.temperature);
 
     // Pre-flight: warn about missing API key before the hard error
-    if let Some((var, url)) = check_provider_key(&provider_name) {
+    if let Some((var, url)) = check_provider_key(&provider_name, &config) {
         eprintln!(
             "{} {} not set for provider '{}'",
             "⚠".bright_yellow(),
@@ -739,7 +739,8 @@ fn create_tool_registry(tool_names: &[String]) -> Result<ToolRegistry> {
 
 /// Pre-flight check: warn if the selected provider's API key is missing.
 /// Returns (env_var_name, export_hint) or None if the key is present / not needed.
-fn check_provider_key(provider_name: &str) -> Option<(&'static str, &'static str)> {
+/// Checks both environment variables AND config-file keys.
+fn check_provider_key(provider_name: &str, config: &crate::config::AppConfig) -> Option<(&'static str, &'static str)> {
     let (var, hint) = match provider_name {
         "openai" => ("OPENAI_API_KEY", "https://platform.openai.com/api-keys"),
         "anthropic" => ("ANTHROPIC_API_KEY", "https://console.anthropic.com/settings/keys"),
@@ -752,11 +753,20 @@ fn check_provider_key(provider_name: &str) -> Option<(&'static str, &'static str
         "bedrock" | "aws" => ("AWS_ACCESS_KEY_ID", "https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-files.html"),
         _ => return None, // ollama = local, no key needed
     };
+
+    // Check environment variable first
     if std::env::var(var).ok().filter(|v| !v.is_empty()).is_some() {
-        None
-    } else {
-        Some((var, hint))
+        return None;
     }
+
+    // Check config-file API key (currently only openai has a config key field)
+    if provider_name == "openai" {
+        if config.provider.openai.api_key.as_ref().filter(|k| !k.is_empty()).is_some() {
+            return None;
+        }
+    }
+
+    Some((var, hint))
 }
 
 /// Create an LLM provider based on configuration and provider name.

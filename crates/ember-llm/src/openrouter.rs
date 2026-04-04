@@ -174,13 +174,15 @@ impl LLMProvider for OpenRouterProvider {
         let status = response.status();
 
         if !status.is_success() {
-            let error_body: OpenRouterError =
-                response.json().await.unwrap_or_else(|_| OpenRouterError {
-                    error: OpenRouterErrorDetail {
-                        message: "Unknown error".to_string(),
-                        code: None,
-                        r#type: None,
-                    },
+            let error_text = response.text().await.unwrap_or_default();
+            let error_msg = serde_json::from_str::<OpenRouterError>(&error_text)
+                .map(|e| e.error.message)
+                .unwrap_or_else(|_| {
+                    if error_text.is_empty() {
+                        format!("HTTP {} (empty response)", status.as_u16())
+                    } else {
+                        error_text
+                    }
                 });
 
             return match status.as_u16() {
@@ -188,14 +190,10 @@ impl LLMProvider for OpenRouterProvider {
                 402 => Err(Error::api_error(
                     "openrouter",
                     402,
-                    "Insufficient credits. Add credits at https://openrouter.ai/credits",
+                    format!("Insufficient credits: {error_msg}. Add credits at https://openrouter.ai/credits"),
                 )),
                 429 => Err(Error::rate_limit("openrouter", None)),
-                _ => Err(Error::api_error(
-                    "openrouter",
-                    status.as_u16(),
-                    error_body.error.message,
-                )),
+                _ => Err(Error::api_error("openrouter", status.as_u16(), error_msg)),
             };
         }
 
@@ -219,24 +217,26 @@ impl LLMProvider for OpenRouterProvider {
         let status = response.status();
 
         if !status.is_success() {
-            let error_body: OpenRouterError =
-                response.json().await.unwrap_or_else(|_| OpenRouterError {
-                    error: OpenRouterErrorDetail {
-                        message: "Unknown error".to_string(),
-                        code: None,
-                        r#type: None,
-                    },
+            let error_text = response.text().await.unwrap_or_default();
+            let error_msg = serde_json::from_str::<OpenRouterError>(&error_text)
+                .map(|e| e.error.message)
+                .unwrap_or_else(|_| {
+                    if error_text.is_empty() {
+                        format!("HTTP {} (empty response)", status.as_u16())
+                    } else {
+                        error_text
+                    }
                 });
 
             return match status.as_u16() {
                 401 => Err(Error::api_key_missing("openrouter")),
-                402 => Err(Error::api_error("openrouter", 402, "Insufficient credits")),
-                429 => Err(Error::rate_limit("openrouter", None)),
-                _ => Err(Error::api_error(
+                402 => Err(Error::api_error(
                     "openrouter",
-                    status.as_u16(),
-                    error_body.error.message,
+                    402,
+                    format!("Insufficient credits: {error_msg}"),
                 )),
+                429 => Err(Error::rate_limit("openrouter", None)),
+                _ => Err(Error::api_error("openrouter", status.as_u16(), error_msg)),
             };
         }
 

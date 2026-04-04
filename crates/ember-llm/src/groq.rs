@@ -188,21 +188,22 @@ impl LLMProvider for GroqProvider {
         let status = response.status();
 
         if !status.is_success() {
-            let error_body: GroqError = response.json().await.unwrap_or_else(|_| GroqError {
-                error: GroqErrorDetail {
-                    message: "Unknown error".to_string(),
-                    r#type: "unknown".to_string(),
-                    code: None,
-                },
-            });
+            let error_text = response.text().await.unwrap_or_default();
+            let error_msg = serde_json::from_str::<GroqError>(&error_text)
+                .map(|e| e.error.message)
+                .unwrap_or_else(|_| {
+                    if error_text.is_empty() {
+                        format!("HTTP {} (empty response)", status.as_u16())
+                    } else {
+                        error_text
+                    }
+                });
 
             return match status.as_u16() {
                 401 => Err(Error::api_key_missing("groq")),
                 429 => {
                     // Groq includes retry-after in rate limit errors
-                    let retry_after = error_body
-                        .error
-                        .message
+                    let retry_after = error_msg
                         .split("try again in ")
                         .nth(1)
                         .and_then(|s| s.split('s').next())
@@ -210,11 +211,7 @@ impl LLMProvider for GroqProvider {
                         .map(|s| s.ceil() as u64);
                     Err(Error::rate_limit("groq", retry_after))
                 }
-                _ => Err(Error::api_error(
-                    "groq",
-                    status.as_u16(),
-                    error_body.error.message,
-                )),
+                _ => Err(Error::api_error("groq", status.as_u16(), error_msg)),
             };
         }
 
@@ -234,22 +231,29 @@ impl LLMProvider for GroqProvider {
         let status = response.status();
 
         if !status.is_success() {
-            let error_body: GroqError = response.json().await.unwrap_or_else(|_| GroqError {
-                error: GroqErrorDetail {
-                    message: "Unknown error".to_string(),
-                    r#type: "unknown".to_string(),
-                    code: None,
-                },
-            });
+            let error_text = response.text().await.unwrap_or_default();
+            let error_msg = serde_json::from_str::<GroqError>(&error_text)
+                .map(|e| e.error.message)
+                .unwrap_or_else(|_| {
+                    if error_text.is_empty() {
+                        format!("HTTP {} (empty response)", status.as_u16())
+                    } else {
+                        error_text
+                    }
+                });
 
             return match status.as_u16() {
                 401 => Err(Error::api_key_missing("groq")),
-                429 => Err(Error::rate_limit("groq", None)),
-                _ => Err(Error::api_error(
-                    "groq",
-                    status.as_u16(),
-                    error_body.error.message,
-                )),
+                429 => {
+                    let retry_after = error_msg
+                        .split("try again in ")
+                        .nth(1)
+                        .and_then(|s| s.split('s').next())
+                        .and_then(|s| s.parse::<f64>().ok())
+                        .map(|s| s.ceil() as u64);
+                    Err(Error::rate_limit("groq", retry_after))
+                }
+                _ => Err(Error::api_error("groq", status.as_u16(), error_msg)),
             };
         }
 

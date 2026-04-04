@@ -411,7 +411,7 @@ fn clear_line() {
 
 /// Display an interactive menu and return the selected index.
 /// Supports arrow keys (Up/Down), Enter to confirm, number keys.
-fn interactive_menu(prompt: &str, options: &[&str], default_idx: usize) -> usize {
+pub(crate) fn interactive_menu(prompt: &str, options: &[&str], default_idx: usize) -> usize {
     let mut selected = default_idx;
 
     // Switch to raw mode for key capture
@@ -544,7 +544,7 @@ fn redraw_menu(options: &[&str], selected: usize) {
 }
 
 /// Read a line of text in raw mode with proper echo.
-fn raw_input(prompt: &str, default: &str) -> String {
+pub(crate) fn raw_input(prompt: &str, default: &str) -> String {
     terminal::enable_raw_mode().ok();
 
     let default_hint = if default.is_empty() {

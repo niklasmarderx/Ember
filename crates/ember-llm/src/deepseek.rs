@@ -120,23 +120,17 @@ impl LLMProvider for DeepSeekProvider {
         let status = response.status();
 
         if !status.is_success() {
-            let error_body: DeepSeekError =
-                response.json().await.unwrap_or_else(|_| DeepSeekError {
-                    error: DeepSeekErrorDetail {
-                        message: "Unknown error".to_string(),
-                        r#type: "unknown".to_string(),
-                        code: None,
-                    },
-                });
+            let error_text = response.text().await.unwrap_or_default();
+            let error_msg = serde_json::from_str::<DeepSeekError>(&error_text)
+                .map(|e| e.error.message)
+                .unwrap_or_else(|_| if error_text.is_empty() {
+                    format!("HTTP {} (empty response)", status.as_u16())
+                } else { error_text });
 
             return match status.as_u16() {
                 401 => Err(Error::api_key_missing("deepseek")),
                 429 => Err(Error::rate_limit("deepseek", None)),
-                _ => Err(Error::api_error(
-                    "deepseek",
-                    status.as_u16(),
-                    error_body.error.message,
-                )),
+                _ => Err(Error::api_error("deepseek", status.as_u16(), error_msg)),
             };
         }
 
@@ -156,23 +150,17 @@ impl LLMProvider for DeepSeekProvider {
         let status = response.status();
 
         if !status.is_success() {
-            let error_body: DeepSeekError =
-                response.json().await.unwrap_or_else(|_| DeepSeekError {
-                    error: DeepSeekErrorDetail {
-                        message: "Unknown error".to_string(),
-                        r#type: "unknown".to_string(),
-                        code: None,
-                    },
-                });
+            let error_text = response.text().await.unwrap_or_default();
+            let error_msg = serde_json::from_str::<DeepSeekError>(&error_text)
+                .map(|e| e.error.message)
+                .unwrap_or_else(|_| if error_text.is_empty() {
+                    format!("HTTP {} (empty response)", status.as_u16())
+                } else { error_text });
 
             return match status.as_u16() {
                 401 => Err(Error::api_key_missing("deepseek")),
                 429 => Err(Error::rate_limit("deepseek", None)),
-                _ => Err(Error::api_error(
-                    "deepseek",
-                    status.as_u16(),
-                    error_body.error.message,
-                )),
+                _ => Err(Error::api_error("deepseek", status.as_u16(), error_msg)),
             };
         }
 

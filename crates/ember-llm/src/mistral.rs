@@ -119,19 +119,17 @@ impl LLMProvider for MistralProvider {
         let status = response.status();
 
         if !status.is_success() {
-            let error_body: MistralError = response.json().await.unwrap_or_else(|_| MistralError {
-                message: "Unknown error".to_string(),
-                request_id: None,
-            });
+            let error_text = response.text().await.unwrap_or_default();
+            let error_msg = serde_json::from_str::<MistralError>(&error_text)
+                .map(|e| e.message)
+                .unwrap_or_else(|_| if error_text.is_empty() {
+                    format!("HTTP {} (empty response)", status.as_u16())
+                } else { error_text });
 
             return match status.as_u16() {
                 401 => Err(Error::api_key_missing("mistral")),
                 429 => Err(Error::rate_limit("mistral", None)),
-                _ => Err(Error::api_error(
-                    "mistral",
-                    status.as_u16(),
-                    error_body.message,
-                )),
+                _ => Err(Error::api_error("mistral", status.as_u16(), error_msg)),
             };
         }
 
@@ -151,19 +149,17 @@ impl LLMProvider for MistralProvider {
         let status = response.status();
 
         if !status.is_success() {
-            let error_body: MistralError = response.json().await.unwrap_or_else(|_| MistralError {
-                message: "Unknown error".to_string(),
-                request_id: None,
-            });
+            let error_text = response.text().await.unwrap_or_default();
+            let error_msg = serde_json::from_str::<MistralError>(&error_text)
+                .map(|e| e.message)
+                .unwrap_or_else(|_| if error_text.is_empty() {
+                    format!("HTTP {} (empty response)", status.as_u16())
+                } else { error_text });
 
             return match status.as_u16() {
                 401 => Err(Error::api_key_missing("mistral")),
                 429 => Err(Error::rate_limit("mistral", None)),
-                _ => Err(Error::api_error(
-                    "mistral",
-                    status.as_u16(),
-                    error_body.message,
-                )),
+                _ => Err(Error::api_error("mistral", status.as_u16(), error_msg)),
             };
         }
 
