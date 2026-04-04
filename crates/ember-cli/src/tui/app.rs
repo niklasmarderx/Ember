@@ -13,7 +13,7 @@ use tokio::sync::mpsc;
 
 use super::ui;
 use crate::config::AppConfig;
-use ember_llm::{LLMProvider, Message, OllamaProvider, OpenAIProvider};
+use ember_llm::{LLMProvider, Message};
 
 /// Application state
 #[allow(dead_code)]
@@ -67,10 +67,8 @@ pub struct App {
 impl App {
     /// Create a new app instance
     pub fn new(config: &AppConfig) -> Result<Self> {
-        let provider: Arc<dyn LLMProvider> = match config.provider.default.to_lowercase().as_str() {
-            "ollama" => Arc::new(OllamaProvider::from_env()),
-            _ => Arc::new(OpenAIProvider::from_env()?),
-        };
+        // Reuse the same provider creation logic as chat to respect config-file keys
+        let provider = crate::commands::chat::create_provider(config, &config.provider.default)?;
 
         let model = match config.provider.default.to_lowercase().as_str() {
             "ollama" => config.provider.ollama.model.clone(),
@@ -236,11 +234,19 @@ impl App {
 
 /// Run the TUI application
 pub async fn run(config: AppConfig) -> Result<()> {
+    // Verify we have a real terminal
+    use std::io::IsTerminal;
+    if !io::stdout().is_terminal() {
+        anyhow::bail!("ember tui requires an interactive terminal. Run it directly in your terminal (not piped or in a subshell).");
+    }
+
     // Create app
     let mut app = App::new(&config)?;
 
     // Setup terminal
-    enable_raw_mode()?;
+    enable_raw_mode().map_err(|e| anyhow::anyhow!(
+        "Failed to initialize terminal: {}. Make sure you're running in a real terminal emulator.", e
+    ))?;
     let mut stdout = io::stdout();
     execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
     let backend = CrosstermBackend::new(stdout);
