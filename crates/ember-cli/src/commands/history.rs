@@ -228,14 +228,28 @@ fn execute_sessions(args: SessionsArgs) -> Result<()> {
         for entry in &entries {
             if let Ok(json) = std::fs::read_to_string(entry.path()) {
                 if let Ok(s) = serde_json::from_str::<PersistedSession>(&json) {
+                    // Find first user message as preview
+                    let preview = s
+                        .messages
+                        .iter()
+                        .find(|m| m.role == "user")
+                        .map(|m| truncate_str(&m.content, 40))
+                        .unwrap_or_default();
                     println!(
-                        "  {:<12} {:<12} {:<28} {:<6} {}",
+                        "  {:<12} {:<12} {:<20} {:<6} {}",
                         s.id.bright_cyan(),
                         s.provider,
-                        truncate_str(&s.model, 26),
+                        truncate_str(&s.model, 18),
                         s.turn_count.to_string().bright_green(),
                         s.updated_at.dimmed(),
                     );
+                    if !preview.is_empty() {
+                        println!(
+                            "  {:<12} {}",
+                            "",
+                            format!("\"{}\"", preview).dimmed()
+                        );
+                    }
                 }
             }
         }

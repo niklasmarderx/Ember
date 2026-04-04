@@ -19,13 +19,18 @@ expression: stdout
     "system_prompt": "You are Ember, a helpful AI assistant.",
     "temperature": 0.7,
     "max_iterations": 10,
-    "streaming": true
+    "streaming": true,
+    "max_retries": 3,
+    "parallel_tools": true,
+    "compact_mode": false,
+    "context_budget": 4000
   },
   "tools": {
     "shell_enabled": true,
     "filesystem_enabled": true,
     "web_enabled": true,
     "allowed_paths": [],
-    "shell_timeout": 30
+    "shell_timeout": 30,
+    "diff_verbosity": "full"
   }
 }

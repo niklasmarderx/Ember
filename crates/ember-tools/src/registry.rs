@@ -181,6 +181,25 @@ pub trait ToolHandler: Send + Sync {
     /// Execute the tool with the given arguments.
     async fn execute(&self, arguments: Value) -> Result<ToolOutput>;
 
+    /// Whether this tool supports streaming output (line-by-line).
+    fn supports_streaming(&self) -> bool {
+        false
+    }
+
+    /// Execute the tool with streaming output.
+    ///
+    /// Sends individual output lines through `tx` as they become available,
+    /// and returns the final aggregated `ToolOutput` when done.
+    /// Default implementation falls back to `execute()` with no streaming.
+    async fn execute_streaming(
+        &self,
+        arguments: Value,
+        tx: tokio::sync::mpsc::Sender<String>,
+    ) -> Result<ToolOutput> {
+        let _ = tx; // unused in default impl
+        self.execute(arguments).await
+    }
+
     /// Check if this tool is enabled.
     fn is_enabled(&self) -> bool {
         true
@@ -252,6 +271,29 @@ impl ToolRegistry {
         Ok(output.to_llm_result(&call.id))
     }
 
+    /// Execute multiple tool calls in parallel and return results in order.
+    ///
+    /// Each result is `(call_id, Result<ToolOutput>)`. Safe because handlers
+    /// are `Arc<dyn ToolHandler + Send + Sync>`.
+    pub async fn execute_parallel(
+        &self,
+        calls: &[LLMToolCall],
+    ) -> Vec<(String, Result<ToolOutput>)> {
+        let futs: Vec<_> = calls
+            .iter()
+            .map(|call| {
+                let name = call.name.clone();
+                let args = call.arguments.clone();
+                let id = call.id.clone();
+                async move {
+                    let result = self.execute(&name, args).await;
+                    (id, result)
+                }
+            })
+            .collect();
+        futures::future::join_all(futs).await
+    }
+
     /// Get all tool names.
     pub fn tool_names(&self) -> Vec<String> {
         self.tools.keys().cloned().collect()
@@ -279,6 +321,36 @@ impl ToolRegistry {
         }
 
         handler.execute(arguments).await
+    }
+
+    /// Check if a tool supports streaming.
+    pub fn supports_streaming(&self, name: &str) -> bool {
+        self.tools
+            .get(name)
+            .map(|h| h.supports_streaming())
+            .unwrap_or(false)
+    }
+
+    /// Execute a tool with streaming output.
+    ///
+    /// Lines are sent through `tx` as they become available.
+    /// Returns the final aggregated `ToolOutput`.
+    pub async fn execute_streaming(
+        &self,
+        name: &str,
+        arguments: Value,
+        tx: tokio::sync::mpsc::Sender<String>,
+    ) -> Result<ToolOutput> {
+        let handler = self
+            .tools
+            .get(name)
+            .ok_or_else(|| Error::ToolNotFound(name.to_string()))?;
+
+        if !handler.is_enabled() {
+            return Err(Error::ToolDisabled(name.to_string()));
+        }
+
+        handler.execute_streaming(arguments, tx).await
     }
 }
 

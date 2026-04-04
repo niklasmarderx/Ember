@@ -691,23 +691,69 @@ async fn generate_review(
         return Ok(());
     }
 
-    // Generate review comments
-    let mut comments = vec![
-        ReviewComment {
-            file: "src/main.rs".to_string(),
-            line: 42,
-            severity: "warning".to_string(),
-            message: "Consider adding error handling here".to_string(),
-            suggestion: Some("Use Result type for better error propagation".to_string()),
-        },
-        ReviewComment {
-            file: "src/lib.rs".to_string(),
-            line: 15,
-            severity: "info".to_string(),
-            message: "Good use of documentation comments".to_string(),
-            suggestion: None,
-        },
-    ];
+    // Send diff to LLM for review
+    let config = crate::config::AppConfig::load(None).unwrap_or_default();
+    let provider = crate::commands::chat::create_provider(&config, &config.provider.default)?;
+    let review_prompt = format!(
+        "You are a code reviewer. Analyze this git diff and provide review comments.\n\
+         For each issue, output EXACTLY this format, one per line:\n\
+         FILE:LINE:SEVERITY:MESSAGE:SUGGESTION\n\n\
+         SEVERITY must be one of: error, warning, info\n\
+         SUGGESTION can be empty if none.\n\
+         Only output the review lines, nothing else.\n\n\
+         Diff:\n```\n{}\n```",
+        &diff[..diff.len().min(8000)] // Truncate very large diffs
+    );
+    let request = ember_llm::CompletionRequest::new(&config.provider.openai.model)
+        .with_message(ember_llm::Message::user(&review_prompt));
+
+    let mut comments: Vec<ReviewComment> = Vec::new();
+    match provider.complete(request).await {
+        Ok(resp) => {
+            for line in resp.content.lines() {
+                let parts: Vec<&str> = line.splitn(5, ':').collect();
+                if parts.len() >= 4 {
+                    comments.push(ReviewComment {
+                        file: parts[0].trim().to_string(),
+                        line: parts[1].trim().parse().unwrap_or(0),
+                        severity: parts[2].trim().to_lowercase(),
+                        message: parts[3].trim().to_string(),
+                        suggestion: parts.get(4).map(|s| s.trim().to_string()).filter(|s| !s.is_empty()),
+                    });
+                }
+            }
+            if comments.is_empty() {
+                // LLM didn't follow format — show raw response as a single info comment
+                comments.push(ReviewComment {
+                    file: "(summary)".to_string(),
+                    line: 0,
+                    severity: "info".to_string(),
+                    message: resp.content.lines().take(5).collect::<Vec<_>>().join(" "),
+                    suggestion: None,
+                });
+            }
+        }
+        Err(e) => {
+            eprintln!(
+                "{} LLM review failed: {}. Showing basic analysis.",
+                "[warn]".bright_yellow(),
+                e
+            );
+            // Fallback: count changed files from diff
+            let changed_files: Vec<&str> = diff
+                .lines()
+                .filter(|l| l.starts_with("+++ b/") || l.starts_with("--- a/"))
+                .filter_map(|l| l.strip_prefix("+++ b/").or_else(|| l.strip_prefix("--- a/")))
+                .collect();
+            comments.push(ReviewComment {
+                file: "(overview)".to_string(),
+                line: 0,
+                severity: "info".to_string(),
+                message: format!("{} file(s) changed in this diff", changed_files.len() / 2),
+                suggestion: None,
+            });
+        }
+    }
 
     // Filter by focus if specified
     if let Some(f) = focus {

@@ -248,6 +248,22 @@ pub struct AgentSettings {
     /// Enable streaming responses
     #[serde(default = "default_true")]
     pub streaming: bool,
+
+    /// Maximum LLM retry attempts on transient failures (default: 3)
+    #[serde(default = "default_max_retries")]
+    pub max_retries: u32,
+
+    /// Enable parallel tool execution (default: true)
+    #[serde(default = "default_true")]
+    pub parallel_tools: bool,
+
+    /// Start in compact response mode (default: false)
+    #[serde(default)]
+    pub compact_mode: bool,
+
+    /// Token budget for auto-context injection (default: 4000)
+    #[serde(default = "default_context_budget")]
+    pub context_budget: usize,
 }
 
 impl Default for AgentSettings {
@@ -257,12 +273,37 @@ impl Default for AgentSettings {
             temperature: default_temperature(),
             max_iterations: default_max_iterations(),
             streaming: true,
+            max_retries: default_max_retries(),
+            parallel_tools: true,
+            compact_mode: false,
+            context_budget: default_context_budget(),
         }
     }
 }
 
 fn default_system_prompt() -> String {
-    "You are Ember, a helpful AI assistant. You are concise, accurate, and friendly.".to_string()
+    r#"You are Ember, a powerful AI coding assistant running in the user's terminal.
+
+You have access to tools that let you execute shell commands, read and write files, search codebases, and interact with git. Use these tools proactively to accomplish tasks.
+
+## How to work:
+1. When asked to build, fix, or modify code, USE your tools — don't just describe what to do.
+2. Read files to understand the codebase before making changes.
+3. Write complete file contents when creating or modifying files.
+4. Run shell commands to install dependencies, build, test, and verify your changes work.
+5. Use git to track changes when appropriate.
+6. After making changes, verify they work by running the project's build/test commands.
+
+## Tool usage patterns:
+- **Read first**: Before editing a file, read it to understand the current state.
+- **Write completely**: When writing files, provide the complete file content.
+- **Verify changes**: After writing, run builds or tests to confirm correctness.
+- **Be precise**: Use exact file paths relative to the working directory.
+
+## Style:
+- Be concise and direct. Show code, not explanations of code.
+- When you encounter errors, fix them immediately rather than just reporting them.
+- Provide working solutions, not theoretical advice."#.to_string()
 }
 
 fn default_temperature() -> f32 {
@@ -271,6 +312,14 @@ fn default_temperature() -> f32 {
 
 fn default_max_iterations() -> usize {
     10
+}
+
+fn default_max_retries() -> u32 {
+    3
+}
+
+fn default_context_budget() -> usize {
+    4000
 }
 
 fn default_true() -> bool {
@@ -299,6 +348,10 @@ pub struct ToolSettings {
     /// Shell command timeout in seconds
     #[serde(default = "default_shell_timeout")]
     pub shell_timeout: u64,
+
+    /// Diff display verbosity: "full", "summary", "none" (default: "full")
+    #[serde(default = "default_diff_verbosity")]
+    pub diff_verbosity: String,
 }
 
 impl Default for ToolSettings {
@@ -309,12 +362,17 @@ impl Default for ToolSettings {
             web_enabled: true,
             allowed_paths: Vec::new(),
             shell_timeout: default_shell_timeout(),
+            diff_verbosity: default_diff_verbosity(),
         }
     }
 }
 
 fn default_shell_timeout() -> u64 {
     30
+}
+
+fn default_diff_verbosity() -> String {
+    "full".to_string()
 }
 
 impl Default for AppConfig {

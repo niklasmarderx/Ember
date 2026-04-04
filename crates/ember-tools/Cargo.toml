@@ -26,6 +26,9 @@ tracing = { workspace = true }
 # Async runtime
 tokio = { workspace = true, features = ["process", "fs", "io-util"] }
 
+# Async combinators
+futures = "0.3"
+
 # Async trait support
 async-trait = { workspace = true }
 

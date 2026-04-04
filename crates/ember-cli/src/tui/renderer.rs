@@ -345,6 +345,211 @@ impl Default for TerminalRenderer {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Streaming Markdown Renderer
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// A streaming-friendly markdown renderer that accumulates text chunks and
+/// renders completed lines with syntax highlighting and formatting.
+///
+/// Usage:
+/// ```no_run
+/// let mut sr = StreamingRenderer::new();
+/// sr.push("## Hello");     // renders heading immediately
+/// sr.push(" World\n");     // completes line, renders
+/// sr.push("```rust\nfn"); // starts code block, buffers
+/// sr.push(" main() {}\n```\n"); // completes code block, renders highlighted
+/// sr.finish();             // flush any remaining buffered text
+/// ```
+pub struct StreamingRenderer {
+    renderer: TerminalRenderer,
+    buffer: String,
+    in_code_block: bool,
+    code_language: String,
+    code_buffer: String,
+    rendered_len: usize,
+}
+
+impl StreamingRenderer {
+    /// Create a new streaming renderer.
+    pub fn new() -> Self {
+        Self {
+            renderer: TerminalRenderer::new(),
+            buffer: String::new(),
+            in_code_block: false,
+            code_language: String::new(),
+            code_buffer: String::new(),
+            rendered_len: 0,
+        }
+    }
+
+    /// Push a new text chunk from the streaming response.
+    ///
+    /// Complete lines are rendered immediately with markdown formatting.
+    /// Incomplete lines are buffered until the next chunk completes them.
+    pub fn push(&mut self, chunk: &str) {
+        self.buffer.push_str(chunk);
+        self.process_buffer();
+    }
+
+    /// Flush any remaining buffered content (call when stream ends).
+    pub fn finish(&mut self) {
+        if !self.buffer.is_empty() {
+            let remaining = self.buffer.clone();
+            self.render_line(&remaining);
+            self.buffer.clear();
+        }
+        if self.in_code_block && !self.code_buffer.is_empty() {
+            // Render unterminated code block
+            let mut out = io::stdout();
+            let _ = self.renderer.render_code_block_to(
+                &self.code_buffer,
+                &self.code_language,
+                &mut out,
+            );
+            self.code_buffer.clear();
+            self.in_code_block = false;
+        }
+    }
+
+    fn process_buffer(&mut self) {
+        // Process complete lines from the buffer
+        while let Some(newline_pos) = self.buffer[self.rendered_len..].find('\n') {
+            let end = self.rendered_len + newline_pos;
+            let line = self.buffer[self.rendered_len..end].to_string();
+            self.rendered_len = end + 1; // skip the \n
+            self.render_line(&line);
+        }
+
+        // Trim already-rendered content from the buffer periodically
+        if self.rendered_len > 4096 {
+            self.buffer = self.buffer[self.rendered_len..].to_string();
+            self.rendered_len = 0;
+        }
+    }
+
+    fn render_line(&mut self, line: &str) {
+        let mut out = io::stdout();
+
+        // Handle code block fences
+        if line.starts_with("```") {
+            if self.in_code_block {
+                // End of code block — render the accumulated code with syntax highlighting
+                let _ = self.renderer.render_code_block_to(
+                    &self.code_buffer,
+                    &self.code_language,
+                    &mut out,
+                );
+                self.code_buffer.clear();
+                self.code_language.clear();
+                self.in_code_block = false;
+            } else {
+                // Start of code block
+                self.in_code_block = true;
+                self.code_language = line.trim_start_matches('`').trim().to_string();
+                self.code_buffer.clear();
+            }
+            return;
+        }
+
+        if self.in_code_block {
+            self.code_buffer.push_str(line);
+            self.code_buffer.push('\n');
+            return;
+        }
+
+        // Render non-code-block lines with markdown formatting
+        if line.starts_with('#') {
+            // Heading
+            let level_usize = line.chars().take_while(|c| *c == '#').count().min(6);
+            let level = level_usize as u8;
+            let text = line[level_usize..].trim();
+            let _ = self.renderer.render_heading_to(level, text, &mut out);
+        } else if line.starts_with("---") || line.starts_with("***") || line.starts_with("___") {
+            let _ = self.renderer.render_hr_to(&mut out);
+        } else if line.starts_with("> ") {
+            // Blockquote
+            let _ = queue!(out, SetForegroundColor(self.renderer.theme.quote));
+            let _ = writeln!(out, "│ {}", &line[2..]);
+            let _ = queue!(out, ResetColor);
+        } else if line.starts_with("- ") || line.starts_with("* ") {
+            // List item
+            let _ = write!(out, "  • {}", &line[2..]);
+            let _ = writeln!(out);
+        } else if line.chars().next().map_or(false, |c| c.is_ascii_digit())
+            && line.contains(". ")
+        {
+            // Ordered list
+            let _ = write!(out, "  {}", line);
+            let _ = writeln!(out);
+        } else {
+            // Plain text — handle inline formatting
+            self.render_inline(line, &mut out);
+            let _ = writeln!(out);
+        }
+        let _ = out.flush();
+    }
+
+    fn render_inline(&self, text: &str, out: &mut impl Write) {
+        let mut chars = text.chars().peekable();
+        while let Some(ch) = chars.next() {
+            match ch {
+                '`' => {
+                    // Inline code
+                    let _ = queue!(out, SetForegroundColor(self.renderer.theme.inline_code));
+                    let _ = write!(out, "`");
+                    for c in chars.by_ref() {
+                        if c == '`' {
+                            break;
+                        }
+                        let _ = write!(out, "{}", c);
+                    }
+                    let _ = write!(out, "`");
+                    let _ = queue!(out, ResetColor);
+                }
+                '*' if chars.peek() == Some(&'*') => {
+                    // Bold
+                    chars.next(); // consume second *
+                    let _ = queue!(out, SetForegroundColor(self.renderer.theme.strong));
+                    loop {
+                        match chars.next() {
+                            Some('*') if chars.peek() == Some(&'*') => {
+                                chars.next(); // consume closing **
+                                break;
+                            }
+                            Some(c) => {
+                                let _ = write!(out, "{}", c);
+                            }
+                            None => break,
+                        }
+                    }
+                    let _ = queue!(out, ResetColor);
+                }
+                '*' | '_' => {
+                    // Italic
+                    let _ = queue!(out, SetForegroundColor(self.renderer.theme.emphasis));
+                    for c in chars.by_ref() {
+                        if c == ch {
+                            break;
+                        }
+                        let _ = write!(out, "{}", c);
+                    }
+                    let _ = queue!(out, ResetColor);
+                }
+                _ => {
+                    let _ = write!(out, "{}", ch);
+                }
+            }
+        }
+    }
+}
+
+impl Default for StreamingRenderer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Helpers
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -426,9 +631,9 @@ pub struct ToolOutputFormatter;
 impl ToolOutputFormatter {
     /// Format a tool execution header.
     ///
-    /// Example output: `"⚡ Running: bash  ls -la"`
+    /// Example output: `">> Running: bash  ls -la"`
     pub fn format_tool_start(tool_name: &str, input_preview: &str) -> String {
-        format!("⚡ Running: {tool_name}  {input_preview}")
+        format!(">> Running: {tool_name}  {input_preview}")
     }
 
     /// Format tool output, truncating to `max_lines` and appending a summary
@@ -516,7 +721,7 @@ mod tests {
     #[test]
     fn tool_output_format_tool_start() {
         let s = ToolOutputFormatter::format_tool_start("bash", "ls -la");
-        assert!(s.contains("⚡"), "missing lightning bolt");
+        assert!(s.contains(">>"), "missing run prefix");
         assert!(s.contains("bash"), "missing tool name");
         assert!(s.contains("ls -la"), "missing input preview");
     }

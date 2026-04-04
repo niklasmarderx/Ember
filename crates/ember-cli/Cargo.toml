@@ -15,11 +15,12 @@ path = "src/main.rs"
 [dependencies]
 # Workspace crates
 ember-core = { path = "../ember-core" }
-ember-llm = { path = "../ember-llm", features = ["openai", "ollama"] }
+ember-llm = { path = "../ember-llm", features = ["openai", "ollama", "anthropic", "gemini", "groq", "deepseek", "mistral", "openrouter", "xai", "bedrock"] }
 ember-tools = { path = "../ember-tools", features = ["shell", "filesystem", "web", "git"] }
 ember-storage = { path = "../ember-storage", features = ["sqlite"] }
 ember-web = { path = "../ember-web" }
 ember-plugins = { path = "../ember-plugins", features = ["marketplace"] }
+ember-browser = { path = "../ember-browser" }
 
 # Async runtime
 tokio = { workspace = true, features = ["full", "signal"] }
@@ -65,6 +66,9 @@ tokio-stream = "0.1"
 
 # Text utilities
 textwrap = "0.16"
+
+# Line editing / input history
+rustyline = "14.0"
 
 # Table formatting
 tabled = "0.14"

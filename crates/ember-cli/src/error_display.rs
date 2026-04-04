@@ -47,23 +47,7 @@ fn display_llm_error(error: &ember_llm::Error) {
 
     // Print user-friendly message with preserved formatting
     for line in user_msg.lines() {
-        if line.starts_with("💡")
-            || line.starts_with("📖")
-            || line.starts_with("⏱️")
-            || line.starts_with("🔑")
-            || line.starts_with("🔌")
-            || line.starts_with("⚠️")
-            || line.starts_with("❌")
-            || line.starts_with("📏")
-            || line.starts_with("🌐")
-            || line.starts_with("⚙️")
-            || line.starts_with("📡")
-            || line.starts_with("🔧")
-            || line.starts_with("📄")
-        {
-            eprintln!("  {}", line.bright_cyan());
-        } else if line.starts_with("  •")
-            || line.starts_with("  1.")
+        if line.starts_with("  1.")
             || line.starts_with("  2.")
             || line.starts_with("  3.")
         {
@@ -92,7 +76,7 @@ fn display_llm_error(error: &ember_llm::Error) {
     // Add recovery suggestions if available
     let suggestions = error.recovery_suggestions();
     if !suggestions.is_empty() {
-        eprintln!("{}", " 💡 Quick Actions ".bright_white().on_blue().bold());
+        eprintln!("{}", " Quick Actions ".bright_white().on_blue().bold());
         eprintln!();
         for (i, suggestion) in suggestions.iter().enumerate() {
             eprintln!(
@@ -107,7 +91,7 @@ fn display_llm_error(error: &ember_llm::Error) {
     // Add documentation link
     eprintln!(
         "  {} {}",
-        "📚 Documentation:".bright_cyan(),
+        "Documentation:".bright_cyan(),
         error_code.doc_url().bright_blue().underline()
     );
     eprintln!();
@@ -141,7 +125,7 @@ fn display_core_error(error: &ember_core::Error) {
         ember_core::Error::ToolExecution { tool, message } => {
             eprintln!(
                 "  {} Tool '{}' failed to execute",
-                "🔧".bright_red(),
+                "[tool]".bright_red(),
                 tool.bright_yellow()
             );
             eprintln!();
@@ -157,7 +141,7 @@ fn display_core_error(error: &ember_core::Error) {
             );
         }
         ember_core::Error::ContextOverflow { current, max } => {
-            eprintln!("  {} Context window exceeded", "📏".bright_red());
+            eprintln!("  {} Context window exceeded", "[ctx]".bright_red());
             eprintln!();
             eprintln!("  Current: {} tokens", current.to_string().bright_yellow());
             eprintln!("  Maximum: {} tokens", max.to_string().bright_green());
@@ -170,7 +154,7 @@ fn display_core_error(error: &ember_core::Error) {
         ember_core::Error::Timeout { seconds } => {
             eprintln!(
                 "  {} Operation timed out after {} seconds",
-                "⏱️".bright_red(),
+                "[timeout]".bright_red(),
                 seconds.to_string().bright_yellow()
             );
             eprintln!();
@@ -183,7 +167,7 @@ fn display_core_error(error: &ember_core::Error) {
             eprintln!("    3. Check your network connection");
         }
         ember_core::Error::ConversationNotFound(id) => {
-            eprintln!("  {} Conversation not found", "❌".bright_red());
+            eprintln!("  {} Conversation not found", "[error]".bright_red());
             eprintln!();
             eprintln!("  ID: {}", id.to_string().bright_yellow());
             eprintln!();
@@ -194,7 +178,7 @@ fn display_core_error(error: &ember_core::Error) {
             );
         }
         ember_core::Error::Config(msg) => {
-            eprintln!("  {} Configuration error", "⚙️".bright_red());
+            eprintln!("  {} Configuration error", "[config]".bright_red());
             eprintln!();
             eprintln!("  {}", msg.bright_white());
             eprintln!();
@@ -203,14 +187,14 @@ fn display_core_error(error: &ember_core::Error) {
             eprintln!("    2. Run: {}", "ember config init".bright_green());
         }
         ember_core::Error::Memory(msg) => {
-            eprintln!("  {} Memory operation failed", "💾".bright_red());
+            eprintln!("  {} Memory operation failed", "[memory]".bright_red());
             eprintln!();
             eprintln!("  {}", msg.bright_white());
             eprintln!();
             eprintln!("  This is usually a temporary issue. Please try again.");
         }
         ember_core::Error::NotInitialized(msg) => {
-            eprintln!("  {} Agent not initialized", "⚠️".bright_red());
+            eprintln!("  {} Agent not initialized", "[warn]".bright_red());
             eprintln!();
             eprintln!("  {}", msg.bright_white());
             eprintln!();
@@ -222,7 +206,7 @@ fn display_core_error(error: &ember_core::Error) {
         ember_core::Error::LoopLimitExceeded { iterations } => {
             eprintln!(
                 "  {} Agent loop limit exceeded ({} iterations)",
-                "🔄".bright_red(),
+                "[loop]".bright_red(),
                 iterations.to_string().bright_yellow()
             );
             eprintln!();
@@ -230,7 +214,7 @@ fn display_core_error(error: &ember_core::Error) {
             eprintln!("  Try rephrasing your request or breaking it into smaller steps.");
         }
         ember_core::Error::Io(e) => {
-            eprintln!("  {} I/O error: {}", "📁".bright_red(), e);
+            eprintln!("  {} I/O error: {}", "[io]".bright_red(), e);
             eprintln!();
             eprintln!("  Check file permissions and disk space.");
         }
@@ -242,7 +226,7 @@ fn display_core_error(error: &ember_core::Error) {
     eprintln!();
     eprintln!(
         "  {} {}",
-        "📚 Documentation:".bright_cyan(),
+        "Documentation:".bright_cyan(),
         format!("https://docs.ember.dev/errors/{}", code.to_lowercase())
             .bright_blue()
             .underline()
@@ -298,14 +282,14 @@ fn display_generic_error(error: &anyhow::Error) {
         eprintln!("  {}", "Caused by:".bright_yellow());
     }
     while let Some(cause) = source {
-        eprintln!("    • {}", cause.to_string().dimmed());
+        eprintln!("    {}", cause.to_string().dimmed());
         source = cause.source();
     }
 
     eprintln!();
     eprintln!(
         "  {} Run {} for more information.",
-        "💡".bright_cyan(),
+        "[hint]".bright_cyan(),
         "ember --help".bright_green()
     );
     eprintln!();
@@ -316,19 +300,19 @@ fn display_generic_error(error: &anyhow::Error) {
 /// Display a warning message
 #[allow(dead_code)]
 pub fn display_warning(message: &str) {
-    eprintln!("{} {}", "⚠️  Warning:".bright_yellow().bold(), message);
+    eprintln!("{} {}", "[warn] Warning:".bright_yellow().bold(), message);
 }
 
 /// Display a success message
 #[allow(dead_code)]
 pub fn display_success(message: &str) {
-    println!("{} {}", "✓".bright_green().bold(), message.bright_white());
+    println!("{} {}", "[ok]".bright_green().bold(), message.bright_white());
 }
 
 /// Display an info message
 #[allow(dead_code)]
 pub fn display_info(message: &str) {
-    println!("{} {}", "ℹ".bright_blue().bold(), message);
+    println!("{} {}", "[info]".bright_blue().bold(), message);
 }
 
 /// Display a retry message
@@ -336,7 +320,7 @@ pub fn display_info(message: &str) {
 pub fn display_retry(attempt: u32, max_attempts: u32, delay_secs: u64) {
     eprintln!(
         "{} Retrying ({}/{}) in {} seconds...",
-        "↻".bright_yellow(),
+        "[retry]".bright_yellow(),
         attempt,
         max_attempts,
         delay_secs
@@ -346,7 +330,7 @@ pub fn display_retry(attempt: u32, max_attempts: u32, delay_secs: u64) {
 /// Display a progress spinner message
 #[allow(dead_code)]
 pub fn display_progress(message: &str) {
-    print!("\r{} {}", "◐".bright_blue(), message);
+    print!("\r{} {}", "...".bright_blue(), message);
     use std::io::Write;
     let _ = std::io::stdout().flush();
 }
@@ -362,7 +346,7 @@ pub fn clear_line() {
 /// Display a hint message
 #[allow(dead_code)]
 pub fn display_hint(message: &str) {
-    eprintln!("  {} {}", "💡".bright_cyan(), message.bright_white());
+    eprintln!("  {} {}", "[hint]".bright_cyan(), message.bright_white());
 }
 
 /// Display a command suggestion

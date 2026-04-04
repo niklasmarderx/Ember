@@ -1,6 +1,6 @@
 //! Filesystem operations tool.
 
-use crate::patch::{write_file_tracked, FileOpHistory};
+use crate::patch::{write_file_tracked, FileOpHistory, FileWriteResult};
 use crate::{registry::ToolOutput, Error, Result, ToolDefinition, ToolHandler};
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
@@ -197,8 +197,8 @@ impl FilesystemTool {
         Ok(content)
     }
 
-    /// Write content to a file.
-    async fn write_file(&self, path: &str, content: &str) -> Result<()> {
+    /// Write content to a file and return the tracked result.
+    async fn write_file(&self, path: &str, content: &str) -> Result<FileWriteResult> {
         let path = self.validate_path(Path::new(path))?;
         debug!(path = %path.display(), "Writing file");
 
@@ -219,8 +219,8 @@ impl FilesystemTool {
 
         // Use tracked write so the change can be undone via /undo.
         let write_result = write_file_tracked(&path, content)?;
-        with_history(|h| h.record(write_result));
-        Ok(())
+        with_history(|h| h.record(write_result.clone()));
+        Ok(write_result)
     }
 
     /// List directory contents.
@@ -373,11 +373,23 @@ impl ToolHandler for FilesystemTool {
                             "Missing 'content' for write operation",
                         )
                     })?;
-                self.write_file(path, content).await?;
-                Ok(ToolOutput::success(format!(
-                    "Successfully wrote to {}",
-                    path
-                )))
+                let result = self.write_file(path, content).await?;
+                let summary = format!(
+                    "Wrote {} (+{} -{})",
+                    path, result.lines_added, result.lines_removed
+                );
+                let data = serde_json::json!({
+                    "path": path,
+                    "created": result.created,
+                    "lines_added": result.lines_added,
+                    "lines_removed": result.lines_removed,
+                    "hunks": result.hunks,
+                });
+                Ok(ToolOutput {
+                    success: true,
+                    output: summary,
+                    data: Some(data),
+                })
             }
             "list" => {
                 let entries = self.list_directory(path).await?;

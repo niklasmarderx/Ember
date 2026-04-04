@@ -78,6 +78,14 @@ pub enum SlashCommand {
     Bench { task: Option<String> },
     /// Show what Ember has learned about your coding preferences.
     Learn { subcommand: Option<String> },
+    /// Switch terminal color theme: dark, light, neon.
+    Theme { theme: Option<String> },
+    /// Show buddy stats and XP progress.
+    Buddy,
+    /// Auto-generate EMBER.md project context file.
+    Init,
+    /// Add files to conversation context.
+    Add { paths: Vec<String> },
     /// An unrecognised slash command — stores the raw name.
     Unknown(String),
 }
@@ -175,6 +183,17 @@ impl SlashCommand {
             "learn" => SlashCommand::Learn {
                 subcommand: arg.map(|a| a.trim().to_lowercase()),
             },
+            "theme" => SlashCommand::Theme {
+                theme: arg.map(|a| a.trim().to_lowercase()),
+            },
+            "buddy" | "pet" | "xp" => SlashCommand::Buddy,
+            "init" => SlashCommand::Init,
+            "add" | "a" => {
+                let paths = arg
+                    .map(|a| a.split_whitespace().map(str::to_owned).collect())
+                    .unwrap_or_default();
+                SlashCommand::Add { paths }
+            }
             other => SlashCommand::Unknown(other.to_owned()),
         };
 
@@ -209,46 +228,53 @@ impl SlashCommand {
             "replay",
             "bench",
             "learn",
+            "theme",
+            "buddy",
+            "init",
+            "add",
         ]
     }
 
     /// A short one-line description of what this command does.
+    /// Look up this command's description from the registry (single source of truth).
     pub fn help_text(&self) -> &'static str {
-        match self {
-            SlashCommand::Help => "Show all available commands or help for a specific command",
-            SlashCommand::Status => "Show session statistics (turns, tokens, estimated cost)",
-            SlashCommand::Compact => "Force compaction of the current session context",
-            SlashCommand::Model { .. } => "Show or change the active language model",
-            SlashCommand::Permissions { .. } => "Show or change the current permission mode",
-            SlashCommand::Config { .. } => "Display configuration, optionally for a named section",
-            SlashCommand::Memory => "Show memory and context window usage",
-            SlashCommand::Clear { .. } => {
-                "Clear the current conversation (prompts for confirmation)"
-            }
-            SlashCommand::Cost => "Show a cost breakdown for the current session",
-            SlashCommand::Fork { .. } => "Fork the current session, optionally giving it a name",
-            SlashCommand::Forks => "List all session forks",
-            SlashCommand::Restore { .. } => "Restore the session to a previous fork point",
-            SlashCommand::Compare { .. } => "Compare two providers side-by-side on the same prompt",
-            SlashCommand::Cache { .. } => {
-                "Show semantic cache stats, or '/cache clear' to clear the cache"
-            }
-            SlashCommand::Undo => "Undo the last file write made by a tool",
-            SlashCommand::Commit { .. } => {
-                "Create a git commit with the given message (or auto-generate one)"
-            }
-            SlashCommand::Diff { .. } => "Show the current git diff of working-tree changes",
-            SlashCommand::Plan => "Toggle Plan Mode (propose changes without executing)",
-            SlashCommand::Execute => "Execute the last proposed plan",
-            SlashCommand::Checkpoint { .. } => "Save a named checkpoint of the conversation",
-            SlashCommand::Checkpoints => "List all saved checkpoints",
-            SlashCommand::Replay => "Show a replayable log of the current session",
-            SlashCommand::Bench { .. } => "Benchmark a task across multiple providers/models",
-            SlashCommand::Learn { .. } => {
-                "Show learned coding preferences, or '/learn reset' to clear"
-            }
-            SlashCommand::Unknown(_) => "Unknown command",
-        }
+        let name = match self {
+            SlashCommand::Help => "help",
+            SlashCommand::Status => "status",
+            SlashCommand::Compact => "compact",
+            SlashCommand::Model { .. } => "model",
+            SlashCommand::Permissions { .. } => "permissions",
+            SlashCommand::Config { .. } => "config",
+            SlashCommand::Memory => "memory",
+            SlashCommand::Clear { .. } => "clear",
+            SlashCommand::Cost => "cost",
+            SlashCommand::Fork { .. } => "fork",
+            SlashCommand::Forks => "forks",
+            SlashCommand::Restore { .. } => "restore",
+            SlashCommand::Compare { .. } => "compare",
+            SlashCommand::Cache { .. } => "cache",
+            SlashCommand::Undo => "undo",
+            SlashCommand::Commit { .. } => "commit",
+            SlashCommand::Diff { .. } => "diff",
+            SlashCommand::Plan => "plan",
+            SlashCommand::Execute => "execute",
+            SlashCommand::Checkpoint { .. } => "checkpoint",
+            SlashCommand::Checkpoints => "checkpoints",
+            SlashCommand::Replay => "replay",
+            SlashCommand::Bench { .. } => "bench",
+            SlashCommand::Learn { .. } => "learn",
+            SlashCommand::Theme { .. } => "theme",
+            SlashCommand::Buddy => "buddy",
+            SlashCommand::Init => "init",
+            SlashCommand::Add { .. } => "add",
+            SlashCommand::Unknown(_) => return "Unknown command",
+        };
+        // Use a leaked registry lookup so we can return &'static str.
+        // The registry is small and this is only called for help display.
+        let reg = SlashCommandRegistry::new();
+        reg.find(name)
+            .map(|e| e.description)
+            .unwrap_or("No description")
     }
 }
 
@@ -342,6 +368,8 @@ pub struct SlashCommandEntry {
     pub usage: &'static str,
     /// Alternative names (without `/`) that map to the same command.
     pub aliases: Vec<&'static str>,
+    /// Category for grouping in help output.
+    pub category: &'static str,
 }
 
 /// Registry of all slash commands, used for display and tab-completion.
@@ -359,149 +387,207 @@ impl SlashCommandRegistry {
     /// Create a registry pre-populated with all built-in slash commands.
     pub fn new() -> Self {
         let commands = vec![
+            // ── Session ──
             SlashCommandEntry {
                 name: "help",
-                description: "Show all commands or help for a specific command",
+                description: "Show all commands",
                 usage: "/help [command]",
                 aliases: vec!["h"],
+                category: "Session",
             },
             SlashCommandEntry {
                 name: "status",
-                description: "Show session statistics (turns, tokens, estimated cost)",
+                description: "Session stats (turns, tokens, cost)",
                 usage: "/status",
                 aliases: vec![],
-            },
-            SlashCommandEntry {
-                name: "compact",
-                description: "Force compaction of the current session context",
-                usage: "/compact",
-                aliases: vec![],
-            },
-            SlashCommandEntry {
-                name: "model",
-                description: "Show or change the active language model",
-                usage: "/model [name]",
-                aliases: vec!["m"],
-            },
-            SlashCommandEntry {
-                name: "permissions",
-                description: "Show or change the current permission mode",
-                usage: "/permissions [mode]",
-                aliases: vec!["perm"],
-            },
-            SlashCommandEntry {
-                name: "config",
-                description: "Display configuration, optionally for a named section",
-                usage: "/config [section]",
-                aliases: vec!["cfg"],
-            },
-            SlashCommandEntry {
-                name: "memory",
-                description: "Show memory and context window usage",
-                usage: "/memory",
-                aliases: vec!["mem"],
-            },
-            SlashCommandEntry {
-                name: "clear",
-                description: "Clear the current conversation (prompts for confirmation)",
-                usage: "/clear [--yes]",
-                aliases: vec!["c"],
+                category: "Session",
             },
             SlashCommandEntry {
                 name: "cost",
-                description: "Show a cost breakdown for the current session",
+                description: "Cost breakdown for this session",
                 usage: "/cost",
                 aliases: vec![],
+                category: "Session",
             },
             SlashCommandEntry {
-                name: "fork",
-                description: "Fork the current session, optionally giving it a name",
-                usage: "/fork [name]",
-                aliases: vec![],
+                name: "memory",
+                description: "Context window usage",
+                usage: "/memory",
+                aliases: vec!["mem"],
+                category: "Session",
             },
             SlashCommandEntry {
-                name: "forks",
-                description: "List all session forks",
-                usage: "/forks",
-                aliases: vec![],
+                name: "clear",
+                description: "Clear conversation history",
+                usage: "/clear [--yes]",
+                aliases: vec!["c"],
+                category: "Session",
             },
             SlashCommandEntry {
-                name: "restore",
-                description: "Restore the session to a previous fork point",
-                usage: "/restore <id>",
-                aliases: vec![],
+                name: "model",
+                description: "Show/change model (fast, smart, code, local)",
+                usage: "/model [name]",
+                aliases: vec!["m"],
+                category: "Session",
             },
             SlashCommandEntry {
-                name: "compare",
-                description: "Compare two providers side-by-side on the same prompt",
-                usage: "/compare [provider1] [provider2] <prompt>",
+                name: "compact",
+                description: "Force context compaction",
+                usage: "/compact",
                 aliases: vec![],
+                category: "Session",
             },
             SlashCommandEntry {
-                name: "cache",
-                description: "Show semantic cache stats; '/cache clear' to clear the cache",
-                usage: "/cache [clear]",
-                aliases: vec![],
+                name: "config",
+                description: "Display configuration",
+                usage: "/config [section]",
+                aliases: vec!["cfg"],
+                category: "Session",
             },
+            SlashCommandEntry {
+                name: "permissions",
+                description: "Show/change permission mode",
+                usage: "/permissions [mode]",
+                aliases: vec!["perm"],
+                category: "Session",
+            },
+            // ── Git & Files ──
             SlashCommandEntry {
                 name: "undo",
-                description: "Undo the last file write made by a tool",
+                description: "Undo the last file write",
                 usage: "/undo",
                 aliases: vec!["u"],
+                category: "Git & Files",
             },
             SlashCommandEntry {
                 name: "commit",
-                description: "Create a git commit with given message (auto-generates if omitted)",
+                description: "Auto git commit",
                 usage: "/commit [message]",
                 aliases: vec![],
+                category: "Git & Files",
             },
             SlashCommandEntry {
                 name: "diff",
-                description: "Show the current git diff of working-tree changes",
+                description: "Show git diff",
                 usage: "/diff [--staged]",
                 aliases: vec![],
+                category: "Git & Files",
             },
+            // ── Planning ──
             SlashCommandEntry {
                 name: "plan",
-                description: "Toggle Plan Mode (propose changes without executing)",
+                description: "Toggle plan mode (propose without executing)",
                 usage: "/plan",
                 aliases: vec![],
+                category: "Planning",
             },
             SlashCommandEntry {
                 name: "execute",
-                description: "Execute the last proposed plan",
+                description: "Execute the proposed plan",
                 usage: "/execute",
                 aliases: vec!["exec", "x"],
+                category: "Planning",
+            },
+            // ── Checkpoints ──
+            SlashCommandEntry {
+                name: "fork",
+                description: "Fork the session",
+                usage: "/fork [name]",
+                aliases: vec![],
+                category: "Checkpoints",
+            },
+            SlashCommandEntry {
+                name: "forks",
+                description: "List session forks",
+                usage: "/forks",
+                aliases: vec![],
+                category: "Checkpoints",
+            },
+            SlashCommandEntry {
+                name: "restore",
+                description: "Restore a fork point",
+                usage: "/restore <id>",
+                aliases: vec![],
+                category: "Checkpoints",
             },
             SlashCommandEntry {
                 name: "checkpoint",
-                description: "Save a named checkpoint of the conversation state",
+                description: "Save a conversation checkpoint",
                 usage: "/checkpoint [name]",
                 aliases: vec!["cp"],
+                category: "Checkpoints",
             },
             SlashCommandEntry {
                 name: "checkpoints",
-                description: "List all saved checkpoints",
+                description: "List saved checkpoints",
                 usage: "/checkpoints",
                 aliases: vec!["cps"],
+                category: "Checkpoints",
             },
             SlashCommandEntry {
                 name: "replay",
-                description: "Show a replayable log of the current session",
+                description: "Show session replay log",
                 usage: "/replay",
                 aliases: vec![],
+                category: "Checkpoints",
+            },
+            // ── Advanced ──
+            SlashCommandEntry {
+                name: "compare",
+                description: "Compare two providers side-by-side",
+                usage: "/compare [p1] [p2] <prompt>",
+                aliases: vec![],
+                category: "Advanced",
+            },
+            SlashCommandEntry {
+                name: "cache",
+                description: "Semantic cache stats or clear",
+                usage: "/cache [clear]",
+                aliases: vec![],
+                category: "Advanced",
             },
             SlashCommandEntry {
                 name: "bench",
-                description: "Benchmark a task across multiple providers/models",
+                description: "Benchmark across providers",
                 usage: "/bench [task]",
                 aliases: vec!["benchmark"],
+                category: "Advanced",
             },
             SlashCommandEntry {
                 name: "learn",
-                description: "Show learned coding preferences; '/learn reset' to clear",
+                description: "Show/reset learned preferences",
                 usage: "/learn [reset|show]",
                 aliases: vec![],
+                category: "Advanced",
+            },
+            SlashCommandEntry {
+                name: "theme",
+                description: "Switch color theme: dark, light, neon",
+                usage: "/theme [dark|light|neon]",
+                aliases: vec![],
+                category: "Session",
+            },
+            SlashCommandEntry {
+                name: "buddy",
+                description: "Show your coding buddy's stats and XP",
+                usage: "/buddy",
+                aliases: vec!["pet", "xp"],
+                category: "Advanced",
+            },
+            // ── Context ──
+            SlashCommandEntry {
+                name: "init",
+                description: "Auto-generate EMBER.md project rules",
+                usage: "/init",
+                aliases: vec![],
+                category: "Git & Files",
+            },
+            SlashCommandEntry {
+                name: "add",
+                description: "Add files to conversation context",
+                usage: "/add <file1> [file2] ...",
+                aliases: vec!["a"],
+                category: "Git & Files",
             },
         ];
 
@@ -538,29 +624,68 @@ impl SlashCommandRegistry {
             .collect()
     }
 
-    /// Render a formatted help string listing all commands.
+    /// Render a formatted help string listing all commands grouped by category.
     pub fn format_help(&self) -> String {
-        let mut out = String::from("Available commands:\n\n");
+        use std::collections::BTreeMap;
+
+        let mut groups: BTreeMap<&str, Vec<&SlashCommandEntry>> = BTreeMap::new();
         for entry in &self.commands {
-            let aliases = if entry.aliases.is_empty() {
-                String::new()
-            } else {
-                format!(
-                    "  (aliases: {})",
-                    entry
-                        .aliases
-                        .iter()
-                        .map(|a| format!("/{a}"))
-                        .collect::<Vec<_>>()
-                        .join(", ")
-                )
-            };
-            out.push_str(&format!(
-                "  {:<22} {}{}\n",
-                entry.usage, entry.description, aliases
-            ));
+            groups.entry(entry.category).or_default().push(entry);
+        }
+
+        let mut out = String::new();
+        for (category, entries) in &groups {
+            out.push_str(&format!("  \x1b[1;33m{}\x1b[0m\n", category));
+            for entry in entries {
+                let aliases = if entry.aliases.is_empty() {
+                    String::new()
+                } else {
+                    format!(
+                        " \x1b[2m({})\x1b[0m",
+                        entry
+                            .aliases
+                            .iter()
+                            .map(|a| format!("/{a}"))
+                            .collect::<Vec<_>>()
+                            .join(", ")
+                    )
+                };
+                out.push_str(&format!(
+                    "    \x1b[36m{:<20}\x1b[0m {}{}\n",
+                    entry.usage, entry.description, aliases
+                ));
+            }
+            out.push('\n');
         }
         out
+    }
+
+    /// Find the closest command name to `input` for "did you mean?" suggestions.
+    pub fn suggest(&self, input: &str) -> Option<String> {
+        let needle = input.trim_start_matches('/').to_lowercase();
+        if needle.is_empty() {
+            return None;
+        }
+
+        let mut best: Option<(&str, usize)> = None;
+        for entry in &self.commands {
+            let dist = edit_distance(&needle, entry.name);
+            if dist <= 2 {
+                if best.is_none() || dist < best.unwrap().1 {
+                    best = Some((entry.name, dist));
+                }
+            }
+            for alias in &entry.aliases {
+                let dist = edit_distance(&needle, alias);
+                if dist <= 2 {
+                    if best.is_none() || dist < best.unwrap().1 {
+                        best = Some((entry.name, dist));
+                    }
+                }
+            }
+        }
+
+        best.map(|(name, _)| format!("/{}", name))
     }
 }
 
@@ -568,11 +693,10 @@ impl SlashCommandRegistry {
 // SlashCompleter
 // ──────────────────────────────────────────────────────────────────────────────
 
-/// Tab-completion helper.
+/// Tab-completion helper that integrates with rustyline.
 ///
-/// When rustyline is not available (as is the case here), this type still
-/// provides the same completion logic so that any future readline integration
-/// can delegate to it directly.
+/// Implements the rustyline `Completer`, `Hinter`, `Highlighter`, `Validator`,
+/// and `Helper` traits so it can be plugged directly into a rustyline `Editor`.
 pub struct SlashCompleter {
     registry: SlashCommandRegistry,
 }
@@ -601,6 +725,98 @@ impl SlashCompleter {
         }
         self.registry.completions_for(partial)
     }
+}
+
+// ── rustyline trait implementations ─────────────────────────────────────────
+
+use rustyline::completion::{Completer, Pair};
+use rustyline::highlight::Highlighter;
+use rustyline::hint::Hinter;
+use rustyline::validate::Validator;
+use rustyline::Helper;
+use rustyline::Context;
+
+impl Completer for SlashCompleter {
+    type Candidate = Pair;
+
+    fn complete(
+        &self,
+        line: &str,
+        pos: usize,
+        _ctx: &Context<'_>,
+    ) -> rustyline::Result<(usize, Vec<Pair>)> {
+        // Only complete when the line starts with '/'
+        if !line.starts_with('/') {
+            return Ok((0, vec![]));
+        }
+
+        // Find the start of the slash command token
+        let start = 0;
+        let partial = &line[start..pos];
+
+        let candidates: Vec<Pair> = self
+            .registry
+            .completions_for(partial)
+            .into_iter()
+            .map(|cmd| Pair {
+                display: cmd.clone(),
+                replacement: format!("{} ", cmd), // add trailing space
+            })
+            .collect();
+
+        Ok((start, candidates))
+    }
+}
+
+impl Hinter for SlashCompleter {
+    type Hint = String;
+
+    fn hint(&self, line: &str, pos: usize, _ctx: &Context<'_>) -> Option<String> {
+        if !line.starts_with('/') || pos == 0 {
+            return None;
+        }
+        let candidates = self.registry.completions_for(line);
+        if candidates.len() == 1 {
+            let full = &candidates[0];
+            if full.len() > pos {
+                return Some(full[pos..].to_string());
+            }
+        }
+        None
+    }
+}
+
+impl Highlighter for SlashCompleter {}
+impl Validator for SlashCompleter {}
+impl Helper for SlashCompleter {}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Edit distance for fuzzy command suggestions
+// ──────────────────────────────────────────────────────────────────────────────
+
+/// Simple Levenshtein edit distance for short strings.
+fn edit_distance(a: &str, b: &str) -> usize {
+    let a_chars: Vec<char> = a.chars().collect();
+    let b_chars: Vec<char> = b.chars().collect();
+    let (m, n) = (a_chars.len(), b_chars.len());
+
+    let mut prev = (0..=n).collect::<Vec<_>>();
+    let mut curr = vec![0; n + 1];
+
+    for i in 1..=m {
+        curr[0] = i;
+        for j in 1..=n {
+            let cost = if a_chars[i - 1] == b_chars[j - 1] {
+                0
+            } else {
+                1
+            };
+            curr[j] = (prev[j] + 1).min(curr[j - 1] + 1).min(prev[j - 1] + cost);
+        }
+        std::mem::swap(&mut prev, &mut curr);
+    }
+
+    prev[n]
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
@@ -675,7 +891,7 @@ mod tests {
     // 8. all_commands returns the correct count (14 commands)
     #[test]
     fn all_commands_count() {
-        assert_eq!(SlashCommand::all_commands().len(), 24);
+        assert_eq!(SlashCommand::all_commands().len(), 28);
     }
 
     // 9. Registry completions for "/he" → ["/help"]
@@ -738,6 +954,11 @@ mod tests {
             SlashCommand::Replay,
             SlashCommand::Bench { task: None },
             SlashCommand::Learn { subcommand: None },
+            SlashCommand::Theme { theme: None },
+            SlashCommand::Buddy,
+            SlashCommand::Undo,
+            SlashCommand::Init,
+            SlashCommand::Add { paths: vec![] },
             SlashCommand::Unknown("xyz".into()),
         ];
         for variant in &variants {

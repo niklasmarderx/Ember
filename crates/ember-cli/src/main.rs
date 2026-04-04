@@ -24,9 +24,12 @@ use tracing_subscriber::{
     EnvFilter,
 };
 
+mod auto_context;
 mod commands;
 mod config;
 mod error_display;
+pub mod memory;
+pub mod onboarding;
 
 #[cfg(feature = "tui")]
 mod tui;
@@ -178,6 +181,10 @@ Model aliases:
         /// Temperature (0.0 - 2.0)
         #[arg(short, long)]
         temperature: Option<f32>,
+
+        /// Auto-approve all tool executions (skip confirmation prompts)
+        #[arg(short = 'y', long)]
+        yes: bool,
 
         /// Disable streaming output
         #[arg(long)]
@@ -440,7 +447,7 @@ Subcommands:\n\
     ///
     /// Uses speech-to-text and text-to-speech for natural language coding.
     #[command(
-        about = "Start a hands-free voice coding session.",
+        about = "[preview] Start a hands-free voice coding session.",
         long_about = "Launch an interactive voice-controlled coding session.\n\n\
 Speak naturally and Ember will:\n\
   - Transcribe your speech in real-time\n\
@@ -475,7 +482,7 @@ TTS: openai, elevenlabs, local"
     ///
     /// Embeds source files for retrieval-augmented generation.
     #[command(
-        about = "Index your codebase for semantic search (RAG).",
+        about = "[preview] Index your codebase for semantic search (RAG).",
         long_about = "Build a local embedding index of your codebase for RAG.\n\n\
 Once indexed, Ember can semantically search your code.\n\
 The index is stored in .ember/index/ using local embeddings."
@@ -505,7 +512,7 @@ The index is stored in .ember/index/ using local embeddings."
     ///
     /// Orchestrates multiple specialized AI agents working in parallel.
     #[command(
-        about = "Run a multi-agent orchestrated task.",
+        about = "[preview] Run a multi-agent orchestrated task.",
         long_about = "Orchestrate multiple specialized AI agents on complex tasks.\n\n\
 Roles: coder, reviewer, tester, architect, documenter\n\
 Agents work in parallel and results are aggregated."
@@ -640,9 +647,107 @@ async fn main() {
     }
 }
 
+/// Check if the first non-flag argument is a known subcommand.
+/// If not, treat all positional args as a chat message (one-shot mode).
+///
+/// Also handles piped stdin: when stdin is not a TTY and no subcommand is given,
+/// reads stdin and prepends it to the chat message.
+fn maybe_rewrite_args() -> Vec<String> {
+    let args: Vec<String> = std::env::args().collect();
+
+    // Known subcommands that clap expects
+    let known_subcommands = [
+        "chat", "run", "config", "info", "serve", "completions", "export",
+        "history", "plugin", "code", "git", "bench", "learn", "voice",
+        "index", "agents", "tui", "help",
+    ];
+
+    // Find the first positional argument (skip flags like --verbose, --config foo)
+    let mut i = 1; // skip binary name
+    while i < args.len() {
+        let arg = &args[i];
+        if arg == "--" {
+            break;
+        }
+        if arg.starts_with('-') {
+            // Skip flag value if it's a key-value flag
+            if matches!(arg.as_str(), "--config" | "-c" | "--log-format" | "--log-level" | "--log-file") {
+                i += 1; // skip the value
+            }
+            i += 1;
+            continue;
+        }
+        // Found a positional argument — is it a known subcommand?
+        if known_subcommands.contains(&arg.to_lowercase().as_str()) {
+            // Check if this is "chat" without a message and stdin has piped data
+            if arg.to_lowercase() == "chat" {
+                return maybe_inject_stdin(args);
+            }
+            return args; // Already has a subcommand, no rewrite needed
+        }
+        // Not a known subcommand — treat everything from here as a chat message
+        let mut new_args = args[..i].to_vec();
+        new_args.push("chat".to_string());
+        // Join remaining args as the message
+        let message = args[i..].join(" ");
+        // Prepend piped stdin if available
+        let piped = read_piped_stdin();
+        if let Some(stdin_content) = piped {
+            new_args.push(format!("{}\n\n{}", stdin_content, message));
+        } else {
+            new_args.push(message);
+        }
+        return new_args;
+    }
+
+    // No positional args at all — check for piped stdin
+    if let Some(stdin_content) = read_piped_stdin() {
+        let mut new_args = args.clone();
+        new_args.push("chat".to_string());
+        new_args.push(stdin_content);
+        return new_args;
+    }
+
+    args
+}
+
+/// If stdin is piped (not a TTY), read all of it. Otherwise return None.
+fn read_piped_stdin() -> Option<String> {
+    use std::io::IsTerminal;
+    if std::io::stdin().is_terminal() {
+        return None;
+    }
+    let mut content = String::new();
+    if std::io::Read::read_to_string(&mut std::io::stdin(), &mut content).is_ok() && !content.is_empty() {
+        Some(content)
+    } else {
+        None
+    }
+}
+
+/// Inject piped stdin into a "chat" command that has no message argument.
+fn maybe_inject_stdin(args: Vec<String>) -> Vec<String> {
+    // Only inject if there's no message argument after "chat"
+    // and stdin is piped
+    let chat_idx = args.iter().position(|a| a.to_lowercase() == "chat");
+    if let Some(idx) = chat_idx {
+        // Check if there's already a message (non-flag arg after "chat")
+        let has_message = args[idx + 1..].iter().any(|a| !a.starts_with('-'));
+        if !has_message {
+            if let Some(stdin_content) = read_piped_stdin() {
+                let mut new_args = args;
+                new_args.push(stdin_content);
+                return new_args;
+            }
+        }
+    }
+    args
+}
+
 /// The actual main function that returns a Result
 async fn run() -> Result<()> {
-    let cli = Cli::parse();
+    let rewritten = maybe_rewrite_args();
+    let cli = Cli::parse_from(rewritten);
 
     init_logging(
         cli.log_format,
@@ -665,6 +770,7 @@ async fn run() -> Result<()> {
             model,
             system,
             temperature,
+            yes,
             no_stream,
             tools,
             format,
@@ -683,6 +789,7 @@ async fn run() -> Result<()> {
                 format,
                 resume,
                 continue_session,
+                yes,
             )
             .await?;
         }
@@ -748,47 +855,61 @@ async fn run() -> Result<()> {
             runs,
             output,
         } => {
+            let model_list: Vec<String> = models
+                .unwrap_or_else(|| vec!["fast".into(), "smart".into(), "code".into()]);
             println!(
-                "{} {} benchmark",
-                "[ember]".bright_yellow(),
-                "📊 Running".bright_cyan(),
+                "{} Benchmarking {} model(s) × {} run(s)",
+                "▸".bright_green(),
+                model_list.len().to_string().bright_cyan(),
+                runs.to_string().bright_cyan(),
             );
-            println!("  Task:    {}", task.bright_green());
-            let model_list = models
-                .as_ref()
-                .map(|m| m.join(", "))
-                .unwrap_or_else(|| "fast, smart, code".to_string());
-            println!("  Models:  {}", model_list.bright_blue());
-            println!("  Runs:    {}", runs.to_string().bright_cyan());
-            println!("  Output:  {}", output.bright_cyan());
+            println!("  Task: {}", task.bright_green());
             println!();
             println!(
-                "  {:<25} {:>8} {:>10} {:>8}",
+                "  {:<30} {:>6} {:>6} {:>10} {:>8}",
                 "Model".bright_yellow().bold(),
-                "Tokens".bright_yellow().bold(),
+                "In".bright_yellow().bold(),
+                "Out".bright_yellow().bold(),
                 "Latency".bright_yellow().bold(),
-                "Cost".bright_yellow().bold()
+                "Status".bright_yellow().bold()
             );
-            println!("  {}", "─".repeat(55));
-            // Simulated results for now
-            println!(
-                "  {:<25} {:>8} {:>10} {:>8}",
-                "fast (haiku)", "~150", "~0.4s", "$0.0001"
-            );
-            println!(
-                "  {:<25} {:>8} {:>10} {:>8}",
-                "smart (opus)", "~200", "~2.1s", "$0.0030"
-            );
-            println!(
-                "  {:<25} {:>8} {:>10} {:>8}",
-                "code (sonnet)", "~180", "~1.2s", "$0.0009"
-            );
+            println!("  {}", "─".repeat(65));
+
+            let results = chat::bench_models(&config, &task, &model_list).await;
+            for r in &results {
+                if let Some(ref err) = r.error {
+                    let display_model = format!("{} ({})", r.model, r.provider);
+                    println!(
+                        "  {:<30} {:>6} {:>6} {:>10} {}",
+                        display_model,
+                        "-", "-", "-",
+                        format!("ERR: {}", truncate(err, 25)).bright_red()
+                    );
+                } else {
+                    let display_model = format!("{} ({})", r.model, r.provider);
+                    let latency = format!("{:.1}s", r.latency_ms as f64 / 1000.0);
+                    println!(
+                        "  {:<30} {:>6} {:>6} {:>10} {}",
+                        display_model.bright_cyan(),
+                        r.tokens_in,
+                        r.tokens_out,
+                        latency.bright_blue(),
+                        "OK".bright_green()
+                    );
+                }
+            }
             println!();
-            println!(
-                "{}",
-                "⚠️  Live benchmarking with real API calls coming soon. These are example outputs."
-                    .bright_yellow()
-            );
+
+            if output != "text" {
+                println!(
+                    "  {}",
+                    format!("Output format '{}' — use --output text for table (default)", output).dimmed()
+                );
+            }
+
+            fn truncate(s: &str, max: usize) -> &str {
+                if s.len() > max { &s[..max] } else { s }
+            }
         }
 
         Commands::Learn { action } => match action {
@@ -846,7 +967,7 @@ async fn run() -> Result<()> {
             println!(
                 "{} {} voice mode",
                 "[ember]".bright_yellow(),
-                "🎤 Starting".bright_cyan(),
+                "Starting".bright_cyan(),
             );
             println!(
                 "   STT: {} | TTS: {} | Wake word: {}",
@@ -871,7 +992,7 @@ async fn run() -> Result<()> {
             );
             println!(
                 "\n{}",
-                "⚠️  Voice mode is in preview. Full audio pipeline coming soon.".bright_yellow()
+                "Voice mode is in preview. Full audio pipeline coming soon.".bright_yellow()
             );
         }
 
@@ -971,7 +1092,7 @@ async fn run() -> Result<()> {
                 );
                 println!(
                     "\n{}",
-                    "⚠️  Embedding pipeline in preview. File discovery works, embeddings coming soon."
+                    "Embedding pipeline in preview. File discovery works, embeddings coming soon."
                         .bright_yellow()
                 );
             }
@@ -987,7 +1108,7 @@ async fn run() -> Result<()> {
                 println!(
                     "{} {} multi-agent orchestration",
                     "[ember]".bright_yellow(),
-                    "🤖 Starting".bright_cyan(),
+                    "Starting".bright_cyan(),
                 );
                 println!("  Task:   {}", task.bright_green());
                 let role_list = roles.as_deref().unwrap_or("coder,reviewer");
@@ -998,7 +1119,7 @@ async fn run() -> Result<()> {
                 println!("  Rounds: {}", max_rounds.to_string().bright_cyan());
                 println!(
                     "\n{}",
-                    "⚠️  Multi-agent orchestration in preview. Framework ready, execution coming soon."
+                    "Multi-agent orchestration in preview. Framework ready, execution coming soon."
                         .bright_yellow()
                 );
             }

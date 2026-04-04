@@ -14,7 +14,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::process::Stdio;
 use std::time::Duration;
-use tokio::io::AsyncReadExt;
+use tokio::io::{AsyncBufReadExt, AsyncReadExt, BufReader};
 use tokio::process::Command;
 use tokio::time::timeout;
 use tracing::{debug, info, warn};
@@ -473,6 +473,97 @@ impl ShellTool {
             }),
         }
     }
+
+    /// Execute a shell command with streaming line-by-line output.
+    ///
+    /// Each line of stdout/stderr is sent through `tx` as it becomes available.
+    /// Returns the aggregated `ShellOutput` when the command finishes.
+    async fn run_command_streaming(
+        &self,
+        command: &str,
+        tx: tokio::sync::mpsc::Sender<String>,
+    ) -> Result<ShellOutput> {
+        self.validate_command(command)?;
+        debug!(command = command, "Executing shell command (streaming)");
+
+        let shell = if cfg!(target_os = "windows") { "cmd" } else { "sh" };
+        let shell_arg = if cfg!(target_os = "windows") { "/C" } else { "-c" };
+
+        let mut cmd = Command::new(shell);
+        cmd.arg(shell_arg)
+            .arg(command)
+            .stdin(Stdio::null())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped());
+
+        if let Some(ref dir) = self.config.working_dir {
+            let expanded = shellexpand::tilde(dir).to_string();
+            cmd.current_dir(expanded);
+        }
+        for (key, value) in &self.config.env_vars {
+            cmd.env(key, value);
+        }
+
+        let timeout_duration = Duration::from_secs(self.config.timeout_secs);
+
+        let result = timeout(timeout_duration, async {
+            let mut child = cmd.spawn()?;
+
+            let stdout = child.stdout.take();
+            let stderr = child.stderr.take();
+
+            // Read stdout line-by-line, sending each line to the channel
+            let tx_out = tx.clone();
+            let stdout_task = tokio::spawn(async move {
+                let mut lines = String::new();
+                if let Some(out) = stdout {
+                    let mut reader = BufReader::new(out);
+                    let mut line = String::new();
+                    while let Ok(n) = reader.read_line(&mut line).await {
+                        if n == 0 { break; }
+                        let _ = tx_out.send(line.clone()).await;
+                        lines.push_str(&line);
+                        line.clear();
+                    }
+                }
+                lines
+            });
+
+            // Read stderr in bulk (less critical for streaming)
+            let stderr_task = tokio::spawn(async move {
+                let mut buf = String::new();
+                if let Some(mut err) = stderr {
+                    let mut bytes = Vec::new();
+                    let _ = err.read_to_end(&mut bytes).await;
+                    buf = String::from_utf8_lossy(&bytes).to_string();
+                }
+                buf
+            });
+
+            let stdout_buf = stdout_task.await.unwrap_or_default();
+            let stderr_buf = stderr_task.await.unwrap_or_default();
+
+            let status = child.wait().await?;
+            Ok::<_, std::io::Error>((status, stdout_buf, stderr_buf))
+        })
+        .await;
+
+        match result {
+            Ok(Ok((status, stdout_str, stderr_str))) => {
+                let exit_code = status.code().unwrap_or(-1);
+                Ok(ShellOutput {
+                    exit_code,
+                    stdout: stdout_str,
+                    stderr: stderr_str,
+                    success: status.success(),
+                })
+            }
+            Ok(Err(e)) => Err(Error::Io(e)),
+            Err(_) => Err(Error::ShellTimeout {
+                seconds: self.config.timeout_secs,
+            }),
+        }
+    }
 }
 
 impl Default for ShellTool {
@@ -532,6 +623,44 @@ impl ToolHandler for ShellTool {
 
     fn is_enabled(&self) -> bool {
         self.enabled
+    }
+
+    fn supports_streaming(&self) -> bool {
+        true
+    }
+
+    async fn execute_streaming(
+        &self,
+        arguments: Value,
+        tx: tokio::sync::mpsc::Sender<String>,
+    ) -> Result<ToolOutput> {
+        let command = arguments
+            .get("command")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| Error::invalid_arguments("shell", "Missing 'command' parameter"))?;
+
+        let result = self.run_command_streaming(command, tx).await?;
+
+        if result.success {
+            let output = if result.stderr.is_empty() {
+                result.stdout
+            } else {
+                format!("{}\n\nSTDERR:\n{}", result.stdout, result.stderr)
+            };
+            Ok(ToolOutput::success_with_data(
+                output,
+                serde_json::json!({
+                    "exit_code": result.exit_code,
+                    "success": true
+                }),
+            ))
+        } else {
+            let output = format!(
+                "Command failed with exit code {}\n\nSTDOUT:\n{}\n\nSTDERR:\n{}",
+                result.exit_code, result.stdout, result.stderr
+            );
+            Ok(ToolOutput::error(output))
+        }
     }
 }
 
