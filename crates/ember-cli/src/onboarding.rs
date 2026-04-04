@@ -56,15 +56,7 @@ const BUDDY_SPECIES: &[(&str, &str, &[&str])] = &[
             r"   -############\\  / VV \  //############-",
         ],
     ),
-    (
-        "Owl",
-        "[O]",
-        &[
-            r"   {o,o}",
-            r"   |)__)",
-            r"   -'--'-",
-        ],
-    ),
+    ("Owl", "[O]", &[r"   {o,o}", r"   |)__)", r"   -'--'-"]),
     (
         "Cat",
         "[C]",
@@ -199,7 +191,7 @@ impl CodingBuddy {
         Self {
             species: species.to_string(),
             emoji: symbol.to_string(),
-            name: format!("{}", species),
+            name: species.to_string(),
             personality: BUDDY_PERSONALITIES[personality_idx].to_string(),
             specialty: BUDDY_SPECIALTIES[specialty_idx].to_string(),
             title: BUDDY_TITLES[title_idx].to_string(),
@@ -402,7 +394,12 @@ fn pause(ms: u64) {
 
 /// Clear the current line.
 fn clear_line() {
-    execute!(io::stdout(), cursor::MoveToColumn(0), terminal::Clear(ClearType::CurrentLine)).ok();
+    execute!(
+        io::stdout(),
+        cursor::MoveToColumn(0),
+        terminal::Clear(ClearType::CurrentLine)
+    )
+    .ok();
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
@@ -425,7 +422,10 @@ pub(crate) fn interactive_menu(prompt: &str, options: &[&str], default_idx: usiz
     draw_menu(options, selected);
 
     loop {
-        if let Ok(Event::Key(KeyEvent { code, modifiers, .. })) = event::read() {
+        if let Ok(Event::Key(KeyEvent {
+            code, modifiers, ..
+        })) = event::read()
+        {
             // Handle Ctrl+C
             if modifiers.contains(KeyModifiers::CONTROL) && code == KeyCode::Char('c') {
                 terminal::disable_raw_mode().ok();
@@ -472,7 +472,12 @@ pub(crate) fn interactive_menu(prompt: &str, options: &[&str], default_idx: usiz
     // Clear menu and print selection
     let lines_to_clear = options.len();
     for _ in 0..lines_to_clear {
-        execute!(io::stdout(), cursor::MoveUp(1), terminal::Clear(ClearType::CurrentLine)).ok();
+        execute!(
+            io::stdout(),
+            cursor::MoveUp(1),
+            terminal::Clear(ClearType::CurrentLine)
+        )
+        .ok();
     }
 
     // Reprint selected option nicely
@@ -559,7 +564,10 @@ pub(crate) fn raw_input(prompt: &str, default: &str) -> String {
     let mut buf = String::new();
 
     loop {
-        if let Ok(Event::Key(KeyEvent { code, modifiers, .. })) = event::read() {
+        if let Ok(Event::Key(KeyEvent {
+            code, modifiers, ..
+        })) = event::read()
+        {
             if modifiers.contains(KeyModifiers::CONTROL) && code == KeyCode::Char('c') {
                 terminal::disable_raw_mode().ok();
                 println!();
@@ -610,125 +618,165 @@ fn egg_animation(buddy: &CodingBuddy) {
     let frames: Vec<(&[&str], &str, u64)> = vec![
         // (ascii_lines, sound_effect, pause_ms)
         // Phase 1: The egg sits quietly
-        (&[
-            "              ",
-            "      ____    ",
-            "     /    \\   ",
-            "    /      \\  ",
-            "   |        | ",
-            "   |        | ",
-            "    \\      /  ",
-            "     \\____/   ",
-            "              ",
-        ], "", 900),
+        (
+            &[
+                "              ",
+                "      ____    ",
+                "     /    \\   ",
+                "    /      \\  ",
+                "   |        | ",
+                "   |        | ",
+                "    \\      /  ",
+                "     \\____/   ",
+                "              ",
+            ],
+            "",
+            900,
+        ),
         // Phase 2: Slight wobble left
-        (&[
-            "              ",
-            "     ____     ",
-            "    /    \\    ",
-            "   /      \\   ",
-            "  |        |  ",
-            "  |        |  ",
-            "   \\      /   ",
-            "    \\____/    ",
-            "              ",
-        ], "  ...?", 350),
+        (
+            &[
+                "              ",
+                "     ____     ",
+                "    /    \\    ",
+                "   /      \\   ",
+                "  |        |  ",
+                "  |        |  ",
+                "   \\      /   ",
+                "    \\____/    ",
+                "              ",
+            ],
+            "  ...?",
+            350,
+        ),
         // Phase 3: Wobble right
-        (&[
-            "              ",
-            "       ____   ",
-            "      /    \\  ",
-            "     /      \\ ",
-            "    |        |",
-            "    |        |",
-            "     \\      / ",
-            "      \\____/  ",
-            "              ",
-        ], "", 350),
+        (
+            &[
+                "              ",
+                "       ____   ",
+                "      /    \\  ",
+                "     /      \\ ",
+                "    |        |",
+                "    |        |",
+                "     \\      / ",
+                "      \\____/  ",
+                "              ",
+            ],
+            "",
+            350,
+        ),
         // Phase 4: Back to center + first hairline crack
-        (&[
-            "              ",
-            "      ____    ",
-            "     /  . \\   ",
-            "    /   |  \\  ",
-            "   |    |   | ",
-            "   |        | ",
-            "    \\      /  ",
-            "     \\____/   ",
-            "              ",
-        ], "  *tick*", 500),
+        (
+            &[
+                "              ",
+                "      ____    ",
+                "     /  . \\   ",
+                "    /   |  \\  ",
+                "   |    |   | ",
+                "   |        | ",
+                "    \\      /  ",
+                "     \\____/   ",
+                "              ",
+            ],
+            "  *tick*",
+            500,
+        ),
         // Phase 5: Wobble harder left
-        (&[
-            "              ",
-            "    ____      ",
-            "   /  . \\     ",
-            "  /  /|  \\    ",
-            " |  / |   |   ",
-            " |    |   |   ",
-            "  \\      /    ",
-            "   \\____/     ",
-            "              ",
-        ], "", 250),
+        (
+            &[
+                "              ",
+                "    ____      ",
+                "   /  . \\     ",
+                "  /  /|  \\    ",
+                " |  / |   |   ",
+                " |    |   |   ",
+                "  \\      /    ",
+                "   \\____/     ",
+                "              ",
+            ],
+            "",
+            250,
+        ),
         // Phase 6: Wobble harder right
-        (&[
-            "              ",
-            "        ____  ",
-            "       / .  \\ ",
-            "      / /|  \\",
-            "     |  /|   |",
-            "     | / |   |",
-            "      \\__|  / ",
-            "       \\___/  ",
-            "              ",
-        ], "  *crack!*", 400),
+        (
+            &[
+                "              ",
+                "        ____  ",
+                "       / .  \\ ",
+                "      / /|  \\",
+                "     |  /|   |",
+                "     | / |   |",
+                "      \\__|  / ",
+                "       \\___/  ",
+                "              ",
+            ],
+            "  *crack!*",
+            400,
+        ),
         // Phase 7: Center, big cracks
-        (&[
-            "              ",
-            "      _**_    ",
-            "     / /\\ \\   ",
-            "    / / |\\ \\  ",
-            "   | /  | \\ | ",
-            "   |/ \\ |  \\| ",
-            "    \\ \\_|  /  ",
-            "     \\__*_/   ",
-            "              ",
-        ], "  *CRACK!*", 500),
+        (
+            &[
+                "              ",
+                "      _**_    ",
+                "     / /\\ \\   ",
+                "    / / |\\ \\  ",
+                "   | /  | \\ | ",
+                "   |/ \\ |  \\| ",
+                "    \\ \\_|  /  ",
+                "     \\__*_/   ",
+                "              ",
+            ],
+            "  *CRACK!*",
+            500,
+        ),
         // Phase 8: Shell splits apart
-        (&[
-            "              ",
-            "    \\  _**  / ",
-            "     ||/  ||  ",
-            "    / |    \\  ",
-            "   |  o  o  | ",
-            "   |   __   | ",
-            "    \\_/  \\_/  ",
-            "   --/    \\-- ",
-            "              ",
-        ], "  *CRAAACK!!*", 400),
+        (
+            &[
+                "              ",
+                "    \\  _**  / ",
+                "     ||/  ||  ",
+                "    / |    \\  ",
+                "   |  o  o  | ",
+                "   |   __   | ",
+                "    \\_/  \\_/  ",
+                "   --/    \\-- ",
+                "              ",
+            ],
+            "  *CRAAACK!!*",
+            400,
+        ),
         // Phase 9: Explosion burst
-        (&[
-            "    \\  |  /   ",
-            "  --- ___ --- ",
-            "    / \\ / \\   ",
-            "   |  o  o |  ",
-            "   |  (__) |  ",
-            "    \\      /  ",
-            "  -- \\____/ --",
-            "    / |  | \\  ",
-            "   /  |  |  \\ ",
-        ], "  !!!", 350),
+        (
+            &[
+                "    \\  |  /   ",
+                "  --- ___ --- ",
+                "    / \\ / \\   ",
+                "   |  o  o |  ",
+                "   |  (__) |  ",
+                "    \\      /  ",
+                "  -- \\____/ --",
+                "    / |  | \\  ",
+                "   /  |  |  \\ ",
+            ],
+            "  !!!",
+            350,
+        ),
         // Phase 10: Smoke clearing
-        (&[
-            "   .  .  .  . ",
-            "  .  .    .   ",
-            "   .   .   .  ",
-            "   |  o  o |  ",
-            "   |  (__) |  ",
-            "    \\      /  ",
-            "     \\____/   ",
-            "              ",
-            "              ",
-        ], "", 400),
+        (
+            &[
+                "   .  .  .  . ",
+                "  .  .    .   ",
+                "   .   .   .  ",
+                "   |  o  o |  ",
+                "   |  (__) |  ",
+                "    \\      /  ",
+                "     \\____/   ",
+                "              ",
+                "              ",
+            ],
+            "",
+            400,
+        ),
     ];
 
     println!();
@@ -841,13 +889,7 @@ fn egg_animation(buddy: &CodingBuddy) {
     pause(300);
 
     typewriter("   ", 0);
-    typewriter(
-        &format!(
-            "Specialty: {}",
-            buddy.specialty.bright_blue()
-        ),
-        25,
-    );
+    typewriter(&format!("Specialty: {}", buddy.specialty.bright_blue()), 25);
     println!();
     println!();
 }
@@ -932,14 +974,13 @@ pub fn run_onboarding() -> Result<UserProfile> {
 
     let name = raw_input("What's your name?", "");
 
-    let lang_options = &["Deutsch", "English", "Espanol", "Francais", "Japanese", "Chinese", "Other"];
+    let lang_options = &[
+        "Deutsch", "English", "Espanol", "Francais", "Japanese", "Chinese", "Other",
+    ];
     let lang_idx = interactive_menu("Preferred language?", lang_options, 1);
     let language = lang_options[lang_idx].to_string();
 
-    let role = raw_input(
-        "Your role?",
-        "developer",
-    );
+    let role = raw_input("Your role?", "developer");
 
     let exp_options = &["Beginner", "Intermediate", "Expert", "Wizard"];
     let exp_idx = interactive_menu("Experience level?", exp_options, 1);
@@ -952,10 +993,7 @@ pub fn run_onboarding() -> Result<UserProfile> {
     }
     .to_string();
 
-    let tech_stack = raw_input(
-        "Favorite tech?",
-        "",
-    );
+    let tech_stack = raw_input("Favorite tech?", "");
 
     let style_options = &[
         "Concise -- straight to the point",
@@ -988,7 +1026,10 @@ pub fn run_onboarding() -> Result<UserProfile> {
 
     // ── Name your buddy ──
     let custom_name = raw_input(
-        &format!("Give {} a name? (Enter to keep '{}')", buddy.emoji, buddy.name),
+        &format!(
+            "Give {} a name? (Enter to keep '{}')",
+            buddy.emoji, buddy.name
+        ),
         &buddy.name,
     );
     if !custom_name.is_empty() {
@@ -1021,7 +1062,8 @@ pub fn run_onboarding() -> Result<UserProfile> {
         6 => "philosophical",
         7 => "no-nonsense",
         _ => "enthusiastic",
-    }.to_string();
+    }
+    .to_string();
 
     println!();
     println!(
@@ -1082,11 +1124,7 @@ pub fn ensure_profile() -> Option<UserProfile> {
     match run_onboarding() {
         Ok(profile) => Some(profile),
         Err(e) => {
-            eprintln!(
-                "{} Onboarding error: {}",
-                "[ember]".bright_red(),
-                e
-            );
+            eprintln!("{} Onboarding error: {}", "[ember]".bright_red(), e);
             None
         }
     }
@@ -1102,7 +1140,7 @@ pub fn welcome_back(profile: &UserProfile) -> String {
         };
         format!(
             "{} {} -- {} says hello!",
-            buddy.emoji.to_string(),
+            buddy.emoji,
             greeting.bright_yellow(),
             buddy.name.bright_cyan()
         )

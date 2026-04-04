@@ -114,7 +114,13 @@ impl MemoryManager {
     }
 
     /// Record a new observation.
-    pub fn observe(&self, category: ObservationCategory, content: &str, context: &str, confidence: f32) -> Result<()> {
+    pub fn observe(
+        &self,
+        category: ObservationCategory,
+        content: &str,
+        context: &str,
+        confidence: f32,
+    ) -> Result<()> {
         let obs = Observation {
             timestamp: now_iso8601(),
             category,
@@ -137,14 +143,21 @@ impl MemoryManager {
         stats.total_observations += 1;
         match obs.category {
             ObservationCategory::Correction => stats.corrections += 1,
-            ObservationCategory::Preference | ObservationCategory::StyleFeedback => stats.preferences += 1,
-            ObservationCategory::CodingPattern | ObservationCategory::ToolPreference => stats.patterns += 1,
+            ObservationCategory::Preference | ObservationCategory::StyleFeedback => {
+                stats.preferences += 1
+            }
+            ObservationCategory::CodingPattern | ObservationCategory::ToolPreference => {
+                stats.patterns += 1
+            }
             _ => {}
         }
         self.save_stats(&stats)?;
 
         // Auto-consolidate if needed
-        if stats.total_observations % MAX_OBSERVATIONS_BEFORE_CONSOLIDATE == 0 {
+        if stats
+            .total_observations
+            .is_multiple_of(MAX_OBSERVATIONS_BEFORE_CONSOLIDATE)
+        {
             self.consolidate()?;
         }
 
@@ -213,8 +226,12 @@ impl MemoryManager {
         for obs in &observations {
             match obs.category {
                 ObservationCategory::Correction => corrections.push(obs),
-                ObservationCategory::Preference | ObservationCategory::StyleFeedback => preferences.push(obs),
-                ObservationCategory::CodingPattern | ObservationCategory::ToolPreference => patterns.push(obs),
+                ObservationCategory::Preference | ObservationCategory::StyleFeedback => {
+                    preferences.push(obs)
+                }
+                ObservationCategory::CodingPattern | ObservationCategory::ToolPreference => {
+                    patterns.push(obs)
+                }
                 ObservationCategory::UserFact => facts.push(obs),
                 ObservationCategory::ProjectKnowledge => project.push(obs),
             }
@@ -336,13 +353,31 @@ impl MemoryManager {
         let stats = self.load_stats();
         println!();
         println!("{}", "Ember's Memory".bright_yellow().bold());
-        println!("   Total observations: {}", stats.total_observations.to_string().bright_green());
-        println!("   Corrections:        {}", stats.corrections.to_string().bright_cyan());
-        println!("   Preferences:        {}", stats.preferences.to_string().bright_cyan());
-        println!("   Patterns:           {}", stats.patterns.to_string().bright_cyan());
+        println!(
+            "   Total observations: {}",
+            stats.total_observations.to_string().bright_green()
+        );
+        println!(
+            "   Corrections:        {}",
+            stats.corrections.to_string().bright_cyan()
+        );
+        println!(
+            "   Preferences:        {}",
+            stats.preferences.to_string().bright_cyan()
+        );
+        println!(
+            "   Patterns:           {}",
+            stats.patterns.to_string().bright_cyan()
+        );
         if stats.consolidation_count > 0 {
-            println!("   Consolidations:     {}", stats.consolidation_count.to_string().bright_blue());
-            println!("   Last consolidated:  {}", stats.last_consolidated.dimmed());
+            println!(
+                "   Consolidations:     {}",
+                stats.consolidation_count.to_string().bright_blue()
+            );
+            println!(
+                "   Last consolidated:  {}",
+                stats.last_consolidated.dimmed()
+            );
         }
         println!();
     }
@@ -350,14 +385,22 @@ impl MemoryManager {
 
 /// Auto-detect observations from a conversation exchange.
 /// This analyses the user message + assistant response to extract learnable knowledge.
-pub fn extract_observations(user_msg: &str, _assistant_msg: &str) -> Vec<(ObservationCategory, String)> {
+pub fn extract_observations(
+    user_msg: &str,
+    _assistant_msg: &str,
+) -> Vec<(ObservationCategory, String)> {
     let mut observations = Vec::new();
     let lower = user_msg.to_lowercase();
 
     // Detect corrections
-    if lower.contains("no, ") || lower.contains("nein,") || lower.contains("falsch")
-        || lower.contains("wrong") || lower.contains("that's not") || lower.contains("das stimmt nicht")
-        || lower.contains("nicht richtig") || lower.starts_with("actually")
+    if lower.contains("no, ")
+        || lower.contains("nein,")
+        || lower.contains("falsch")
+        || lower.contains("wrong")
+        || lower.contains("that's not")
+        || lower.contains("das stimmt nicht")
+        || lower.contains("nicht richtig")
+        || lower.starts_with("actually")
     {
         observations.push((
             ObservationCategory::Correction,
@@ -366,9 +409,14 @@ pub fn extract_observations(user_msg: &str, _assistant_msg: &str) -> Vec<(Observ
     }
 
     // Detect preferences
-    if lower.contains("i prefer") || lower.contains("ich bevorzuge") || lower.contains("ich mag")
-        || lower.contains("i like") || lower.contains("please always") || lower.contains("bitte immer")
-        || lower.contains("i want") || lower.contains("ich will")
+    if lower.contains("i prefer")
+        || lower.contains("ich bevorzuge")
+        || lower.contains("ich mag")
+        || lower.contains("i like")
+        || lower.contains("please always")
+        || lower.contains("bitte immer")
+        || lower.contains("i want")
+        || lower.contains("ich will")
     {
         observations.push((
             ObservationCategory::Preference,
@@ -377,9 +425,14 @@ pub fn extract_observations(user_msg: &str, _assistant_msg: &str) -> Vec<(Observ
     }
 
     // Detect style feedback
-    if lower.contains("too verbose") || lower.contains("zu lang") || lower.contains("kürzer")
-        || lower.contains("shorter") || lower.contains("more detail") || lower.contains("mehr detail")
-        || lower.contains("too short") || lower.contains("zu kurz")
+    if lower.contains("too verbose")
+        || lower.contains("zu lang")
+        || lower.contains("kürzer")
+        || lower.contains("shorter")
+        || lower.contains("more detail")
+        || lower.contains("mehr detail")
+        || lower.contains("too short")
+        || lower.contains("zu kurz")
     {
         observations.push((
             ObservationCategory::StyleFeedback,
@@ -388,8 +441,11 @@ pub fn extract_observations(user_msg: &str, _assistant_msg: &str) -> Vec<(Observ
     }
 
     // Detect tool/framework preferences
-    if lower.contains("use ") && (lower.contains("instead") || lower.contains("stattdessen")
-        || lower.contains("rather than") || lower.contains("anstatt"))
+    if lower.contains("use ")
+        && (lower.contains("instead")
+            || lower.contains("stattdessen")
+            || lower.contains("rather than")
+            || lower.contains("anstatt"))
     {
         observations.push((
             ObservationCategory::ToolPreference,
@@ -415,20 +471,56 @@ fn now_iso8601() -> String {
         .unwrap_or_default()
         .as_secs();
     let s = secs;
-    let sec = (s % 60) as u32; let s = s / 60;
-    let min = (s % 60) as u32; let s = s / 60;
-    let hour = (s % 24) as u32; let s = s / 24;
+    let sec = (s % 60) as u32;
+    let s = s / 60;
+    let min = (s % 60) as u32;
+    let s = s / 60;
+    let hour = (s % 24) as u32;
+    let s = s / 24;
     let mut days = s as u32;
     let mut y = 1970u32;
     loop {
-        let dy = if (y % 4 == 0 && y % 100 != 0) || y % 400 == 0 { 366 } else { 365 };
-        if days < dy { break; }
+        let dy = if (y.is_multiple_of(4) && !y.is_multiple_of(100)) || y.is_multiple_of(400) {
+            366
+        } else {
+            365
+        };
+        if days < dy {
+            break;
+        }
         days -= dy;
         y += 1;
     }
-    let leap = (y % 4 == 0 && y % 100 != 0) || y % 400 == 0;
-    let md = [31u32, if leap {29} else {28}, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+    let leap = (y.is_multiple_of(4) && !y.is_multiple_of(100)) || y.is_multiple_of(400);
+    let md = [
+        31u32,
+        if leap { 29 } else { 28 },
+        31,
+        30,
+        31,
+        30,
+        31,
+        31,
+        30,
+        31,
+        30,
+        31,
+    ];
     let mut mo = 0u32;
-    for d in &md { if days < *d { break; } days -= d; mo += 1; }
-    format!("{:04}-{:02}-{:02}T{:02}:{:02}:{:02}Z", y, mo+1, days+1, hour, min, sec)
+    for d in &md {
+        if days < *d {
+            break;
+        }
+        days -= d;
+        mo += 1;
+    }
+    format!(
+        "{:04}-{:02}-{:02}T{:02}:{:02}:{:02}Z",
+        y,
+        mo + 1,
+        days + 1,
+        hour,
+        min,
+        sec
+    )
 }

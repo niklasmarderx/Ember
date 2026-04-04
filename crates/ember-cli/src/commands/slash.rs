@@ -670,17 +670,13 @@ impl SlashCommandRegistry {
         let mut best: Option<(&str, usize)> = None;
         for entry in &self.commands {
             let dist = edit_distance(&needle, entry.name);
-            if dist <= 2 {
-                if best.is_none() || dist < best.unwrap().1 {
-                    best = Some((entry.name, dist));
-                }
+            if dist <= 2 && (best.is_none() || dist < best.unwrap().1) {
+                best = Some((entry.name, dist));
             }
             for alias in &entry.aliases {
                 let dist = edit_distance(&needle, alias);
-                if dist <= 2 {
-                    if best.is_none() || dist < best.unwrap().1 {
-                        best = Some((entry.name, dist));
-                    }
+                if dist <= 2 && (best.is_none() || dist < best.unwrap().1) {
+                    best = Some((entry.name, dist));
                 }
             }
         }
@@ -733,8 +729,8 @@ use rustyline::completion::{Completer, Pair};
 use rustyline::highlight::Highlighter;
 use rustyline::hint::Hinter;
 use rustyline::validate::Validator;
-use rustyline::Helper;
 use rustyline::Context;
+use rustyline::Helper;
 
 impl Completer for SlashCompleter {
     type Candidate = Pair;

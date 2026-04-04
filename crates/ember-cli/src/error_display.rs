@@ -47,10 +47,7 @@ fn display_llm_error(error: &ember_llm::Error) {
 
     // Print user-friendly message with preserved formatting
     for line in user_msg.lines() {
-        if line.starts_with("  1.")
-            || line.starts_with("  2.")
-            || line.starts_with("  3.")
-        {
+        if line.starts_with("  1.") || line.starts_with("  2.") || line.starts_with("  3.") {
             eprintln!("  {}", line.bright_white());
         } else if line.contains("export ")
             || line.contains("ember ")
@@ -306,7 +303,11 @@ pub fn display_warning(message: &str) {
 /// Display a success message
 #[allow(dead_code)]
 pub fn display_success(message: &str) {
-    println!("{} {}", "[ok]".bright_green().bold(), message.bright_white());
+    println!(
+        "{} {}",
+        "[ok]".bright_green().bold(),
+        message.bright_white()
+    );
 }
 
 /// Display an info message

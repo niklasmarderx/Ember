@@ -9,9 +9,8 @@ use std::env;
 use tracing::{debug, instrument};
 
 use crate::{
-    provider::StreamResponse, CompletionRequest, CompletionResponse, ContentPart, Error,
-    FinishReason, ImageSource, LLMProvider, ModelInfo, Result, StreamChunk, TokenUsage,
-    ToolCallDelta,
+    provider::StreamResponse, CompletionRequest, CompletionResponse, Error, FinishReason,
+    LLMProvider, ModelInfo, Result, StreamChunk, TokenUsage, ToolCallDelta,
 };
 
 use tokio_stream::wrappers::ReceiverStream;
@@ -139,9 +138,13 @@ impl LLMProvider for GeminiProvider {
             let error_text = response.text().await.unwrap_or_default();
             let error_msg = serde_json::from_str::<GeminiError>(&error_text)
                 .map(|e| e.error.message)
-                .unwrap_or_else(|_| if error_text.is_empty() {
-                    format!("HTTP {} (empty response)", status.as_u16())
-                } else { error_text });
+                .unwrap_or_else(|_| {
+                    if error_text.is_empty() {
+                        format!("HTTP {} (empty response)", status.as_u16())
+                    } else {
+                        error_text
+                    }
+                });
 
             return match status.as_u16() {
                 401 | 403 => Err(Error::api_key_missing("gemini")),
@@ -180,9 +183,13 @@ impl LLMProvider for GeminiProvider {
             let error_text = response.text().await.unwrap_or_default();
             let error_msg = serde_json::from_str::<GeminiError>(&error_text)
                 .map(|e| e.error.message)
-                .unwrap_or_else(|_| if error_text.is_empty() {
-                    format!("HTTP {} (empty response)", status.as_u16())
-                } else { error_text });
+                .unwrap_or_else(|_| {
+                    if error_text.is_empty() {
+                        format!("HTTP {} (empty response)", status.as_u16())
+                    } else {
+                        error_text
+                    }
+                });
 
             return match status.as_u16() {
                 401 | 403 => Err(Error::api_key_missing("gemini")),
@@ -350,6 +357,7 @@ fn uuid_simple() -> String {
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
+#[allow(dead_code)]
 struct GeminiRequest {
     contents: Vec<GeminiContent>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -363,6 +371,7 @@ struct GeminiRequest {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+#[allow(dead_code)]
 struct GeminiContent {
     role: String,
     parts: Vec<GeminiPart>,
@@ -370,6 +379,7 @@ struct GeminiContent {
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[allow(dead_code)]
 struct GeminiPart {
     #[serde(skip_serializing_if = "Option::is_none")]
     text: Option<String>,
@@ -383,18 +393,21 @@ struct GeminiPart {
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[allow(dead_code)]
 struct GeminiInlineData {
     mime_type: String,
     data: String,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+#[allow(dead_code)]
 struct GeminiFunctionCall {
     name: String,
     args: serde_json::Value,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+#[allow(dead_code)]
 struct GeminiFunctionResponse {
     name: String,
     response: serde_json::Value,
@@ -402,6 +415,7 @@ struct GeminiFunctionResponse {
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
+#[allow(dead_code)]
 struct GeminiGenerationConfig {
     #[serde(skip_serializing_if = "Option::is_none")]
     temperature: Option<f32>,
@@ -417,11 +431,13 @@ struct GeminiGenerationConfig {
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
+#[allow(dead_code)]
 struct GeminiTool {
     function_declarations: Vec<GeminiFunctionDeclaration>,
 }
 
 #[derive(Debug, Serialize)]
+#[allow(dead_code)]
 struct GeminiFunctionDeclaration {
     name: String,
     description: String,
@@ -430,12 +446,14 @@ struct GeminiFunctionDeclaration {
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
+#[allow(dead_code)]
 struct GeminiSafetySetting {
     category: String,
     threshold: String,
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct GeminiResponse {
     candidates: Vec<GeminiCandidate>,
     #[serde(default)]
@@ -444,6 +462,7 @@ struct GeminiResponse {
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[allow(dead_code)]
 struct GeminiCandidate {
     content: GeminiContent,
     finish_reason: Option<String>,
@@ -451,6 +470,7 @@ struct GeminiCandidate {
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[allow(dead_code)]
 struct GeminiUsageMetadata {
     prompt_token_count: u32,
     candidates_token_count: u32,
@@ -458,6 +478,7 @@ struct GeminiUsageMetadata {
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct GeminiStreamResponse {
     candidates: Vec<GeminiCandidate>,
     #[serde(default)]
@@ -465,11 +486,13 @@ struct GeminiStreamResponse {
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct GeminiError {
     error: GeminiErrorDetail,
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct GeminiErrorDetail {
     message: String,
     code: u16,
@@ -477,12 +500,14 @@ struct GeminiErrorDetail {
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct GeminiModelsResponse {
     models: Vec<GeminiModelInfo>,
 }
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[allow(dead_code)]
 struct GeminiModelInfo {
     name: String,
     display_name: String,

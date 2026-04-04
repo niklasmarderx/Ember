@@ -110,9 +110,13 @@ impl LLMProvider for OpenAIProvider {
             let error_text = response.text().await.unwrap_or_default();
             let error_msg = serde_json::from_str::<OpenAIError>(&error_text)
                 .map(|e| e.error.message)
-                .unwrap_or_else(|_| if error_text.is_empty() {
-                    format!("HTTP {} (empty response)", status.as_u16())
-                } else { error_text });
+                .unwrap_or_else(|_| {
+                    if error_text.is_empty() {
+                        format!("HTTP {} (empty response)", status.as_u16())
+                    } else {
+                        error_text
+                    }
+                });
 
             return match status.as_u16() {
                 401 => Err(Error::api_key_missing("openai")),
@@ -143,9 +147,13 @@ impl LLMProvider for OpenAIProvider {
             let error_text = response.text().await.unwrap_or_default();
             let error_msg = serde_json::from_str::<OpenAIError>(&error_text)
                 .map(|e| e.error.message)
-                .unwrap_or_else(|_| if error_text.is_empty() {
-                    format!("HTTP {} (empty response)", status.as_u16())
-                } else { error_text });
+                .unwrap_or_else(|_| {
+                    if error_text.is_empty() {
+                        format!("HTTP {} (empty response)", status.as_u16())
+                    } else {
+                        error_text
+                    }
+                });
 
             return match status.as_u16() {
                 401 => Err(Error::api_key_missing("openai")),

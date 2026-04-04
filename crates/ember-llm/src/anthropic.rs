@@ -120,9 +120,13 @@ impl LLMProvider for AnthropicProvider {
             let error_text = response.text().await.unwrap_or_default();
             let error_msg = serde_json::from_str::<AnthropicError>(&error_text)
                 .map(|e| e.error.message)
-                .unwrap_or_else(|_| if error_text.is_empty() {
-                    format!("HTTP {} (empty response)", status.as_u16())
-                } else { error_text });
+                .unwrap_or_else(|_| {
+                    if error_text.is_empty() {
+                        format!("HTTP {} (empty response)", status.as_u16())
+                    } else {
+                        error_text
+                    }
+                });
 
             return match status.as_u16() {
                 401 => Err(Error::api_key_missing("anthropic")),
@@ -150,9 +154,13 @@ impl LLMProvider for AnthropicProvider {
             let error_text = response.text().await.unwrap_or_default();
             let error_msg = serde_json::from_str::<AnthropicError>(&error_text)
                 .map(|e| e.error.message)
-                .unwrap_or_else(|_| if error_text.is_empty() {
-                    format!("HTTP {} (empty response)", status.as_u16())
-                } else { error_text });
+                .unwrap_or_else(|_| {
+                    if error_text.is_empty() {
+                        format!("HTTP {} (empty response)", status.as_u16())
+                    } else {
+                        error_text
+                    }
+                });
 
             return match status.as_u16() {
                 401 => Err(Error::api_key_missing("anthropic")),
@@ -350,6 +358,7 @@ impl LLMProvider for AnthropicProvider {
 // Anthropic API types
 
 #[derive(Debug, Serialize)]
+#[allow(dead_code)]
 struct AnthropicRequest {
     model: String,
     messages: Vec<AnthropicMessage>,
@@ -379,6 +388,7 @@ enum AnthropicSystem {
 
 /// A system-prompt content block (only `text` type is currently valid here).
 #[derive(Debug, Serialize)]
+#[allow(dead_code)]
 struct SystemBlock {
     r#type: &'static str,
     text: String,
@@ -390,6 +400,7 @@ struct SystemBlock {
 ///
 /// The only currently supported value is `"ephemeral"`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[allow(dead_code)]
 struct CacheControl {
     r#type: CacheControlType,
 }
@@ -409,6 +420,7 @@ impl CacheControl {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+#[allow(dead_code)]
 struct AnthropicMessage {
     role: String,
     content: AnthropicContent,
@@ -470,6 +482,7 @@ enum AnthropicImageSource {
 }
 
 #[derive(Debug, Serialize)]
+#[allow(dead_code)]
 struct AnthropicTool {
     name: String,
     description: String,
@@ -477,6 +490,7 @@ struct AnthropicTool {
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct AnthropicResponse {
     id: String,
     model: String,
@@ -486,6 +500,7 @@ struct AnthropicResponse {
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct AnthropicUsage {
     input_tokens: u32,
     output_tokens: u32,
@@ -498,12 +513,14 @@ struct AnthropicUsage {
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct AnthropicError {
     r#type: String,
     error: AnthropicErrorDetail,
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct AnthropicErrorDetail {
     r#type: String,
     message: String,
@@ -512,12 +529,14 @@ struct AnthropicErrorDetail {
 // Streaming types
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct ContentBlockStart {
     index: usize,
     content_block: ContentBlock,
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct ContentBlockDelta {
     index: usize,
     delta: DeltaContent,
@@ -533,11 +552,13 @@ enum DeltaContent {
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct MessageDelta {
     delta: MessageDeltaContent,
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct MessageDeltaContent {
     stop_reason: Option<String>,
 }
@@ -572,16 +593,12 @@ fn convert_content_part_to_anthropic(part: &crate::types::ContentPart) -> Conten
 /// Anthropic's caching semantics require the marker to sit on the *last*
 /// block of the prefix to be cached; earlier blocks in the same turn are
 /// implicitly included.
-fn mark_last_block_cacheable(blocks: &mut Vec<ContentBlock>) {
-    if let Some(last) = blocks.last_mut() {
-        match last {
-            ContentBlock::Text { cache_control, .. }
-            | ContentBlock::Image { cache_control, .. } => {
-                *cache_control = Some(CacheControl::ephemeral());
-            }
-            // ToolUse / ToolResult don't support cache_control — leave them.
-            _ => {}
-        }
+fn mark_last_block_cacheable(blocks: &mut [ContentBlock]) {
+    if let Some(
+        ContentBlock::Text { cache_control, .. } | ContentBlock::Image { cache_control, .. },
+    ) = blocks.last_mut()
+    {
+        *cache_control = Some(CacheControl::ephemeral());
     }
 }
 

@@ -3,9 +3,11 @@
 //! Implementation for xAI's Grok models including Grok-2 and Grok-2 mini.
 //! Uses OpenAI-compatible API format at api.x.ai
 
+#[cfg(test)]
+use crate::Message;
 use crate::{
-    CompletionRequest, CompletionResponse, Error, FinishReason, LLMProvider, Message, ModelInfo,
-    Result, Role, StreamChunk, TokenUsage, ToolCall, ToolCallDelta, ToolDefinition,
+    CompletionRequest, CompletionResponse, Error, FinishReason, LLMProvider, ModelInfo, Result,
+    Role, StreamChunk, TokenUsage, ToolCall, ToolCallDelta, ToolDefinition,
 };
 use async_trait::async_trait;
 use futures::Stream;
@@ -115,6 +117,7 @@ impl XAIProvider {
 
 // API request/response types
 #[derive(Debug, Serialize)]
+#[allow(dead_code)]
 struct XAIRequest {
     model: String,
     messages: Vec<XAIMessage>,
@@ -132,6 +135,7 @@ struct XAIRequest {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+#[allow(dead_code)]
 struct XAIMessage {
     role: String,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -143,6 +147,7 @@ struct XAIMessage {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+#[allow(dead_code)]
 struct XAIToolCall {
     id: String,
     r#type: String,
@@ -150,18 +155,21 @@ struct XAIToolCall {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+#[allow(dead_code)]
 struct XAIFunction {
     name: String,
     arguments: String,
 }
 
 #[derive(Debug, Serialize)]
+#[allow(dead_code)]
 struct XAITool {
     r#type: String,
     function: XAIToolFunction,
 }
 
 #[derive(Debug, Serialize)]
+#[allow(dead_code)]
 struct XAIToolFunction {
     name: String,
     description: String,
@@ -169,6 +177,7 @@ struct XAIToolFunction {
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct XAIResponse {
     id: String,
     choices: Vec<XAIChoice>,
@@ -176,12 +185,14 @@ struct XAIResponse {
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct XAIChoice {
     message: XAIResponseMessage,
     finish_reason: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct XAIResponseMessage {
     role: String,
     content: Option<String>,
@@ -189,6 +200,7 @@ struct XAIResponseMessage {
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct XAIUsage {
     prompt_tokens: u32,
     completion_tokens: u32,
@@ -196,23 +208,27 @@ struct XAIUsage {
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct XAIStreamResponse {
     choices: Vec<XAIStreamChoice>,
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct XAIStreamChoice {
     delta: XAIStreamDelta,
     finish_reason: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct XAIStreamDelta {
     content: Option<String>,
     tool_calls: Option<Vec<XAIStreamToolCall>>,
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct XAIStreamToolCall {
     index: usize,
     id: Option<String>,
@@ -220,28 +236,33 @@ struct XAIStreamToolCall {
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct XAIStreamFunction {
     name: Option<String>,
     arguments: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct XAIErrorResponse {
     error: XAIErrorDetail,
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct XAIErrorDetail {
     message: String,
     r#type: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct XAIModelsResponse {
     data: Vec<XAIModel>,
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct XAIModel {
     id: String,
     owned_by: String,
@@ -427,7 +448,7 @@ impl LLMProvider for XAIProvider {
 
             let mut reader = tokio::io::BufReader::new(
                 tokio_util::io::StreamReader::new(
-                    response.bytes_stream().map(|r| r.map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e)))
+                    response.bytes_stream().map(|r| r.map_err(std::io::Error::other))
                 )
             );
 

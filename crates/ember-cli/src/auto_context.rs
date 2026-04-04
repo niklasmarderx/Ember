@@ -18,6 +18,7 @@ pub struct ContextPart {
 /// Collected auto-context ready for injection.
 pub struct AutoContext {
     pub parts: Vec<ContextPart>,
+    #[allow(dead_code)]
     pub total_tokens: usize,
 }
 
@@ -26,7 +27,10 @@ impl AutoContext {
     pub fn to_prompt_section(&self) -> String {
         let mut out = String::new();
         for part in &self.parts {
-            out.push_str(&format!("\n## Project Context [{}]\n{}\n", part.label, part.content));
+            out.push_str(&format!(
+                "\n## Project Context [{}]\n{}\n",
+                part.label, part.content
+            ));
         }
         out
     }
@@ -168,7 +172,10 @@ impl AutoContextBuilder {
                 if name_str == "target" || name_str == "node_modules" || name_str == ".git" {
                     continue;
                 }
-                let ft = entry.file_type().map(|t| if t.is_dir() { "/" } else { "" }).unwrap_or("");
+                let ft = entry
+                    .file_type()
+                    .map(|t| if t.is_dir() { "/" } else { "" })
+                    .unwrap_or("");
                 tree.push_str(&format!("{}{}\n", name_str, ft));
             }
         }

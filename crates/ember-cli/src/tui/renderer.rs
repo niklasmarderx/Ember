@@ -469,15 +469,15 @@ impl StreamingRenderer {
         } else if line.starts_with("> ") {
             // Blockquote
             let _ = queue!(out, SetForegroundColor(self.renderer.theme.quote));
-            let _ = writeln!(out, "│ {}", &line[2..]);
+            if let Some(stripped) = line.strip_prefix("> ") {
+                let _ = writeln!(out, "│ {stripped}");
+            }
             let _ = queue!(out, ResetColor);
         } else if line.starts_with("- ") || line.starts_with("* ") {
             // List item
             let _ = write!(out, "  • {}", &line[2..]);
             let _ = writeln!(out);
-        } else if line.chars().next().map_or(false, |c| c.is_ascii_digit())
-            && line.contains(". ")
-        {
+        } else if line.chars().next().is_some_and(|c| c.is_ascii_digit()) && line.contains(". ") {
             // Ordered list
             let _ = write!(out, "  {}", line);
             let _ = writeln!(out);

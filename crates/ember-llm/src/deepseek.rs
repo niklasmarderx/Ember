@@ -9,9 +9,8 @@ use std::env;
 use tracing::{debug, instrument};
 
 use crate::{
-    provider::StreamResponse, CompletionRequest, CompletionResponse, ContentPart, Error,
-    FinishReason, ImageSource, LLMProvider, ModelInfo, Result, StreamChunk, TokenUsage, ToolCall,
-    ToolCallDelta,
+    provider::StreamResponse, CompletionRequest, CompletionResponse, Error, FinishReason,
+    LLMProvider, ModelInfo, Result, StreamChunk, TokenUsage, ToolCall, ToolCallDelta,
 };
 
 use tokio_stream::wrappers::ReceiverStream;
@@ -123,9 +122,13 @@ impl LLMProvider for DeepSeekProvider {
             let error_text = response.text().await.unwrap_or_default();
             let error_msg = serde_json::from_str::<DeepSeekError>(&error_text)
                 .map(|e| e.error.message)
-                .unwrap_or_else(|_| if error_text.is_empty() {
-                    format!("HTTP {} (empty response)", status.as_u16())
-                } else { error_text });
+                .unwrap_or_else(|_| {
+                    if error_text.is_empty() {
+                        format!("HTTP {} (empty response)", status.as_u16())
+                    } else {
+                        error_text
+                    }
+                });
 
             return match status.as_u16() {
                 401 => Err(Error::api_key_missing("deepseek")),
@@ -153,9 +156,13 @@ impl LLMProvider for DeepSeekProvider {
             let error_text = response.text().await.unwrap_or_default();
             let error_msg = serde_json::from_str::<DeepSeekError>(&error_text)
                 .map(|e| e.error.message)
-                .unwrap_or_else(|_| if error_text.is_empty() {
-                    format!("HTTP {} (empty response)", status.as_u16())
-                } else { error_text });
+                .unwrap_or_else(|_| {
+                    if error_text.is_empty() {
+                        format!("HTTP {} (empty response)", status.as_u16())
+                    } else {
+                        error_text
+                    }
+                });
 
             return match status.as_u16() {
                 401 => Err(Error::api_key_missing("deepseek")),
@@ -318,6 +325,7 @@ impl LLMProvider for DeepSeekProvider {
 // DeepSeek API types (OpenAI-compatible)
 
 #[derive(Debug, Serialize)]
+#[allow(dead_code)]
 struct DeepSeekRequest {
     model: String,
     messages: Vec<DeepSeekMessage>,
@@ -340,6 +348,7 @@ struct DeepSeekRequest {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+#[allow(dead_code)]
 struct DeepSeekMessage {
     role: String,
     content: DeepSeekContent,
@@ -369,17 +378,20 @@ enum DeepSeekContentPart {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+#[allow(dead_code)]
 struct DeepSeekImageUrl {
     url: String,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+#[allow(dead_code)]
 struct DeepSeekTool {
     r#type: String,
     function: DeepSeekFunction,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+#[allow(dead_code)]
 struct DeepSeekFunction {
     name: String,
     description: String,
@@ -387,6 +399,7 @@ struct DeepSeekFunction {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+#[allow(dead_code)]
 struct DeepSeekToolCall {
     id: String,
     r#type: String,
@@ -394,12 +407,14 @@ struct DeepSeekToolCall {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+#[allow(dead_code)]
 struct DeepSeekFunctionCall {
     name: String,
     arguments: String,
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct DeepSeekResponse {
     id: String,
     model: String,
@@ -408,12 +423,14 @@ struct DeepSeekResponse {
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct DeepSeekChoice {
     message: DeepSeekResponseMessage,
     finish_reason: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct DeepSeekResponseMessage {
     role: String,
     content: Option<String>,
@@ -425,6 +442,7 @@ struct DeepSeekResponseMessage {
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct DeepSeekUsage {
     prompt_tokens: u32,
     completion_tokens: u32,
@@ -440,11 +458,13 @@ struct DeepSeekUsage {
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct DeepSeekError {
     error: DeepSeekErrorDetail,
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct DeepSeekErrorDetail {
     message: String,
     r#type: String,
@@ -455,17 +475,20 @@ struct DeepSeekErrorDetail {
 // Streaming types
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct DeepSeekStreamResponse {
     choices: Vec<DeepSeekStreamChoice>,
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct DeepSeekStreamChoice {
     delta: DeepSeekStreamDelta,
     finish_reason: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct DeepSeekStreamDelta {
     content: Option<String>,
     /// R1 model streams reasoning content separately
@@ -476,6 +499,7 @@ struct DeepSeekStreamDelta {
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct DeepSeekStreamToolCall {
     index: usize,
     id: Option<String>,
@@ -483,6 +507,7 @@ struct DeepSeekStreamToolCall {
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct DeepSeekStreamFunction {
     name: Option<String>,
     arguments: Option<String>,
