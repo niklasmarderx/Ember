@@ -1108,7 +1108,52 @@ fn format_commits(commits: &str) -> String {
     result
 }
 
-fn matches_focus(_message: &str, _focus: ReviewFocus) -> bool {
-    // Simplified - in real implementation would analyze message content
-    true
+fn matches_focus(message: &str, focus: ReviewFocus) -> bool {
+    let msg = message.to_lowercase();
+    match focus {
+        ReviewFocus::All => true,
+        ReviewFocus::Security => {
+            msg.contains("unsafe")
+                || msg.contains("inject")
+                || msg.contains("auth")
+                || msg.contains("secret")
+                || msg.contains("password")
+                || msg.contains("credential")
+                || msg.contains("xss")
+                || msg.contains("csrf")
+                || msg.contains("sanitiz")
+                || msg.contains("vulnerab")
+        }
+        ReviewFocus::Performance => {
+            msg.contains("perf")
+                || msg.contains("slow")
+                || msg.contains("cache")
+                || msg.contains("optim")
+                || msg.contains("allocat")
+                || msg.contains("clone")
+                || msg.contains("O(n")
+                || msg.contains("loop")
+                || msg.contains("batch")
+        }
+        ReviewFocus::Style => {
+            msg.contains("naming")
+                || msg.contains("format")
+                || msg.contains("style")
+                || msg.contains("convention")
+                || msg.contains("indent")
+                || msg.contains("consistent")
+                || msg.contains("readab")
+        }
+        ReviewFocus::Logic => {
+            msg.contains("bug")
+                || msg.contains("error")
+                || msg.contains("wrong")
+                || msg.contains("incorrect")
+                || msg.contains("off-by")
+                || msg.contains("edge case")
+                || msg.contains("null")
+                || msg.contains("panic")
+                || msg.contains("unwrap")
+        }
+    }
 }

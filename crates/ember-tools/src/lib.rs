@@ -62,6 +62,12 @@ pub mod structured_bash;
 #[cfg(feature = "filesystem")]
 pub mod filesystem;
 
+#[cfg(feature = "filesystem")]
+pub mod grep;
+
+#[cfg(feature = "filesystem")]
+pub mod glob;
+
 pub mod patch;
 
 #[cfg(feature = "web")]
@@ -99,6 +105,12 @@ pub use structured_bash::{
 
 #[cfg(feature = "filesystem")]
 pub use filesystem::FilesystemTool;
+
+#[cfg(feature = "filesystem")]
+pub use grep::GrepTool;
+
+#[cfg(feature = "filesystem")]
+pub use glob::GlobTool;
 
 pub use patch::{
     apply_patch, compute_diff, format_unified_diff, reverse_hunks, undo_write, write_file_tracked,
@@ -142,6 +154,12 @@ pub mod prelude {
 
     #[cfg(feature = "filesystem")]
     pub use crate::FilesystemTool;
+
+    #[cfg(feature = "filesystem")]
+    pub use crate::GrepTool;
+
+    #[cfg(feature = "filesystem")]
+    pub use crate::GlobTool;
 
     #[cfg(feature = "web")]
     pub use crate::WebTool;

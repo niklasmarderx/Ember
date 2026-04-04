@@ -35,8 +35,12 @@ pub mod onboarding;
 mod tui;
 
 use commands::{
-    chat, code, completions, config as config_cmd, export, git, history, plugin, serve,
+    chat, code, completions, config as config_cmd, export, git, history,
 };
+#[cfg(feature = "plugins")]
+use commands::plugin;
+#[cfg(feature = "serve")]
+use commands::serve;
 use config::AppConfig;
 
 /// Ember CLI - AI assistant for your terminal.
@@ -125,6 +129,35 @@ pub enum ChatFormat {
     Json,
     /// Markdown formatted output
     Markdown,
+}
+
+/// Stub args for serve command when the feature is disabled.
+#[cfg(not(feature = "serve"))]
+#[derive(clap::Args, Debug)]
+struct ServeArgsStub {
+    #[arg(short, long, default_value = "3000")]
+    port: u16,
+    #[arg(long, default_value = "0.0.0.0")]
+    host: String,
+    #[arg(long)]
+    static_dir: Option<String>,
+}
+
+/// Stub args for plugin command when the feature is disabled.
+#[cfg(not(feature = "plugins"))]
+#[derive(clap::Args, Debug)]
+struct PluginArgsStub {
+    #[command(subcommand)]
+    pub command: PluginActionStub,
+}
+
+#[cfg(not(feature = "plugins"))]
+#[derive(clap::Subcommand, Debug)]
+enum PluginActionStub {
+    /// Install a plugin
+    Install { name: String },
+    /// List installed plugins
+    List,
 }
 
 #[derive(Subcommand)]
@@ -248,7 +281,11 @@ or update individual configuration values.",
     Info,
 
     /// Start Ember's HTTP server for API access.
+    #[cfg(feature = "serve")]
     Serve(serve::ServeArgs),
+    #[cfg(not(feature = "serve"))]
+    /// Start Ember's HTTP server for API access. (requires --features serve)
+    Serve(ServeArgsStub),
 
     /// Export a conversation to JSON, Markdown, or HTML.
     ///
@@ -306,14 +343,7 @@ Search supports filtering by date range and various sorting options.",
     History(history::HistoryArgs),
 
     /// Manage Ember plugins.
-    ///
-    /// Search, install, update, and manage plugins from the Ember marketplace.
-    ///
-    /// Examples:
-    ///   ember plugin search weather
-    ///   ember plugin install weather
-    ///   ember plugin list
-    ///   ember plugin update --all
+    #[cfg(feature = "plugins")]
     #[command(
         about = "Manage Ember plugins.",
         long_about = "Search, install, update, and manage Ember plugins.
@@ -336,6 +366,9 @@ Features:
   ember plugin info weather"
     )]
     Plugin(plugin::PluginArgs),
+    #[cfg(not(feature = "plugins"))]
+    /// Manage Ember plugins. (requires --features plugins)
+    Plugin(PluginArgsStub),
 
     /// AI-powered code intelligence.
     ///
@@ -930,8 +963,17 @@ async fn run() -> Result<()> {
             print_info()?;
         }
 
-        Commands::Serve(args) => {
-            serve::run(args).await?;
+        Commands::Serve(_args) => {
+            #[cfg(feature = "serve")]
+            {
+                serve::run(_args).await?;
+            }
+            #[cfg(not(feature = "serve"))]
+            {
+                eprintln!("{} The 'serve' feature is not enabled in this build.", "[error]".bright_red());
+                eprintln!("  Recompile with: cargo install ember-cli --features serve");
+                std::process::exit(1);
+            }
         }
 
         Commands::Completions { shell } => {
@@ -947,8 +989,17 @@ async fn run() -> Result<()> {
             history::execute(args).await?;
         }
 
-        Commands::Plugin(args) => {
-            plugin::execute(args).await?;
+        Commands::Plugin(_args) => {
+            #[cfg(feature = "plugins")]
+            {
+                plugin::execute(_args).await?;
+            }
+            #[cfg(not(feature = "plugins"))]
+            {
+                eprintln!("{} The 'plugins' feature is not enabled in this build.", "[error]".bright_red());
+                eprintln!("  Recompile with: cargo install ember-cli --features plugins");
+                std::process::exit(1);
+            }
         }
 
         Commands::Code(args) => {
@@ -1069,15 +1120,15 @@ async fn run() -> Result<()> {
                     println!("{}", "Nothing to reset.".dimmed());
                 }
             }
-            LearnAction::Export { output } => {
-                let path = output.as_deref().unwrap_or("ember-preferences.json");
+            LearnAction::Export { output: _ } => {
                 println!(
-                    "{} Exported preferences to {}",
-                    "[ember]".bright_yellow(),
-                    path.bright_green()
+                    "{} Learning export is not yet implemented.",
+                    "[preview]".bright_yellow(),
                 );
-                // Write empty JSON for now
-                let _ = std::fs::write(path, "{\"preferences\": [], \"patterns\": []}");
+                println!(
+                    "  {}",
+                    "This feature will export learned preferences and patterns from your sessions.".dimmed()
+                );
             }
         },
 

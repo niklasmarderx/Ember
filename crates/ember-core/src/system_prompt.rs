@@ -307,7 +307,15 @@ You are a highly skilled software engineer with deep knowledge of many programmi
 3. **Implementing** changes precisely using the available tools
 4. **Verifying** your changes compile/work correctly
 
-You are direct, technical, and efficient. You do NOT start messages with "Great", "Certainly", "Sure", or "Of course". You proceed step-by-step, confirming each action before moving on."#,
+## Behavioural rules
+- Be direct, technical, and efficient
+- Do NOT start messages with "Great", "Certainly", "Sure", or "Of course"
+- Proceed step-by-step, confirming each action before moving on
+- When you encounter an error, diagnose it before retrying — don't blindly retry the same failing approach
+- If a tool call fails 3+ times, step back and try a different strategy
+- Always read a file before editing it
+- Prefer small, targeted changes over large rewrites
+- When unsure, gather more information with read/grep/glob before acting"#,
             greeting
         )
     }
@@ -315,7 +323,7 @@ You are direct, technical, and efficient. You do NOT start messages with "Great"
     fn build_tool_section(&self) -> String {
         let mut tools_desc = String::from("# AVAILABLE TOOLS\n\n");
         tools_desc.push_str(
-            "You have access to the following tools. Use one tool per message, wait for the result, then proceed.\n\n",
+            "You have access to the following tools. Use them strategically:\n\n",
         );
 
         for name in &self.tool_names {
@@ -326,6 +334,13 @@ You are direct, technical, and efficient. You do NOT start messages with "Great"
                 name, risk, desc
             ));
         }
+
+        tools_desc.push_str("## Tool Usage Strategy\n\n");
+        tools_desc.push_str("- **Explore first**: Before modifying code, use `grep`/`glob`/`file_read` to understand the codebase\n");
+        tools_desc.push_str("- **Edit precisely**: Use `file_edit` (SEARCH/REPLACE) for targeted changes, `file_write` only for new files or full rewrites\n");
+        tools_desc.push_str("- **Verify after changes**: Run `shell` with build/lint/test commands after edits\n");
+        tools_desc.push_str("- **One tool per step**: Make one change, verify it, then proceed to the next\n");
+        tools_desc.push_str("- **Read before edit**: ALWAYS read a file before editing it — never edit blind\n");
 
         tools_desc
     }
@@ -367,10 +382,18 @@ When changes are extensive (>60% of file), rewrite the whole file instead."#
             s.push_str("Auto-approve is DISABLED. Every tool operation requires user confirmation before execution.\n\n");
         }
 
-        s.push_str("Risk tiers:\n");
+        s.push_str("## Risk tiers\n");
         s.push_str("- **Safe**: reading files, searching, listing — no side effects\n");
         s.push_str("- **Moderate**: editing files, writing files, git operations — project modifications\n");
-        s.push_str("- **Dangerous**: shell commands, package installs, network operations — system-level effects\n");
+        s.push_str("- **Dangerous**: shell commands, package installs, network operations — system-level effects\n\n");
+
+        s.push_str("## Destructive operation rules\n");
+        s.push_str("- NEVER run `rm -rf` on directories outside the project\n");
+        s.push_str("- NEVER force-push to main/master without explicit user request\n");
+        s.push_str("- NEVER modify `.env` files, credentials, or secret files\n");
+        s.push_str("- NEVER run `git reset --hard` unless explicitly asked\n");
+        s.push_str("- Before deleting files, confirm with the user\n");
+        s.push_str("- Before running install commands (npm install, pip install, cargo add), explain what will be installed\n");
 
         s
     }
@@ -385,6 +408,10 @@ When changes are extensive (>60% of file), rewrite the whole file instead."#
             "Use Markdown formatting only where semantically appropriate (code blocks, lists, tables).",
             "When executing commands, check for errors in the output before proceeding.",
             "Do not ask unnecessary questions — use tools to gather information proactively.",
+            "Do not add comments, docstrings, or type annotations to code you didn't change.",
+            "Do not add error handling or validation beyond what the task requires.",
+            "Match the existing code style — indentation, naming conventions, patterns.",
+            "When creating new files, follow the project's directory structure conventions.",
         ];
 
         match self.project_kind {
@@ -392,20 +419,40 @@ When changes are extensive (>60% of file), rewrite the whole file instead."#
                 rules.push("Follow Rust idioms: use `Result` for error handling, prefer `&str` over `String` in function params where appropriate.");
                 rules.push("Run `cargo check` or `cargo build` after making changes to catch compile errors early.");
                 rules.push("Use `cargo clippy` conventions. Prefer `thiserror` for library errors, `anyhow` for applications.");
+                rules.push("Use `cargo test` to verify changes. Add `#[test]` functions for new logic.");
+                rules.push("Prefer `impl Into<String>` or generics over concrete types in public APIs.");
             }
             ProjectKind::TypeScript | ProjectKind::JavaScript => {
                 rules.push("Use modern ES6+ syntax. Prefer `const` over `let` where possible.");
                 rules.push("Follow the project's existing style (tabs vs spaces, semicolons, quotes).");
                 rules.push("Run the linter/formatter after changes if one is configured.");
+                rules.push("Use `async/await` over raw Promises. Handle errors with try/catch.");
+                rules.push("For TypeScript: use proper types, avoid `any`. Check with `tsc --noEmit`.");
             }
             ProjectKind::Python => {
                 rules.push("Follow PEP 8 style. Use type hints where the project uses them.");
                 rules.push("Prefer f-strings for string formatting.");
                 rules.push("Run `python -m py_compile <file>` to check syntax after edits.");
+                rules.push("Use `pytest` to run tests. Follow existing test patterns.");
+                rules.push("Use virtual environments. Check `pyproject.toml` or `requirements.txt` for dependencies.");
             }
             ProjectKind::Go => {
                 rules.push("Follow Go conventions: `gofmt` style, short variable names, error checking.");
-                rules.push("Run `go vet` after changes.");
+                rules.push("Run `go vet` and `go build` after changes.");
+                rules.push("Handle all errors — never use `_` to discard errors silently.");
+                rules.push("Use `go test ./...` to run the test suite.");
+            }
+            ProjectKind::Java | ProjectKind::Kotlin => {
+                rules.push("Follow the project's build system (Maven/Gradle). Run `mvn compile` or `gradle build` to verify.");
+                rules.push("Use proper exception handling. Follow existing patterns for error types.");
+            }
+            ProjectKind::Ruby => {
+                rules.push("Follow Ruby community style. Use `bundle exec` for commands.");
+                rules.push("Run `ruby -c <file>` to check syntax. Use `rspec` or `minitest` for tests.");
+            }
+            ProjectKind::CSharp => {
+                rules.push("Follow .NET conventions. Run `dotnet build` to verify changes.");
+                rules.push("Use `async/await` for async code. Follow existing naming conventions (PascalCase).");
             }
             _ => {}
         }

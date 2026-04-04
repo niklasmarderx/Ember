@@ -55,6 +55,7 @@ use crate::config::AppConfig;
 use crate::ChatFormat;
 use anyhow::{Context, Result};
 use colored::Colorize;
+#[cfg(feature = "browser")]
 use ember_browser::BrowserTool;
 use ember_core::usage_tracker::SessionUsageTracker;
 use ember_llm::router::is_model_alias;
@@ -63,10 +64,38 @@ use ember_llm::{
     GroqProvider, LLMProvider, Message, MistralProvider, OllamaProvider, OpenAIProvider,
     OpenRouterProvider, RetryConfig, XAIProvider,
 };
+#[cfg(feature = "plugins")]
 use ember_plugins::hooks::{HookContext, HookEvent, HookRunner};
+
+// No-op stubs when plugins feature is disabled
+#[cfg(not(feature = "plugins"))]
+mod hooks_stub {
+    #[derive(Clone, Copy)]
+    pub enum HookEvent { PreToolUse, PostToolUse, PostToolUseFailure }
+    pub struct HookContext {
+        pub event: HookEvent,
+        pub tool_name: String,
+        pub tool_input: String,
+        pub tool_output: Option<String>,
+        pub error: Option<String>,
+    }
+    pub struct HookResult;
+    impl HookResult {
+        pub fn messages(&self) -> &[String] { &[] }
+        pub fn should_block(&self) -> bool { false }
+        pub fn is_denied(&self) -> bool { false }
+    }
+    pub struct HookRunner;
+    impl HookRunner {
+        pub fn new() -> Self { Self }
+        pub fn run(&self, _ctx: &HookContext) -> HookResult { HookResult }
+    }
+}
+#[cfg(not(feature = "plugins"))]
+use hooks_stub::{HookContext, HookEvent, HookRunner};
 use ember_storage::semantic_cache::{SemanticCache, SemanticCacheBuilder};
 use ember_tools::filesystem::undo_last as filesystem_undo_last;
-use ember_tools::{FilesystemTool, GitTool, ShellTool, ToolRegistry, WebTool};
+use ember_tools::{FilesystemTool, GitTool, GlobTool, GrepTool, ShellTool, ToolRegistry, WebTool};
 use futures::StreamExt;
 use rustyline::error::ReadlineError;
 use serde::{Deserialize, Serialize};
@@ -721,12 +750,15 @@ fn create_default_tool_registry(config: &AppConfig) -> ToolRegistry {
     }
     if config.tools.filesystem_enabled {
         registry.register(FilesystemTool::new());
+        registry.register(GrepTool::new());
+        registry.register(GlobTool::new());
     }
     if config.tools.web_enabled {
         registry.register(WebTool::new());
     }
     // Git and browser don't have config flags yet — always register
     registry.register(GitTool::new());
+    #[cfg(feature = "browser")]
     registry.register(BrowserTool::new());
     let count = registry.llm_tool_definitions().len();
     info!("Auto-registered {} tools", count);
@@ -744,8 +776,10 @@ fn create_tool_registry(tool_names: &[String]) -> Result<ToolRegistry> {
                 registry.register(ShellTool::new());
             }
             "filesystem" | "fs" => {
-                info!("Registering filesystem tool");
+                info!("Registering filesystem, grep, glob tools");
                 registry.register(FilesystemTool::new());
+                registry.register(GrepTool::new());
+                registry.register(GlobTool::new());
             }
             "web" | "http" => {
                 info!("Registering web tool");
@@ -756,8 +790,19 @@ fn create_tool_registry(tool_names: &[String]) -> Result<ToolRegistry> {
                 registry.register(GitTool::new());
             }
             "browser" => {
-                info!("Registering browser tool");
-                registry.register(BrowserTool::new());
+                #[cfg(feature = "browser")]
+                {
+                    info!("Registering browser tool");
+                    registry.register(BrowserTool::new());
+                }
+                #[cfg(not(feature = "browser"))]
+                {
+                    warn!("Browser tool requires --features browser");
+                    eprintln!(
+                        "{} Browser tool not available. Recompile with: --features browser",
+                        "[warn]".bright_yellow(),
+                    );
+                }
             }
             other => {
                 warn!("Unknown tool: {}", other);
@@ -2420,7 +2465,8 @@ async fn agent_interactive(
                         match result {
                             Ok(tool_output) => {
                                 // Track success in strategy tracker
-                                strategy_tracker.record(&call.name, tool_output.success, None);
+                                let err_hint = if tool_output.success { None } else { Some(tool_output.output.as_str()) };
+                                strategy_tracker.record(&call.name, tool_output.success, err_hint);
 
                                 let post_ctx = HookContext {
                                     event: HookEvent::PostToolUse,
@@ -2469,16 +2515,23 @@ async fn agent_interactive(
                                 // If strategy tracker suggests switching, inject hint
                                 if strategy_tracker.should_switch_strategy() {
                                     let reflection = strategy_tracker.reflect();
+                                    let label = match reflection.severity {
+                                        3 => "[CRITICAL]".bright_red().bold(),
+                                        2 => "[reflect]".bright_yellow().bold(),
+                                        _ => "[reflect]".bright_yellow(),
+                                    };
                                     println!(
                                         "  {} {}",
-                                        "[reflect]".bright_yellow(),
+                                        label,
                                         reflection.reasoning.dimmed()
                                     );
                                     // Inject a system hint to help the LLM recover
                                     if let Some(ref alt) = reflection.alternative_strategy {
-                                        history.push(Message::system(&format!(
-                                            "[Strategy hint: {}]", alt
-                                        )));
+                                        let hint = format!(
+                                            "[Agent reflection — severity {}/3: {} Suggested action: {}]",
+                                            reflection.severity, reflection.reasoning, alt
+                                        );
+                                        history.push(Message::system(&hint));
                                     }
                                 }
                             }

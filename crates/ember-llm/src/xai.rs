@@ -3,8 +3,6 @@
 //! Implementation for xAI's Grok models including Grok-2 and Grok-2 mini.
 //! Uses OpenAI-compatible API format at api.x.ai
 
-#[cfg(test)]
-use crate::Message;
 use crate::{
     CompletionRequest, CompletionResponse, Error, FinishReason, LLMProvider, ModelInfo, Result,
     Role, StreamChunk, TokenUsage, ToolCall, ToolCallDelta, ToolDefinition,
@@ -603,6 +601,7 @@ fn parse_finish_reason(reason: Option<String>) -> Option<FinishReason> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::Message;
 
     #[test]
     fn test_provider_creation() {

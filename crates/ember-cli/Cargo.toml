@@ -18,9 +18,9 @@ ember-core = { path = "../ember-core" }
 ember-llm = { path = "../ember-llm", features = ["openai", "ollama", "anthropic", "gemini", "groq", "deepseek", "mistral", "openrouter", "xai", "bedrock"] }
 ember-tools = { path = "../ember-tools", features = ["shell", "filesystem", "web", "git"] }
 ember-storage = { path = "../ember-storage", features = ["sqlite"] }
-ember-web = { path = "../ember-web" }
-ember-plugins = { path = "../ember-plugins", features = ["marketplace"] }
-ember-browser = { path = "../ember-browser" }
+ember-web = { path = "../ember-web", optional = true }
+ember-plugins = { path = "../ember-plugins", features = ["marketplace"], optional = true }
+ember-browser = { path = "../ember-browser", optional = true }
 
 # Async runtime
 tokio = { workspace = true, features = ["full", "signal"] }
@@ -89,6 +89,10 @@ libc = "0.2"
 [features]
 default = ["tui"]
 tui = ["dep:ratatui"]
+browser = ["dep:ember-browser"]
+serve = ["dep:ember-web"]
+plugins = ["dep:ember-plugins"]
+full = ["tui", "browser", "serve", "plugins"]
 
 [dev-dependencies]
 assert_cmd = "2.0"

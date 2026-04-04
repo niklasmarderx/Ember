@@ -553,42 +553,23 @@ async fn suggest_refactoring(
         anyhow::bail!("Path does not exist: {}", path.display());
     }
 
-    // Mock refactoring suggestions
-    let suggestions = vec![
-        RefactoringSuggestion {
-            file: path.clone(),
-            line: 42,
-            kind: "ExtractFunction".to_string(),
-            title: "Extract duplicated logic to helper function".to_string(),
-            description: "Lines 42-58 contain logic that appears multiple times. Consider extracting to a reusable function.".to_string(),
-            confidence: "High".to_string(),
-            impact: "Medium".to_string(),
-        },
-        RefactoringSuggestion {
-            file: path.clone(),
-            line: 120,
-            kind: "SimplifyConditional".to_string(),
-            title: "Simplify nested conditionals".to_string(),
-            description: "The nested if-else chain can be simplified using match or early returns.".to_string(),
-            confidence: "Medium".to_string(),
-            impact: "Low".to_string(),
-        },
-        RefactoringSuggestion {
-            file: path.clone(),
-            line: 85,
-            kind: "RenameSymbol".to_string(),
-            title: "Rename ambiguous variable 'x'".to_string(),
-            description: "Variable 'x' should have a more descriptive name like 'user_count' or 'item_index'.".to_string(),
-            confidence: "VeryHigh".to_string(),
-            impact: "Low".to_string(),
-        },
-    ];
+    // Refactoring suggestions are not yet implemented — would require
+    // AST analysis via tree-sitter (available in ember-code crate).
+    println!(
+        "{} Refactoring analysis for {}:",
+        "[preview]".bright_yellow(),
+        path.display().to_string().bright_white()
+    );
+    println!(
+        "  {}",
+        "Refactoring suggestions require AST analysis which is not yet wired into the CLI.".dimmed()
+    );
+    println!(
+        "  {}",
+        "The ember-code crate has a real RefactoringEngine — integration coming soon.".dimmed()
+    );
 
-    // Filter by confidence
-    let filtered: Vec<_> = suggestions
-        .into_iter()
-        .filter(|s| matches_confidence(&s.confidence, min_confidence))
-        .collect();
+    let filtered: Vec<RefactoringSuggestion> = vec![];
 
     match format {
         OutputFormat::Json => {

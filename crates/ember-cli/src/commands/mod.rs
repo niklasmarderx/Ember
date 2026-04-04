@@ -7,6 +7,8 @@ pub mod config;
 pub mod export;
 pub mod git;
 pub mod history;
+#[cfg(feature = "plugins")]
 pub mod plugin;
+#[cfg(feature = "serve")]
 pub mod serve;
 pub mod slash;

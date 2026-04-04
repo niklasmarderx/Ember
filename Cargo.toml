@@ -10,6 +10,8 @@ members = [
     "crates/ember-browser",
     "crates/ember-cli",
     "crates/ember-web",
+]
+exclude = [
     "crates/ember-desktop",
     "crates/ember-telemetry",
     "crates/ember-i18n",

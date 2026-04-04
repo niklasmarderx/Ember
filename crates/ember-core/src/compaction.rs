@@ -407,7 +407,7 @@ pub fn compact_message_history(
 /// Tracks tool execution success/failure to detect when the agent is stuck.
 #[derive(Debug, Clone)]
 pub struct StrategyTracker {
-    recent_results: Vec<(String, bool)>,
+    recent_results: Vec<(String, bool, Option<String>)>,
     consecutive_failures: usize,
 }
 
@@ -418,6 +418,8 @@ pub struct StrategyReflection {
     pub reasoning: String,
     /// Optional alternative approach to try.
     pub alternative_strategy: Option<String>,
+    /// Severity: 1 = mild suggestion, 2 = strong suggestion, 3 = critical
+    pub severity: u8,
 }
 
 impl StrategyTracker {
@@ -430,9 +432,9 @@ impl StrategyTracker {
     }
 
     /// Record a tool execution result.
-    pub fn record(&mut self, tool_name: &str, success: bool, _error: Option<&str>) {
+    pub fn record(&mut self, tool_name: &str, success: bool, error: Option<&str>) {
         self.recent_results
-            .push((tool_name.to_string(), success));
+            .push((tool_name.to_string(), success, error.map(|e| e.to_string())));
         if success {
             self.consecutive_failures = 0;
         } else {
@@ -449,31 +451,89 @@ impl StrategyTracker {
         self.consecutive_failures >= 3
     }
 
-    /// Generate a reflection about what's going wrong.
+    /// Generate a reflection about what's going wrong, with concrete suggestions.
     pub fn reflect(&self) -> StrategyReflection {
-        let recent_failures: Vec<&str> = self
+        let recent_failures: Vec<(&str, Option<&str>)> = self
             .recent_results
             .iter()
             .rev()
             .take(self.consecutive_failures)
-            .map(|(name, _)| name.as_str())
+            .map(|(name, _, err)| (name.as_str(), err.as_deref()))
             .collect();
 
-        let reasoning = format!(
-            "The last {} tool calls failed ({}). Consider a different approach.",
-            self.consecutive_failures,
-            recent_failures.join(", ")
-        );
+        let tool_names: Vec<&str> = recent_failures.iter().map(|(n, _)| *n).collect();
+        let errors: Vec<&str> = recent_failures.iter().filter_map(|(_, e)| *e).collect();
 
-        let alternative = if self.consecutive_failures >= 5 {
-            Some("Try breaking the problem into smaller steps, or ask the user for clarification.".to_string())
+        // Analyze failure patterns
+        let same_tool = tool_names.windows(2).all(|w| w[0] == w[1]);
+        let has_not_found = errors.iter().any(|e| e.contains("not found") || e.contains("No such file"));
+        let has_search_failed = errors.iter().any(|e| e.contains("SEARCH not found"));
+        let has_permission = errors.iter().any(|e| e.contains("denied") || e.contains("permission"));
+        let has_syntax = errors.iter().any(|e| e.contains("syntax") || e.contains("compile") || e.contains("parse"));
+
+        let (reasoning, alternative, severity) = if self.consecutive_failures >= 5 {
+            (
+                format!(
+                    "CRITICAL: {} consecutive failures ({}). The current approach is not working.",
+                    self.consecutive_failures,
+                    tool_names.join(", ")
+                ),
+                Some("Stop and reconsider the approach entirely. Break the problem into smaller steps. Consider reading more files to understand the codebase better, or ask the user for clarification.".to_string()),
+                3u8,
+            )
+        } else if has_search_failed && same_tool {
+            (
+                format!(
+                    "SEARCH/REPLACE blocks are not matching the file content ({} failures). The file may have changed or the search text is incorrect.",
+                    self.consecutive_failures,
+                ),
+                Some("Re-read the file to see its current content, then try the edit again with the exact text from the file.".to_string()),
+                2,
+            )
+        } else if has_not_found {
+            (
+                format!("File or path not found ({} failures). The expected file may not exist at that path.", self.consecutive_failures),
+                Some("Use `glob` to search for the file by name pattern, or `grep` to find it by content.".to_string()),
+                2,
+            )
+        } else if has_permission {
+            (
+                format!("Permission denied ({} failures). The operation is blocked.", self.consecutive_failures),
+                Some("Try a different approach that doesn't require the blocked permission, or ask the user to grant access.".to_string()),
+                2,
+            )
+        } else if has_syntax {
+            (
+                format!("Syntax/compile errors detected ({} failures). The code changes contain errors.", self.consecutive_failures),
+                Some("Read the error output carefully. Fix the specific syntax issue. Consider reverting and trying a simpler change.".to_string()),
+                2,
+            )
+        } else if same_tool {
+            (
+                format!(
+                    "The `{}` tool has failed {} times in a row. Repeating the same call is unlikely to help.",
+                    tool_names.first().unwrap_or(&"unknown"),
+                    self.consecutive_failures,
+                ),
+                Some("Try a different tool or different arguments. Read more context before retrying.".to_string()),
+                2,
+            )
         } else {
-            Some("Try a different tool or different arguments.".to_string())
+            (
+                format!(
+                    "The last {} tool calls failed ({}). Consider a different approach.",
+                    self.consecutive_failures,
+                    tool_names.join(", ")
+                ),
+                Some("Try a different tool or different arguments.".to_string()),
+                1,
+            )
         };
 
         StrategyReflection {
             reasoning,
             alternative_strategy: alternative,
+            severity,
         }
     }
 }
