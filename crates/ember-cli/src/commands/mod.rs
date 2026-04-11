@@ -13,6 +13,7 @@ pub mod history;
 #[cfg(feature = "plugins")]
 pub mod plugin;
 pub mod provider_factory;
+pub mod providers;
 pub mod risk;
 #[cfg(feature = "serve")]
 pub mod serve;

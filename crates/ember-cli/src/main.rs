@@ -619,6 +619,23 @@ Supported shells:
         #[arg(value_enum)]
         shell: Shell,
     },
+
+    /// List available LLM providers and their configuration status.
+    ///
+    /// Shows which providers are ready to use (API key configured) and
+    /// which ones still need a key. Includes default model names and
+    /// links to get API keys.
+    ///
+    /// Examples:
+    ///   ember providers
+    #[command(
+        about = "List available LLM providers and their status.",
+        long_about = "Show all supported LLM providers with their current configuration status.\n\n\
+For each provider, indicates whether an API key is present, the default model, \n\
+and where to get a key if one is missing.",
+        after_help = "Examples:\n  ember providers\n  ember chat --provider groq"
+    )]
+    Providers,
 }
 
 #[derive(Subcommand)]
@@ -972,6 +989,10 @@ async fn run() -> Result<()> {
         Commands::Completions { shell } => {
             completions::generate_completions::<Cli>(shell)?;
             completions::print_installation_instructions(shell);
+        }
+
+        Commands::Providers => {
+            commands::providers::list_providers();
         }
 
         Commands::Export(args) => {
