@@ -126,7 +126,10 @@ pub fn list_providers() {
         let (status_label, status_detail) = key_status(provider.env_var);
 
         let status_display = match status_label {
-            "ready" | "local" => format!(" {} ", status_label).bright_white().on_green().bold(),
+            "ready" | "local" => format!(" {} ", status_label)
+                .bright_white()
+                .on_green()
+                .bold(),
             _ => format!(" {} ", status_label).bright_white().on_red().bold(),
         };
 
@@ -147,11 +150,7 @@ pub fn list_providers() {
                 "○".bright_green()
             );
         } else if status_label == "ready" {
-            println!(
-                "         {} {} is set",
-                "●".bright_green(),
-                status_detail
-            );
+            println!("         {} {} is set", "●".bright_green(), status_detail);
         } else {
             println!(
                 "         {} {} not found — get a key at {}",
@@ -169,7 +168,10 @@ pub fn list_providers() {
         PROVIDERS.len()
     );
     println!();
-    println!("  Use with:  {}", "ember chat --provider <name>".bright_cyan());
+    println!(
+        "  Use with:  {}",
+        "ember chat --provider <name>".bright_cyan()
+    );
     println!(
         "  Configure: {}",
         "ember config set provider.default <name>".bright_cyan()

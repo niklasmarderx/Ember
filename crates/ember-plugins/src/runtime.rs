@@ -120,7 +120,6 @@ impl PluginRuntime {
         #[cfg(feature = "wasmtime")]
         let engine = {
             let mut wasm_config = Config::new();
-            wasm_config.async_support(true);
             if config.enable_fuel {
                 wasm_config.consume_fuel(true);
             }

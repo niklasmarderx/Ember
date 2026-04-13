@@ -96,8 +96,8 @@ dirs = "6"
 regex = "1"
 
 # WASM runtime (for plugins)
-wasmtime = "29"
-wasmtime-wasi = "29"
+wasmtime = "43"
+wasmtime-wasi = "43"
 
 # TUI (Terminal UI)
 ratatui = "0.27"
