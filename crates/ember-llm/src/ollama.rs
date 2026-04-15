@@ -11,6 +11,20 @@ use crate::{
     LLMProvider, ModelInfo, Result, StreamChunk, TokenUsage,
 };
 
+fn map_connect_error(e: reqwest::Error, base_url: &str) -> Error {
+    if e.is_connect() || e.is_request() && e.to_string().contains("connection refused") {
+        Error::provider_unavailable(
+            "ollama",
+            format!(
+                "Could not connect to Ollama at {}. Is Ollama running? Start it with: ollama serve",
+                base_url
+            ),
+        )
+    } else {
+        Error::provider_unavailable("ollama", format!("Failed to connect: {}", e))
+    }
+}
+
 use tokio_stream::wrappers::ReceiverStream;
 
 const DEFAULT_BASE_URL: &str = "http://localhost:11434";
@@ -91,9 +105,7 @@ impl LLMProvider for OllamaProvider {
             .json(&ollama_request)
             .send()
             .await
-            .map_err(|e| {
-                Error::provider_unavailable("ollama", format!("Failed to connect: {}", e))
-            })?;
+            .map_err(|e| map_connect_error(e, &self.base_url))?;
 
         let status = response.status();
 
@@ -119,9 +131,7 @@ impl LLMProvider for OllamaProvider {
             .json(&ollama_request)
             .send()
             .await
-            .map_err(|e| {
-                Error::provider_unavailable("ollama", format!("Failed to connect: {}", e))
-            })?;
+            .map_err(|e| map_connect_error(e, &self.base_url))?;
 
         let status = response.status();
 
@@ -190,9 +200,7 @@ impl LLMProvider for OllamaProvider {
             .get(format!("{}/api/tags", self.base_url))
             .send()
             .await
-            .map_err(|e| {
-                Error::provider_unavailable("ollama", format!("Failed to connect: {}", e))
-            })?;
+            .map_err(|e| map_connect_error(e, &self.base_url))?;
 
         if !response.status().is_success() {
             return Err(Error::api_error(
@@ -221,9 +229,11 @@ impl LLMProvider for OllamaProvider {
     }
 
     async fn health_check(&self) -> Result<()> {
-        self.client.get(&self.base_url).send().await.map_err(|e| {
-            Error::provider_unavailable("ollama", format!("Ollama is not running: {}", e))
-        })?;
+        self.client
+            .get(&self.base_url)
+            .send()
+            .await
+            .map_err(|e| map_connect_error(e, &self.base_url))?;
         Ok(())
     }
 
@@ -361,5 +371,17 @@ mod tests {
         let provider = OllamaProvider::new();
         assert_eq!(provider.name(), "ollama");
         assert_eq!(provider.default_model(), "llama3.2");
+    }
+
+    #[test]
+    fn test_ollama_connection_refused_message() {
+        // Verify the error message format for connection refused errors
+        let err = Error::provider_unavailable(
+            "ollama",
+            "Could not connect to Ollama at http://localhost:11434. Is Ollama running? Start it with: ollama serve",
+        );
+        let msg = err.to_string();
+        assert!(msg.contains("ollama serve"));
+        assert!(msg.contains("localhost:11434"));
     }
 }
