@@ -1056,8 +1056,6 @@ async fn run() -> Result<()> {
             );
             println!("  {}", "─".repeat(65));
 
-            use futures::future::join_all;
-
             let futures = model_list.iter().map(|model| {
                 crate::commands::bench::bench_models(&config, &task, &vec![model.clone()])
             });
