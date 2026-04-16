@@ -18,6 +18,7 @@ ember-core = { path = "../ember-core" }
 ember-llm = { path = "../ember-llm", features = ["openai", "ollama", "anthropic", "gemini", "groq", "deepseek", "mistral", "openrouter", "xai", "bedrock"] }
 ember-tools = { path = "../ember-tools", features = ["shell", "filesystem", "web", "git"] }
 ember-storage = { path = "../ember-storage", features = ["sqlite"] }
+futures = "0.3"
 ember-web = { path = "../ember-web", optional = true }
 ember-plugins = { path = "../ember-plugins", features = ["marketplace"], optional = true }
 ember-browser = { path = "../ember-browser", optional = true }
