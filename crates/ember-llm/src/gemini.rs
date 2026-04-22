@@ -16,15 +16,15 @@ use crate::{
 use tokio_stream::wrappers::ReceiverStream;
 
 const DEFAULT_BASE_URL: &str = "https://generativelanguage.googleapis.com/v1beta";
-const DEFAULT_MODEL: &str = "gemini-2.0-flash-exp";
+const DEFAULT_MODEL: &str = "gemini-2.0-flash";
 
 /// Google Gemini API provider
 ///
 /// Supports the latest Gemini models including:
-/// - gemini-2.0-flash-exp (default, fast and capable)
-/// - gemini-1.5-pro (best quality)
-/// - gemini-1.5-flash (fast, cost-effective)
-/// - gemini-1.5-flash-8b (lightweight)
+/// - gemini-2.5-pro (most capable, with thinking)
+/// - gemini-2.0-flash (default, fast and capable)
+/// - gemini-1.5-pro (high quality)
+/// - gemini-1.5-flash (cost-effective)
 ///
 /// # Example
 ///
@@ -34,7 +34,7 @@ const DEFAULT_MODEL: &str = "gemini-2.0-flash-exp";
 /// #[tokio::main]
 /// async fn main() -> Result<(), Box<dyn std::error::Error>> {
 ///     let provider = GeminiProvider::from_env()?;
-///     let request = CompletionRequest::new("gemini-2.0-flash-exp")
+///     let request = CompletionRequest::new("gemini-2.0-flash")
 ///         .with_message(Message::user("Hello!"));
 ///     let response = provider.complete(request).await?;
 ///     println!("{}", response.content);
@@ -751,7 +751,7 @@ mod tests {
 
     #[test]
     fn test_gemini_request_conversion() {
-        let request = CompletionRequest::new("gemini-2.0-flash-exp")
+        let request = CompletionRequest::new("gemini-2.0-flash")
             .with_message(Message::system("You are helpful"))
             .with_message(Message::user("Hello"))
             .with_temperature(0.7);
@@ -766,7 +766,7 @@ mod tests {
 
     #[test]
     fn test_gemini_multimodal_request() {
-        let request = CompletionRequest::new("gemini-2.0-flash-exp")
+        let request = CompletionRequest::new("gemini-2.0-flash")
             .with_message(Message::user("Describe this image"))
             .with_temperature(0.5);
 

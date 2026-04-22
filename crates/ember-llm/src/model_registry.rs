@@ -271,9 +271,129 @@ impl ModelRegistry {
             deprecated: false,
             replacement: None,
         });
+
+        self.register(ModelMetadata {
+            id: "o3".to_string(),
+            name: "o3".to_string(),
+            provider: "openai".to_string(),
+            description: Some("Full o3 reasoning model".to_string()),
+            context_window: 200000,
+            max_output_tokens: 100000,
+            input_price_per_1k: 0.01,
+            output_price_per_1k: 0.04,
+            cached_input_price_per_1k: Some(0.005),
+            capabilities: ModelCapabilities {
+                tools: true,
+                vision: true,
+                audio: false,
+                streaming: true,
+                json_mode: true,
+                reasoning: true,
+                code_execution: false,
+            },
+            released: Some("2025-04-16".to_string()),
+            deprecated: false,
+            replacement: None,
+        });
+
+        self.register(ModelMetadata {
+            id: "o4-mini".to_string(),
+            name: "o4 Mini".to_string(),
+            provider: "openai".to_string(),
+            description: Some("Fast reasoning model with vision support".to_string()),
+            context_window: 200000,
+            max_output_tokens: 100000,
+            input_price_per_1k: 0.0011,
+            output_price_per_1k: 0.0044,
+            cached_input_price_per_1k: Some(0.00055),
+            capabilities: ModelCapabilities {
+                tools: true,
+                vision: true,
+                audio: false,
+                streaming: true,
+                json_mode: true,
+                reasoning: true,
+                code_execution: false,
+            },
+            released: Some("2025-04-16".to_string()),
+            deprecated: false,
+            replacement: None,
+        });
+
+        self.register(ModelMetadata {
+            id: "gpt-4.1".to_string(),
+            name: "GPT-4.1".to_string(),
+            provider: "openai".to_string(),
+            description: Some("Flagship model for complex tasks, 1M context".to_string()),
+            context_window: 1047576,
+            max_output_tokens: 32768,
+            input_price_per_1k: 0.002,
+            output_price_per_1k: 0.008,
+            cached_input_price_per_1k: Some(0.0005),
+            capabilities: ModelCapabilities {
+                tools: true,
+                vision: true,
+                audio: false,
+                streaming: true,
+                json_mode: true,
+                reasoning: false,
+                code_execution: false,
+            },
+            released: Some("2025-04-14".to_string()),
+            deprecated: false,
+            replacement: None,
+        });
+
+        self.register(ModelMetadata {
+            id: "gpt-4.1-mini".to_string(),
+            name: "GPT-4.1 Mini".to_string(),
+            provider: "openai".to_string(),
+            description: Some("Affordable GPT-4.1 variant, 1M context".to_string()),
+            context_window: 1047576,
+            max_output_tokens: 32768,
+            input_price_per_1k: 0.0004,
+            output_price_per_1k: 0.0016,
+            cached_input_price_per_1k: Some(0.0001),
+            capabilities: ModelCapabilities {
+                tools: true,
+                vision: true,
+                audio: false,
+                streaming: true,
+                json_mode: true,
+                reasoning: false,
+                code_execution: false,
+            },
+            released: Some("2025-04-14".to_string()),
+            deprecated: false,
+            replacement: None,
+        });
     }
 
     fn register_anthropic_models(&mut self) {
+        self.register(ModelMetadata {
+            id: "claude-3-7-sonnet-20250219".to_string(),
+            name: "Claude 3.7 Sonnet".to_string(),
+            provider: "anthropic".to_string(),
+            description: Some("Hybrid reasoning model with extended thinking".to_string()),
+            context_window: 200000,
+            max_output_tokens: 64000,
+            input_price_per_1k: 0.003,
+            output_price_per_1k: 0.015,
+            cached_input_price_per_1k: Some(0.0003),
+            capabilities: ModelCapabilities {
+                tools: true,
+                vision: true,
+                audio: false,
+                streaming: true,
+                json_mode: true,
+                reasoning: true,
+                code_execution: false,
+            },
+            released: Some("2025-02-19".to_string()),
+            deprecated: false,
+            replacement: None,
+        });
+
         self.register(ModelMetadata {
             id: "claude-3-5-sonnet-20241022".to_string(),
             name: "Claude 3.5 Sonnet".to_string(),
@@ -349,10 +469,58 @@ impl ModelRegistry {
 
     fn register_google_models(&mut self) {
         self.register(ModelMetadata {
-            id: "gemini-2.0-flash-exp".to_string(),
+            id: "gemini-2.5-pro".to_string(),
+            name: "Gemini 2.5 Pro".to_string(),
+            provider: "gemini".to_string(),
+            description: Some("Most capable Gemini model with thinking".to_string()),
+            context_window: 1048576,
+            max_output_tokens: 65536,
+            input_price_per_1k: 0.00125,
+            output_price_per_1k: 0.01,
+            cached_input_price_per_1k: Some(0.0003125),
+            capabilities: ModelCapabilities {
+                tools: true,
+                vision: true,
+                audio: true,
+                streaming: true,
+                json_mode: true,
+                reasoning: true,
+                code_execution: true,
+            },
+            released: Some("2025-03-25".to_string()),
+            deprecated: false,
+            replacement: None,
+        });
+
+        self.register(ModelMetadata {
+            id: "gemini-2.0-flash".to_string(),
             name: "Gemini 2.0 Flash".to_string(),
             provider: "gemini".to_string(),
-            description: Some("Latest Gemini model, multimodal, fast".to_string()),
+            description: Some("Fast multimodal model with tool use and code execution".to_string()),
+            context_window: 1048576,
+            max_output_tokens: 8192,
+            input_price_per_1k: 0.0001,
+            output_price_per_1k: 0.0004,
+            cached_input_price_per_1k: Some(0.000025),
+            capabilities: ModelCapabilities {
+                tools: true,
+                vision: true,
+                audio: true,
+                streaming: true,
+                json_mode: true,
+                reasoning: false,
+                code_execution: true,
+            },
+            released: Some("2025-02-05".to_string()),
+            deprecated: false,
+            replacement: None,
+        });
+
+        self.register(ModelMetadata {
+            id: "gemini-2.0-flash-exp".to_string(),
+            name: "Gemini 2.0 Flash (exp)".to_string(),
+            provider: "gemini".to_string(),
+            description: Some("Experimental Gemini 2.0 Flash — use gemini-2.0-flash instead".to_string()),
             context_window: 1000000,
             max_output_tokens: 8192,
             input_price_per_1k: 0.0,
@@ -368,8 +536,8 @@ impl ModelRegistry {
                 code_execution: true,
             },
             released: Some("2024-12-11".to_string()),
-            deprecated: false,
-            replacement: None,
+            deprecated: true,
+            replacement: Some("gemini-2.0-flash".to_string()),
         });
 
         self.register(ModelMetadata {
@@ -817,7 +985,8 @@ mod tests {
         let registry = ModelRegistry::new();
         assert!(registry.get("gpt-4o").is_some());
         assert!(registry.get("claude-3-5-sonnet-20241022").is_some());
-        assert!(registry.get("gemini-2.0-flash-exp").is_some());
+        assert!(registry.get("gemini-2.0-flash").is_some());
+        assert!(registry.get("gemini-2.5-pro").is_some());
         assert!(registry.get("deepseek-chat").is_some());
     }
 
