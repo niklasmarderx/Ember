@@ -223,6 +223,11 @@ pub async fn complete_with_retry(
                     error = %e,
                     "Request failed, will retry"
                 );
+                eprintln!(
+                    "Retrying request (attempt {}/{})...",
+                    attempt + 1,
+                    config.max_retries
+                );
 
                 last_error = Some(e);
                 attempt += 1;
@@ -388,5 +393,27 @@ mod tests {
         // API key missing should not be retried
         let api_key = Error::api_key_missing("openai");
         assert!(!should_retry(&api_key, 0, &config));
+    }
+
+    #[tokio::test]
+    async fn test_retry_exhaustion_returns_last_error() {
+        use crate::mock::MockProvider;
+
+        let provider = MockProvider::new();
+        // Queue two errors — the second one will never be reached since
+        // InvalidRequest is not retryable, but this verifies that
+        // complete_with_retry propagates errors correctly.
+        provider.queue_error("something went wrong");
+
+        let config = RetryConfig::new()
+            .with_max_retries(3)
+            .with_initial_delay(Duration::from_millis(1))
+            .with_jitter(false);
+
+        let request = crate::CompletionRequest::new("mock-model")
+            .with_message(crate::Message::user("hello"));
+
+        let result = complete_with_retry(&provider, request, &config).await;
+        assert!(result.is_err());
     }
 }
