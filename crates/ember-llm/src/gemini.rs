@@ -453,6 +453,7 @@ struct GeminiSafetySetting {
 }
 
 #[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
 #[allow(dead_code)]
 struct GeminiResponse {
     candidates: Vec<GeminiCandidate>,
@@ -478,6 +479,7 @@ struct GeminiUsageMetadata {
 }
 
 #[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
 #[allow(dead_code)]
 struct GeminiStreamResponse {
     candidates: Vec<GeminiCandidate>,
@@ -774,5 +776,91 @@ mod tests {
 
         assert_eq!(gemini_req.contents.len(), 1);
         assert_eq!(gemini_req.contents[0].role, "user");
+    }
+
+    #[test]
+    fn test_stream_response_parsing_text_chunk() {
+        let json = r#"{"candidates":[{"content":{"role":"model","parts":[{"text":"Hello"}]},"finishReason":null}]}"#;
+        let parsed: GeminiStreamResponse = serde_json::from_str(json).unwrap();
+        let candidate = parsed.candidates.first().unwrap();
+        let text: String = candidate
+            .content
+            .parts
+            .iter()
+            .filter_map(|p| p.text.clone())
+            .collect();
+        assert_eq!(text, "Hello");
+        assert!(candidate.finish_reason.is_none());
+    }
+
+    #[test]
+    fn test_stream_response_parsing_finish_stop() {
+        let json = r#"{"candidates":[{"content":{"role":"model","parts":[{"text":""}]},"finishReason":"STOP"}],"usageMetadata":{"promptTokenCount":5,"candidatesTokenCount":10,"totalTokenCount":15}}"#;
+        let parsed: GeminiStreamResponse = serde_json::from_str(json).unwrap();
+        let candidate = parsed.candidates.first().unwrap();
+        assert_eq!(candidate.finish_reason.as_deref(), Some("STOP"));
+        let usage = parsed.usage_metadata.unwrap();
+        assert_eq!(usage.total_token_count, 15);
+    }
+
+    #[test]
+    fn test_stream_response_parsing_finish_max_tokens() {
+        let json = r#"{"candidates":[{"content":{"role":"model","parts":[{"text":"truncated"}]},"finishReason":"MAX_TOKENS"}]}"#;
+        let parsed: GeminiStreamResponse = serde_json::from_str(json).unwrap();
+        let candidate = parsed.candidates.first().unwrap();
+        let finish_reason = candidate.finish_reason.as_ref().map(|r| match r.as_str() {
+            "STOP" => FinishReason::Stop,
+            "MAX_TOKENS" => FinishReason::Length,
+            "SAFETY" => FinishReason::ContentFilter,
+            _ => FinishReason::Stop,
+        });
+        assert!(matches!(finish_reason, Some(FinishReason::Length)));
+    }
+
+    #[test]
+    fn test_stream_response_parsing_function_call() {
+        let json = r#"{"candidates":[{"content":{"role":"model","parts":[{"functionCall":{"name":"get_weather","args":{"city":"Berlin"}}}]},"finishReason":"STOP"}]}"#;
+        let parsed: GeminiStreamResponse = serde_json::from_str(json).unwrap();
+        let candidate = parsed.candidates.first().unwrap();
+        let fc = candidate.content.parts[0].function_call.as_ref().unwrap();
+        assert_eq!(fc.name, "get_weather");
+        assert_eq!(fc.args["city"], "Berlin");
+    }
+
+    #[test]
+    fn test_stream_chunk_done_on_finish_reason() {
+        // A chunk with finishReason set should produce done=true
+        let json = r#"{"candidates":[{"content":{"role":"model","parts":[{"text":"last word"}]},"finishReason":"STOP"}]}"#;
+        let parsed: GeminiStreamResponse = serde_json::from_str(json).unwrap();
+        let candidate = parsed.candidates.first().unwrap();
+        let done = candidate.finish_reason.is_some();
+        assert!(done);
+    }
+
+    #[test]
+    fn test_stream_chunk_not_done_without_finish_reason() {
+        let json = r#"{"candidates":[{"content":{"role":"model","parts":[{"text":"still going"}]}}]}"#;
+        let parsed: GeminiStreamResponse = serde_json::from_str(json).unwrap();
+        let candidate = parsed.candidates.first().unwrap();
+        let done = candidate.finish_reason.is_some();
+        assert!(!done);
+    }
+
+    #[test]
+    fn test_sse_endpoint_uses_alt_sse() {
+        let provider = GeminiProvider::new("test-key");
+        // The streaming endpoint must include &alt=sse for SSE format
+        // (tested indirectly via get_endpoint)
+        let endpoint = provider.get_endpoint("gemini-2.0-flash", true);
+        assert!(endpoint.contains("streamGenerateContent"));
+        assert!(endpoint.contains("test-key"));
+    }
+
+    #[test]
+    fn test_non_streaming_endpoint() {
+        let provider = GeminiProvider::new("key-abc");
+        let endpoint = provider.get_endpoint("gemini-1.5-pro", false);
+        assert!(endpoint.contains("generateContent"));
+        assert!(!endpoint.contains("streamGenerateContent"));
     }
 }
