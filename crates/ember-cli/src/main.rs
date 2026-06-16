@@ -5,14 +5,13 @@
 //!   ember chat                           # Interactive chat mode
 //!   ember config init                    # Initialize configuration
 //!   ember config show                    # Show current configuration
-
 #![allow(clippy::too_many_arguments)]
 #![allow(clippy::wildcard_in_or_patterns)]
 #![allow(clippy::if_same_then_else)]
 #![allow(clippy::manual_div_ceil)]
 #![allow(clippy::derivable_impls)]
 #![allow(clippy::module_name_repetitions)]
-
+use futures::future::join_all;
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand, ValueEnum};
 use clap_complete::Shell;
@@ -1057,7 +1056,12 @@ async fn run() -> Result<()> {
             );
             println!("  {}", "─".repeat(65));
 
-            let results = crate::commands::bench::bench_models(&config, &task, &model_list).await;
+            let futures = model_list.iter().map(|model| {
+                crate::commands::bench::bench_models(&config, &task, &vec![model.clone()])
+            });
+            
+            let results_nested = join_all(futures).await;
+            let results: Vec<_> = results_nested.into_iter().flatten().collect();
             for r in &results {
                 if let Some(ref err) = r.error {
                     let display_model = format!("{} ({})", r.model, r.provider);
