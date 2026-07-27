@@ -55,7 +55,7 @@ jobs:
             --html
 
       - name: Upload HTML report
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: coverage-report
           path: target/llvm-cov/html/
@@ -99,7 +99,7 @@ jobs:
             --json --output-path coverage-${{ matrix.crate }}.json
 
       - name: Upload crate coverage
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: coverage-${{ matrix.crate }}
           path: coverage-${{ matrix.crate }}.json
@@ -155,7 +155,7 @@ jobs:
         continue-on-error: true
 
       - name: Upload mutation report
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: always()
         with:
           name: mutation-report
