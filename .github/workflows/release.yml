@@ -235,7 +235,7 @@ jobs:
     continue-on-error: true
     steps:
       - name: Update Homebrew tap
-        uses: mislav/bump-homebrew-formula-action@v3
+        uses: mislav/bump-homebrew-formula-action@v4
         with:
           formula-name: ember
           homebrew-tap: ${{ github.repository_owner }}/homebrew-tap
