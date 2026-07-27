@@ -80,7 +80,7 @@ jobs:
           (Get-FileHash ${{ matrix.asset_name }} -Algorithm SHA256).Hash.ToLower() + "  ${{ matrix.asset_name }}" | Out-File ${{ matrix.asset_name }}.sha256
           
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ${{ matrix.asset_name }}
           path: |

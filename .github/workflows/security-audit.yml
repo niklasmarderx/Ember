@@ -98,7 +98,7 @@ jobs:
         run: cargo tree --all-features > dependency-tree.txt
 
       - name: Upload dependency tree
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: dependency-tree
           path: dependency-tree.txt
